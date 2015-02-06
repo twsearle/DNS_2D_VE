@@ -1,0 +1,11 @@
+# Use global syntax
+syntax: glob
+
+*.pyc
+*~
+*.swp
+*.DS_Store
+*.o
+*.h5
+*.dat
+*.pickle
