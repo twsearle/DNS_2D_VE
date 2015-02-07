@@ -627,10 +627,10 @@ def to_spectral_2(in2D, CNSTS):
     ## remove the aliased modes and copy into output
     out2D[:, :N+1] = tmp[:M, :N+1]
     out2D[:, N+1:] = tmp[:M, 2*Nf+1-N:]
-    print "is the temp matrix spectrum of real space?"
-    print allclose(tmp[:Mf, 1:Nf+1], conj(tmp[:Mf, 2*Nf+1:Nf:-1])) 
-    print "is the output matrix spectrum of real space?",
-    print allclose(out2D[:, 1:N+1], conj(out2D[:M, 2*N+1:N:-1])) 
+    #print "is the temp matrix spectrum of real space?"
+    #print allclose(tmp[:Mf, 1:Nf+1], conj(tmp[:Mf, 2*Nf+1:Nf:-1])) 
+    #print "is the output matrix spectrum of real space?",
+    #print allclose(out2D[:, 1:N+1], conj(out2D[:M, 2*N+1:N:-1])) 
 
     return out2D
 
@@ -716,8 +716,6 @@ def test_roll_profile(CNSTS):
     print '1 2D transform method', allclose(actualSpec, inverseTest2)
     print '1 2D transform method', allclose(actualSpec, inverseTest3)
 
-    print inverseTest2
-
 
     if CNSTS['dealiasing'] == False:
         print 'and if you start from real space? ', allclose(GLreal, to_physical(to_spectral(GLreal, CNSTS), CNSTS))
@@ -736,6 +734,7 @@ def test_roll_profile(CNSTS):
 
     print 'actual real space = transformed analytic spectrum?', allclose(GLreal,
                                                                          physicalTest)
+
     # To get both transforms to be forward transforms, need to flip Fourier
     # modes and renormalise
     physicalTest2 = real(to_physical_2(actualSpec,CNSTS))
@@ -746,13 +745,13 @@ def test_roll_profile(CNSTS):
     #print 'difference Fourier dir: ', (physicalTest2-physicalTest)[M/2,:]
     #print 'difference Cheby dir: ', (physicalTest2-physicalTest)[:,N/2]
 
-    #plot(real(physicalTest[:,100]), 'b')
-    #plot(real(GLreal[:,100]), 'r+')
-    #show()
+    plot(y_points, real(physicalTest[:,10]), 'b')
+    plot(y_points, real(GLreal[:,10]), 'r+')
+    show()
 
-    #plot(real(physicalTest[M/2,:]), 'b')
-    #plot(real(GLreal[M/2,:]), 'r+')
-    #show()
+    plot(x_points, real(physicalTest[M/2,:]), 'b')
+    plot(x_points, real(GLreal[M/2,:]), 'r+')
+    show()
 
     #imshow(real(GLreal) - real(physicalTest), origin='lower')
     #colorbar()
@@ -851,137 +850,6 @@ def test_roll_profile(CNSTS):
     Test mixed derivatives:
     -----------------------
     """
-
-
-
-
-
-def test_diff(CNSTS, testFunc=lambda x: 1-x**2):
-
-    """
-    Check correctness of x,y differentiation.
-
-    I differentiate the profile in all directions in turn: x, y
-
-    Then I move onto a mixed profile. a superposition of 2 functions in the 2
-    directions and check that differentiation works.
-
-    """
-
-    M = CNSTS['M']
-    N = CNSTS['N']
-    Lx = CNSTS['Lx']
-    Ly = CNSTS['Ly']
-
-    print '\n----------------------------------------'
-    print '2D differentiation of a function'
-    print '-----------------------------------------'
-
-    # y
-    print '\n-------------------'
-    print 'testing y direction'
-    print '-------------------'
-    testVec = zeros((M, 2*N+1), dtype='complex')
-
-    y_points = cos(pi*arange(M) / (M-1))
-
-    testVec[:,0] = testFunc(y_points)
-
-    testVec = to_spectral(testVec, CNSTS)
-    yParabola = testVec[:,0]
-
-
-    derivVec = dy(testVec, CNSTS)
-    realVec = to_physical(derivVec, CNSTS)
-
-    fig = figure()
-    fig.suptitle('y direction')
-    xlabel('y')
-    plot(y_points, realVec[:, 0], 'g+')
-    show()
-
-    # x
-    #print '\n-------------------'
-    #print 'testing x direction'
-    #print '-------------------'
-    #testVec = zeros((M, 2*N+1), dtype='complex')
-
-    #x_points = Lx*arange(2*N+1) / (2*N) - Lx/2.
-    #xParabola = fftpack.fft(testFunc(x_points))
-
-    #testVec[0,:] = xParabola
-
-    #derivVec = dx(testVec, CNSTS)
-
-    #realVec = to_physical(derivVec, CNSTS)
-
-    #fig = figure()
-    #fig.suptitle('x direction')
-    #xlabel('x')
-    #plot(x_points, realVec[0, :], 'g+')
-    #plot(x_points, realVec[2, :], 'r.')
-    #show()
-
-    # Parabolas in both directions at the same time
-    print '\n--------------------------------------------------------'
-    print 'testing parabolas in both directions at the same time'
-    print '----------------------------------------------------------'
-
-    print 'not implemented yet!'
-
-    #testVec = zeros((M, 2*N+1), dtype='complex')
-
-    #testVec[:,0] = (2*N+1) * yParabola
-    #testVec[0,:] += xParabola
-
-    #realdy = dy(testVec, CNSTS)
-    #realdx = dx(testVec, CNSTS)
-
-    #print 'transform y derivative'
-    #realdy = to_physical(realdy, CNSTS)
-    #print 'transform x derivative'
-    #realdx = to_physical(realdx, CNSTS)
-
-    #_fail = False
-
-    #for _m in range(M):
-    #    for _n in range(2*N+1):
-    #        if not allclose(realdx[_m, _n, :], realdx[0, 0, :], atol=1e-6):
-    #            print '(y, z)', _m, _n
-    #            _fail = True
-    #            break
-
-    #if _fail:
-    #    print 'Error: the partial derivative w.r.t x is not independent'
-    #    print '\tof the other directions'
-    #    _fail = False
-    #else: 
-    #    print 'the partial derivative w.r.t x is y,z independent'
-
-    #for _n in range(2*N+1):
-    #    for _i in range(2*L+1):
-    #        if not allclose(realdy[:, _n, _i], realdy[:, 0, 0], atol=1e-6):
-    #            print '(z, x)', _n, _i
-    #            _fail = True
-    #            break
-
-    #if _fail:
-    #    print 'Error: the partial derivative w.r.t y is not independent'
-    #    print '\tof the other directions'
-    #    _fail = False
-    #else: 
-    #    print 'the partial derivative w.r.t y is z,x independent'
-
-
-    #fig = figure()
-    #fig.suptitle('partial derivatives of $f = 1-x^2 + 1-y^2 + 1-z^2$')
-    #xlabel('$x_i$')
-    #ylabel('$\partial_{i} f $')
-    #plot(x_points, -2*x_points, 'b')
-    #plot(x_points, realdx[0, 0, :], 'b+')
-    #plot(y_points, realdy[:, 0, 0], 'g.')
-    #plot(z_points, realdz[0, :, :], 'rx')
-    #show()
 
 def test_prods(CNSTS):
     """
@@ -1357,13 +1225,13 @@ def test_c_version(CNSTS):
 
 if __name__ == "__main__":
 
-    CNSTS = set_constants(M=40, N=5, kx=1.31, dealiasing=False)
+    CNSTS = set_constants(M=40, N=20, kx=1.31, dealiasing=False)
 
-    #test_roll_profile(CNSTS)
+    test_roll_profile(CNSTS)
 
     #test_diff(CNSTS, testFunc=lambda x: 1-x**2)
 
     #test_prods(CNSTS)
 
-    test_c_version(CNSTS)
+    #test_c_version(CNSTS)
 
