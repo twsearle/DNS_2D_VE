@@ -634,6 +634,53 @@ def to_spectral_2(in2D, CNSTS):
 
     return out2D
 
+def increase_resolution(vec, NOld, MOld, CNSTS):
+    """increase resolution from Nold, Mold to N, M and return the higher res
+    vector"""
+    N = CNSTS["N"]
+    M = CNSTS["M"]
+
+    highMres = zeros((2*NOld+1)*M, dtype ='complex')
+
+    for n in range(2*NOld+1):
+        highMres[n*M:n*M + MOld] = vec[n*MOld:(n+1)*MOld]
+    del n
+    fullres = zeros((2*N+1)*M, dtype='complex')
+    fullres[(N-NOld)*M:(N-NOld)*M + M*(2*NOld+1)] = highMres[0:M*(2*NOld+1)]
+    return fullres
+
+def decrease_resolution(vec, NOld, MOld, CNSTS):
+    """ 
+    decrease both the N and M resolutions
+    """
+    N = CNSTS["N"]
+    M = CNSTS["M"]
+
+    lowMvec = zeros((2*NOld+1)*M, dtype='complex')
+    for n in range(2*NOld+1):
+        lowMvec[n*M:(n+1)*M] = vec[n*MOld:n*MOld + M]
+    del n
+
+    lowNMvec = zeros((2*N+1)*M, dtype='D')
+    lowNMvec = lowMvec[(NOld-N)*M:(NOld-N)*M + (2*N+1)*M]
+
+    return lowNMvec
+
+def decide_resolution(vec, NOld, MOld, CNSTS):
+    """
+    Choose to increase or decrease resolution depending on values of N,M
+    NOld,MOld.
+    """
+    N = CNSTS["N"]
+    M = CNSTS["M"]
+    if N >= NOld and M >= MOld:
+        ovec = increase_resolution(vec, NOld, MOld, CNSTS)
+
+    elif N <= NOld and M <= MOld:
+        ovec = decrease_resolution(vec, NOld, MOld, CNSTS)
+
+    return ovec
+
 def load_hdf5_state(filename):
     f = h5py.File(filename, "r")
     inarr = array(f["psi"])
@@ -674,7 +721,9 @@ def test_roll_profile(CNSTS):
     actualSpec = (2*Nf+1) * V
 
     y_points = cos(pi*arange(Mf)/(Mf-1))
-    x_points = linspace(0, 2.-(2./(2*Nf+1)), 2*Nf+1)
+    #x_points = linspace(0, 2.-(2./(2*Nf+1)), 2*Nf+1)
+    xlen = 2*pi / kx
+    x_points = linspace(0, xlen-(xlen/(2*Nf+1)), 2*Nf+1)
 
     GLreal = zeros((Mf, 2*Nf+1), 'complex')
 
@@ -753,9 +802,12 @@ def test_roll_profile(CNSTS):
     plot(x_points, real(GLreal[M/2,:]), 'r+')
     show()
 
-    #imshow(real(GLreal) - real(physicalTest), origin='lower')
-    #colorbar()
-    #show()
+    imshow(real(GLreal),  origin='lower')
+    colorbar()
+    show()
+    imshow(real(physicalTest),  origin='lower')
+    colorbar()
+    show()
 
     #print 'the maximum difference in the arrays ', amax(real(GLreal) -real(physicalTest))
 
@@ -804,9 +856,6 @@ def test_roll_profile(CNSTS):
 
     print 'dyy of the spectrum is the same as a double application of dy? ',\
             allclose(to_physical(yyDerivTest, CNSTS), to_physical(tmpTest, CNSTS))
-
-    print (tmpTest - yyDerivTest)[:, 1]
-    print dyy(ones((M,2*N+1)), CNSTS)[:,1]
 
     tmpTest = d3y(actualSpec, CNSTS)
 
@@ -915,20 +964,21 @@ def test_c_version(CNSTS):
     oneOverC = ones(M)
     oneOverC[0] = 1. / 2.
 
-    # V = zeros((M, 2*N+1), dtype = 'complex')
+    #V = zeros((M, 2*N+1), dtype = 'complex')
 
-    # for m in range(0,M,2):
-    #     V[m, 1] = 2*oneOverC[m]*( ((-1)**(m/2))*(special.jv(m,p)/cos(p)) - 
-    #                 special.iv(m,gamma)/cosh(gamma) )
-    #     V[m, 2*N] = 2*oneOverC[m]*( ((-1)**(m/2))*(special.jv(m,p)/cos(p)) - 
-    #                 special.iv(m,gamma)/cosh(gamma) )
-    # del m        
+    #for m in range(0,M,2):
+    #    V[m, 1] = 2*oneOverC[m]*( ((-1)**(m/2))*(special.jv(m,p)/cos(p)) - 
+    #                special.iv(m,gamma)/cosh(gamma) )
+    #    V[m, 2*N] = 2*oneOverC[m]*( ((-1)**(m/2))*(special.jv(m,p)/cos(p)) - 
+    #                special.iv(m,gamma)/cosh(gamma) )
+    #del m        
 
-    # Normal = ( cos(p)*cosh(gamma) ) / ( cosh(gamma) - cos(p) )
-    # V = 0.5 * Normal * V
-    # actualSpec = (2*N+1) * V
+    #Normal = ( cos(p)*cosh(gamma) ) / ( cosh(gamma) - cos(p) )
+    #V = 0.5 * Normal * V
+    #actualSpec = (2*N+1) * V
 
     #actualSpec, _ = pickle.load(open('pf-N5-M40-kx1.31-Re3000.0.pickle', 'r'))
+    #actualSpec = decide_resolution(actualSpec, 5, 40, CNSTS)
     #actualSpec = actualSpec.reshape(2*N+1, M).T
     #actualSpec = ifftshift(actualSpec, axes=1)
     #actualSpec[:,5] = 0
@@ -937,13 +987,13 @@ def test_c_version(CNSTS):
 
     # insert stupider spectrum
     actualSpec = zeros((M,2*N+1), dtype='complex')
-    #actualSpec[:,5] = r_[0:M]
-    actualSpec[:M/3, 0] = r_[0:M/3]
-    #actualSpec[2*M/3:,0] = actualSpec[2*M/3:,0] * 1e-6 * rand(M-2*M/3)*1.j
-    #actualSpec[2*M/3:,5] = actualSpec[2*M/3:,5] * 1e-6 * rand(M-2*M/3)*1.j
+    #actualSpec[:M/3,5] = r_[M/3:0:-1]
+    #actualSpec[:M/3, 0] = r_[M/3:0:-1]
+    actualSpec[2*M/3:,0] = actualSpec[2*M/3:,0] * 1e-6 * rand(M-2*M/3)*1.j
+    actualSpec[2*M/3:,5] = actualSpec[2*M/3:,5] * 1e-6 * rand(M-2*M/3)*1.j
     #actualSpec[:,2*N-4] = r_[0:M]
     #actualSpec[:2*M/3,1:2*N/3 + 1] = rand(2*M/3, 2*N/3) + 1.j*rand(2*M/3, 2*N/3)
-    #actualSpec[:, N+1:] = conj(fliplr(actualSpec[:, 1:N+1]))
+    actualSpec[:, N+1:] = conj(fliplr(actualSpec[:, 1:N+1]))
     #actualSpec[:M, 1:N + 1] = rand(M, N) + 1.j*rand(M, N)
     #actualSpec[:, N+1:] = conj(fliplr(actualSpec[:, 1:N+1]))
 
@@ -1080,7 +1130,8 @@ def test_c_version(CNSTS):
     print 'checking python fft products are equal to matrix method products'
     # print 'vdyypsi'
 
-    # matvdyypsi = dot(tsm.prod_mat(-matdx), matdyypsi)
+    # matvdyypsi = dot(tsm.prod_mat(-matdx), matdyypsi)/(2*N+1)
+
 
     # physv = to_physical_2(-dxSpec, CNSTS)
     # physdyy = to_physical_2(dy(dy(actualSpec, CNSTS), CNSTS), CNSTS)
@@ -1092,7 +1143,7 @@ def test_c_version(CNSTS):
     #     print "mode", -n, linalg.norm(matvdyypsi[(N-n)*M: (N+1-n)*M] - vdyypsi[:, 2*N+1-n])
 
     # matvdyypsi2D = matvdyypsi.reshape(2*N+1, M).T
-    # matvdyypsi2D = ifftshift(matvdyypsi2D, axes=-1)
+    # matvdyypsi2D = ifftshift(matvdyypsi2D, axes=-1) 
 
     # print allclose(matvdyypsi2D, vdyypsi)
     # print linalg.norm(matvdyypsi2D - vdyypsi)
@@ -1102,24 +1153,30 @@ def test_c_version(CNSTS):
     print 'psipsi'
     psiR = to_physical_2(actualSpec, CNSTS)
     psipsi = to_spectral_2(psiR*psiR, CNSTS)
-    matpsipsi = dot(tsm.prod_mat(flatspec), flatspec)
+    matpsipsi = dot(tsm.prod_mat(flatspec), flatspec)/(2*N+1)
     matpsipsi2D = matpsipsi.reshape(2*N+1, M).T
-    matpsipsi2D = ifftshift(matpsipsi2D, axes=-1)
+    matpsipsi2D = ifftshift(matpsipsi2D, axes=-1) 
 
-    print "mode", 0, linalg.norm(matpsipsi[(N)*M:(N+1)*M] - psipsi[:, 0])
-    for n in range(1,N+1):
-        print "mode", n, linalg.norm(matpsipsi[(N+n)*M:(N+1+n)*M] - psipsi[:, n])
-        print "mode", -n, linalg.norm(matpsipsi[(N-n)*M: (N+1-n)*M] - psipsi[:, 2*N+1-n])
+    if not allclose(matpsipsi2D, psipsi):
+        print "mode", 0, linalg.norm(matpsipsi[(N)*M:(N+1)*M] - psipsi[:, 0])
+        for n in range(1,N+1):
+            print "mode", n, linalg.norm(matpsipsi[(N+n)*M:(N+1+n)*M] - psipsi[:, n])
+            print "mode", -n, linalg.norm(matpsipsi[(N-n)*M: (N+1-n)*M] - psipsi[:, 2*N+1-n])
 
-    matpsipsi2D = matpsipsi.reshape(2*N+1, M).T
-    matpsipsi2D = ifftshift(matpsipsi2D, axes=-1)
+        matpsipsi2D = matpsipsi.reshape(2*N+1, M).T
+        matpsipsi2D = ifftshift(matpsipsi2D, axes=-1)
 
-    print allclose(matpsipsi2D, psipsi)
-    print linalg.norm(matpsipsi2D - psipsi)
-    print "pick on one mode 0,2", psipsi[0,1], matpsipsi2D[0,1]
-    print matpsipsi2D
-    print psipsi
-    exit(1)
+        print linalg.norm(matpsipsi2D - psipsi)
+        print "pick on one mode 0,2", psipsi[0,1], matpsipsi2D[0,1]
+        imshow(real(psiR*psiR), origin='lower')
+        colorbar()
+        show()
+        rsmat =real(to_physical_2(matpsipsi2D, CNSTS))
+        imshow(rsmat, origin='lower')
+        colorbar()
+        show()
+        print linalg.norm(rsmat-psiR*psiR)
+        exit(1)
 
 
     # the normalisation factor comes in becuase we are doing a single 2D fft
@@ -1225,13 +1282,13 @@ def test_c_version(CNSTS):
 
 if __name__ == "__main__":
 
-    CNSTS = set_constants(M=40, N=20, kx=1.31, dealiasing=False)
+    CNSTS = set_constants(M=40, N=20, kx=1.31, dealiasing=True)
 
-    test_roll_profile(CNSTS)
+    #test_roll_profile(CNSTS)
 
     #test_diff(CNSTS, testFunc=lambda x: 1-x**2)
 
     #test_prods(CNSTS)
 
-    #test_c_version(CNSTS)
+    test_c_version(CNSTS)
 

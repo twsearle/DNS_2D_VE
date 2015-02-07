@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri  6 Feb 23:29:25 2015
+// Last modified: Sat  7 Feb 10:19:05 2015
 
 /* Program Description:
  *
@@ -57,14 +57,14 @@ int main()
 {
     flow_params params;
 
-    params.N = 5;
+    params.N = 20;
     params.M = 40;
     params.Ly = 2.;
     params.kx = 1.31;
     params.Re = 400;
     params.Wi = 1e-05;
     params.beta = 1.0;
-    params.dealiasing = 0;
+    params.dealiasing = 1;
 
     if (params.dealiasing)
     {

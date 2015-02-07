@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Fri  6 Feb 22:08:43 2015
+#   Last modified: Sat  7 Feb 10:31:39 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -519,7 +519,7 @@ udxlplc = load_hdf5_state("./output/udxlplpsi.h5").reshape(2*N+1, M).T
 udxlplc = fftshift(udxlplc, axes=1)
 udxlplc = udxlplc.T.flatten()
 
-UDXLPLPSI = dot(prod_mat(U), dot(MDX, LPLPSI))
+UDXLPLPSI = dot(prod_mat(U), dot(MDX, LPLPSI)) / (2*N+1)
 
 print 'udxlolpsi ?', allclose(UDXLPLPSI, udxlplc)
 if not allclose(UDXLPLPSI, udxlplc):
@@ -546,7 +546,7 @@ vdylplc = load_hdf5_state("./output/vdylplpsi.h5").reshape(2*N+1, M).T
 vdylplc = fftshift(vdylplc, axes=1)
 vdylplc = vdylplc.T.flatten()
 
-VDYLPLPSI = dot(prod_mat(V), dot(MDY, LPLPSI))
+VDYLPLPSI = dot(prod_mat(V), dot(MDY, LPLPSI)) / (2*N+1)
 
 print 'vdylplpsi ?', allclose(VDYLPLPSI, vdylplc)
 if not allclose(VDYLPLPSI, vdylplc):
@@ -555,11 +555,11 @@ if not allclose(VDYLPLPSI, vdylplc):
     #print 'VDYLPLPSI1c', vdylplc[M: 2*M]
     print 'difference', (VDYLPLPSI-vdylplc)[N*M+38::M]
 
-vdyyc = load_hdf5_state("./output/vdylplpsi.h5").reshape(2*N+1, M).T 
+vdyyc = load_hdf5_state("./output/vdyypsi.h5").reshape(2*N+1, M).T 
 vdyyc = fftshift(vdyyc, axes=1)
 vdyyc = vdyyc.T.flatten()
 
-VDYU = dot(prod_mat(V), dot(MDY, U))
+VDYU = dot(prod_mat(V), dot(MDY, dot(MDY, PSI))) / (2*N+1)
 
 print 'vdyypsi ?', allclose(VDYU, vdyyc)
 if not allclose(VDYU, vdyyc):
