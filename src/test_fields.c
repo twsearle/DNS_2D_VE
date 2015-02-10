@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Sat  7 Feb 10:19:05 2015
+// Last modified: Tue 10 Feb 11:20:41 2015
 
 /* Program Description:
  *
@@ -57,14 +57,14 @@ int main()
 {
     flow_params params;
 
-    params.N = 20;
-    params.M = 40;
+    params.N = 10;
+    params.M = 60;
     params.Ly = 2.;
     params.kx = 1.31;
     params.Re = 400;
     params.Wi = 1e-05;
     params.beta = 1.0;
-    params.dealiasing = 1;
+    params.dealiasing = 1.0;
 
     if (params.dealiasing)
     {
@@ -85,8 +85,9 @@ int main()
     int M = params.M;
     int Nf = params.Nf;
     int Mf = params.Mf;
+
     fftw_complex *arrin, *physout, *derivout, *scratchin, *scratchout, *phystest;
-    fftw_complex *specout, *specout2, *scratch;
+    fftw_complex *specout, *specout2, *scratch, *physout2, *physout3;
     fftw_plan phys_plan, spec_plan;
     char infn[20] = "initial.h5";
 
@@ -115,12 +116,14 @@ int main()
     scratch = (fftw_complex*) fftw_malloc(M*(2*N+1) * sizeof(fftw_complex));
 
     physout = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
+    physout2 = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
+    physout3 = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
     phystest = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
     scratchin = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
     scratchout = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
 
     //Set up some dft plans
-    phys_plan = fftw_plan_dft_2d(2*Nf+1, 2*Mf-2,  scratchin, scratchout, FFTW_FORWARD, FFTW_ESTIMATE);
+    phys_plan = fftw_plan_dft_2d(2*Nf+1, 2*Mf-2,  scratchin, scratchout, FFTW_BACKWARD, FFTW_ESTIMATE);
     spec_plan = fftw_plan_dft_2d(2*Nf+1, 2*Mf-2,  scratchin, scratchout, FFTW_FORWARD, FFTW_ESTIMATE);
 
     // load the initial field from scipy
@@ -162,14 +165,38 @@ int main()
     //npy_save_double_complex("testd4y.npy", 0, 1, shape, &scratch[0]);
     save_hdf5_state("testd4y.h5", scratch, params);
 
+
+
     to_physical(arrin, physout, scratchin, scratchout, &phys_plan, params);
+    to_physical(arrin, physout3, scratchin, scratchout, &phys_plan, params);
     //npy_save_double_complex("testPhysicalT.npy", 0, 1, shapefft, &physout[0]);
     save_hdf5_arr("testPhysicalT.h5", physout, shapefft[0]);
+
+    // Test a product
+    for (i=0; i<2*Nf+1; i++)
+    {
+	for (j=0; j<Mf; j++)
+	{
+	    physout2[indfft(i,j)] = physout[indfft(i,j)]*physout3[indfft(i,j)];
+	}
+	
+    }
+    save_hdf5_arr("psipsiR.h5", physout2, shapefft[0]);
+
+    to_spectral(physout2, specout, scratchin, scratchout, &spec_plan, params);
+    save_hdf5_state("psipsi.h5", specout, params);
 
     to_spectral(physout, specout, scratchin, scratchout, &spec_plan, params);
     //npy_save_double_complex("testSpectralT.npy", 0, 1, shape, &specout[0]);
     save_hdf5_state("testSpectralT.h5", specout, params);
 
+    fft_convolve(arrin, arrin, specout, physout2, physout3, scratchin, scratchout,
+	    &phys_plan, &spec_plan, params);
+    save_hdf5_state("fft_convolve.h5", specout, params);
+
+
+
+    // Test transforms from physical space
     for (i=0; i<2*Nf+1; i++)
     {
 	for (j=0; j<Mf; j++)

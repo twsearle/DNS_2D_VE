@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri  6 Feb 17:57:52 2015
+// Last modified: Mon  9 Feb 22:53:11 2015
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -40,6 +40,11 @@ void to_physical(fftw_complex *arrin, fftw_complex *arrout,
 void to_spectral(fftw_complex *arrin, fftw_complex *arrout,
 		 fftw_complex *scratchin, fftw_complex *scratchout,
 		 fftw_plan *spec_plan,  flow_params cnsts);
+
+void fft_convolve(fftw_complex *arr1, fftw_complex *arr2, fftw_complex *arrout,
+	fftw_complex *scratchp1, fftw_complex *scratchp2, fftw_complex
+	*scratchin, fftw_complex *scratchout, fftw_plan *physplan, fftw_plan
+	*spec_plan, flow_params cnsts);
 
 void save_hdf5_state(char *filename, fftw_complex *arr, flow_params cnsts);
 

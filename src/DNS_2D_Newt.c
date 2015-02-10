@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri  6 Feb 23:23:14 2015
+// Last modified: Mon  9 Feb 22:57:22 2015
 
 /* Program Description:
  *
@@ -172,8 +172,7 @@ int main(int argc, char **argv)
     fftw_complex *scratchin, *scratchout;
     fftw_complex *psi, *u, *v, *udxlplpsi, *vdylplpsi, *biharmpsi, *lplpsi;
     fftw_complex *dyyypsi, *dypsi, *vdyypsi;
-    fftw_complex *physu, *physv, *physdxlplpsi, *physdylplpsi, *physdyypsi;
-    fftw_complex *physudxlplpsi, *physvdylplpsi, *physvdyypsi;
+    fftw_complex *scratchp1, *scratchp2;
 
     fftw_complex *RHSvec;
     double norm;
@@ -223,21 +222,15 @@ int main(int argc, char **argv)
     scratchin = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
     scratchout = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
 
-    physu = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
-    physv = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
-    physdxlplpsi = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
-    physudxlplpsi = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
-    physdylplpsi = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
-    physvdylplpsi = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
-    physdyypsi = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
-    physvdyypsi = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
+    scratchp1 = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
+    scratchp2 = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
 
     RHSvec = (fftw_complex*) fftw_malloc(M * sizeof(fftw_complex));
 
     // Set up some dft plans
     printf("\n------\nSetting up fftw3 plans\n------\n");
     phys_plan = fftw_plan_dft_2d(2*Nf+1, 2*Mf-2,  scratchin, scratchout,
-			 FFTW_FORWARD, fftwFlag);
+			 FFTW_BACKWARD, fftwFlag);
     spec_plan = fftw_plan_dft_2d(2*Nf+1, 2*Mf-2,  scratchin, scratchout,
 			 FFTW_FORWARD, fftwFlag);
 
@@ -321,7 +314,7 @@ int main(int argc, char **argv)
 	//}
 	
 
-	to_physical(u, physu, scratchin, scratchout, &phys_plan, params);
+      // to_physical(u, scratchp1, scratchin, scratchout, &phys_plan, params);
 
       // v
       dx(psi, v, params);
@@ -338,7 +331,7 @@ int main(int argc, char **argv)
           save_hdf5_state("./output/v.h5", &v[0], params);
       }
 
-	to_physical(v, physv, scratchin, scratchout, &phys_plan, params);
+	//to_physical(v, scratchp2, scratchin, scratchout, &phys_plan, params);
 
 	// lplpsi dyy(psi) + dxx(psi)
 
@@ -413,17 +406,8 @@ int main(int argc, char **argv)
 	    save_hdf5_state("./output/dxlplpsi.h5", &udxlplpsi[0], params);
 	}
 
-	to_physical(udxlplpsi, physdxlplpsi, scratchin, scratchout, &phys_plan, params);
-
-	for(i=0; i<2*Nf+1; i++)
-	{
-	    for(j=0; j<Mf; j++)
-	    {
-		physudxlplpsi[indfft(i,j)] = physu[indfft(i,j)]*physdxlplpsi[indfft(i,j)];
-	    }
-	}
-
-	to_spectral(physudxlplpsi, udxlplpsi, scratchin, scratchout, &spec_plan, params);
+	fft_convolve(udxlplpsi, u, udxlplpsi, scratchp1, scratchp2, scratchin,
+		scratchout, &phys_plan, &spec_plan, params);
 
 	if(timeStep==0)
 	{
@@ -437,17 +421,8 @@ int main(int argc, char **argv)
 	    save_hdf5_state("./output/dylplpsi.h5", &vdylplpsi[0], params);
 	}
 
-	to_physical(vdylplpsi, physdylplpsi, scratchin, scratchout, &phys_plan, params);
-
-	for(i=0; i<2*Nf+1; i++)
-	{
-	    for(j=0; j<Mf; j++)
-	    {
-		physvdylplpsi[indfft(i,j)] = physv[indfft(i,j)]*physdylplpsi[indfft(i,j)];
-	    }
-	}
-
-	to_spectral(physvdylplpsi, vdylplpsi, scratchin, scratchout, &spec_plan, params);
+	fft_convolve(vdylplpsi, v, vdylplpsi, scratchp1, scratchp2, scratchin,
+		scratchout, &phys_plan, &spec_plan, params);
 
 	if(timeStep==0)
 	{
@@ -456,19 +431,9 @@ int main(int argc, char **argv)
 	
 	//vdyypsi = vdyu
 	dy(u, vdyypsi, params);
-	dy(vdyypsi, dyyypsi, params);
 
-	to_physical(vdyypsi, physdyypsi, scratchin, scratchout, &phys_plan, params);
-
-	for(i=0; i<2*N+1; i++)
-	{
-	    for(j=0; j<M; j++)
-	    {
-		physvdyypsi[indfft(i,j)] = physv[indfft(i,j)]*physdyypsi[indfft(i,j)];
-	    }
-	}
-
-	to_spectral(physvdyypsi, vdyypsi, scratchin, scratchout, &spec_plan, params);
+	fft_convolve(vdyypsi, v, vdyypsi, scratchp1, scratchp2, scratchin,
+		scratchout, &phys_plan, &spec_plan, params);
 
 	if(timeStep==0)
 	{
@@ -626,11 +591,8 @@ int main(int argc, char **argv)
     fftw_free(vdylplpsi);
     fftw_free(lplpsi);
     fftw_free(biharmpsi);
-    fftw_free(physu);
-    fftw_free(physv);
-    fftw_free(physdxlplpsi);
-    fftw_free(physdylplpsi);
-    fftw_free(physdyypsi);
+    fftw_free(scratchp1);
+    fftw_free(scratchp2);
     fftw_free(dyyypsi);
     fftw_free(dypsi);
     fftw_free(vdyypsi);

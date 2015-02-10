@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Sat  7 Feb 10:31:39 2015
+#   Last modified: Mon  9 Feb 22:59:35 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -64,6 +64,7 @@ Re = config.getfloat('General', 'Re')
 Wi = 0.0
 beta = 1.0
 kx = config.getfloat('General', 'kx')
+
 dealiasing = False
 if dealiasing:
     Nf = 3*N/2
@@ -80,8 +81,8 @@ fp.close()
 numTimeSteps = int(totTime / dt)
 assert not (totTime % dt), "non-integer number of time steps!"
 
-NOld = N 
-MOld = M
+NOld = 5
+MOld = 40 
 kwargs = {'N': N, 'M': M, 'Re': Re,'Wi': Wi, 'beta': beta, 'kx': kx,'time':
           totTime, 'dt':dt, 'dealiasing':dealiasing }
 baseFileName  = "-N{N}-M{M}-kx{kx}-Re{Re}-b{beta}-Wi{Wi}-dt{dt}.pickle".format(**kwargs)
@@ -193,6 +194,52 @@ def load_hdf5_state(filename):
     return inarr
 
 
+def increase_resolution(vec, NOld, MOld, CNSTS):
+    """increase resolution from Nold, Mold to N, M and return the higher res
+    vector"""
+    N = CNSTS["N"]
+    M = CNSTS["M"]
+
+    highMres = zeros((2*NOld+1)*M, dtype ='complex')
+
+    for n in range(2*NOld+1):
+        highMres[n*M:n*M + MOld] = vec[n*MOld:(n+1)*MOld]
+    del n
+    fullres = zeros((2*N+1)*M, dtype='complex')
+    fullres[(N-NOld)*M:(N-NOld)*M + M*(2*NOld+1)] = highMres[0:M*(2*NOld+1)]
+    return fullres
+
+def decrease_resolution(vec, NOld, MOld, CNSTS):
+    """ 
+    decrease both the N and M resolutions
+    """
+    N = CNSTS["N"]
+    M = CNSTS["M"]
+
+    lowMvec = zeros((2*NOld+1)*M, dtype='complex')
+    for n in range(2*NOld+1):
+        lowMvec[n*M:(n+1)*M] = vec[n*MOld:n*MOld + M]
+    del n
+
+    lowNMvec = zeros((2*N+1)*M, dtype='D')
+    lowNMvec = lowMvec[(NOld-N)*M:(NOld-N)*M + (2*N+1)*M]
+
+    return lowNMvec
+
+def decide_resolution(vec, NOld, MOld, CNSTS):
+    """
+    Choose to increase or decrease resolution depending on values of N,M
+    NOld,MOld.
+    """
+    N = CNSTS["N"]
+    M = CNSTS["M"]
+    if N >= NOld and M >= MOld:
+        ovec = increase_resolution(vec, NOld, MOld, CNSTS)
+
+    elif N <= NOld and M <= MOld:
+        ovec = decrease_resolution(vec, NOld, MOld, CNSTS)
+
+    return ovec
 
 
 # -----------------------------------------------------------------------------
@@ -259,16 +306,17 @@ PSI = zeros((2*N+1)*M,dtype='complex')
 #PSI[N*M+3] += -1.0/12.0
 
 # some junk to put in as a test.
-PSI[(N-2)*M+ 0]   += 1
-PSI[(N-2)*M+ 1] += 1
-PSI[(N-2)*M+ 2] += 2.0
-PSI[(N-2)*M+ 3] += 1
-PSI[(N-2)*M+ 4] += 3
- 
-PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
+#PSI[(N-2)*M+ 0]   += 1
+#PSI[(N-2)*M+ 1] += 1
+#PSI[(N-2)*M+ 2] += 2.0
+#PSI[(N-2)*M+ 3] += 1
+#PSI[(N-2)*M+ 4] += 3
+# 
+#PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
 
 # Read in stream function from file
-#`(PSI, Nu) = pickle.load(open(inFileName,'r'))
+(PSI, Nu) = pickle.load(open(inFileName,'r'))
+PSI = decide_resolution(PSI, NOld, MOld, CNSTS)
 
 
 # Form the operators
@@ -385,7 +433,7 @@ else:
             "{0:e}".format(CNSTS["Re"]), "-W", "{0:e}".format(CNSTS["Wi"]),\
             "-b", "{0:e}".format(CNSTS["beta"]), "-t", \
             "{0:e}".format(CNSTS["dt"]), "-s",\
-          "{0:d}".format(stepsPerFrame), "-T", "{0:d}".format(numTimeSteps),"-d"
+          "{0:d}".format(stepsPerFrame), "-T", "{0:d}".format(numTimeSteps)
 
 subprocess.call(cargs)
 
@@ -519,14 +567,16 @@ udxlplc = load_hdf5_state("./output/udxlplpsi.h5").reshape(2*N+1, M).T
 udxlplc = fftshift(udxlplc, axes=1)
 udxlplc = udxlplc.T.flatten()
 
-UDXLPLPSI = dot(prod_mat(U), dot(MDX, LPLPSI)) / (2*N+1)
+UDXLPLPSI = dot(prod_mat(U), dot(MDX, LPLPSI))
 
 print 'udxlolpsi ?', allclose(UDXLPLPSI, udxlplc)
 if not allclose(UDXLPLPSI, udxlplc):
     print 'difference', linalg.norm(UDXLPLPSI-udxlplc)
-    #print 'UDXLPLPSI1', UDXLPLPSI[M: 2*M]
-    #print 'UDXLPLPSI1c', udxlplc[M: 2*M]
-    print 'difference', (UDXLPLPSI-udxlplc)[N*M+38::M]
+    print 'relative difference', linalg.norm(UDXLPLPSI-udxlplc)/linalg.norm(udxlplc)
+
+    print "max difference", amax(UDXLPLPSI-udxlplc)
+    print "max difference arg", argmax(UDXLPLPSI-udxlplc)
+
     print "mode 0", linalg.norm(UDXLPLPSI[N*M:(N+1)*M]-udxlplc[N*M:(N+1)*M])
     for n in range(1,N+1):
         print "mode", n, linalg.norm(UDXLPLPSI[(N+n)*M:(N+n+1)*M]-udxlplc[(N+n)*M:(N+n+1)*M])
@@ -546,11 +596,12 @@ vdylplc = load_hdf5_state("./output/vdylplpsi.h5").reshape(2*N+1, M).T
 vdylplc = fftshift(vdylplc, axes=1)
 vdylplc = vdylplc.T.flatten()
 
-VDYLPLPSI = dot(prod_mat(V), dot(MDY, LPLPSI)) / (2*N+1)
+VDYLPLPSI = dot(prod_mat(V), dot(MDY, LPLPSI))
 
 print 'vdylplpsi ?', allclose(VDYLPLPSI, vdylplc)
 if not allclose(VDYLPLPSI, vdylplc):
     print 'difference', linalg.norm(VDYLPLPSI-vdylplc)
+    print 'relative difference', linalg.norm(VDYLPLPSI-vdylplc)/linalg.norm(vdylplc)
     #print 'VDYLPLPSI1', VDYLPLPSI[M: 2*M]
     #print 'VDYLPLPSI1c', vdylplc[M: 2*M]
     print 'difference', (VDYLPLPSI-vdylplc)[N*M+38::M]
@@ -559,7 +610,7 @@ vdyyc = load_hdf5_state("./output/vdyypsi.h5").reshape(2*N+1, M).T
 vdyyc = fftshift(vdyyc, axes=1)
 vdyyc = vdyyc.T.flatten()
 
-VDYU = dot(prod_mat(V), dot(MDY, dot(MDY, PSI))) / (2*N+1)
+VDYU = dot(prod_mat(V), dot(MDY, dot(MDY, PSI))) 
 
 print 'vdyypsi ?', allclose(VDYU, vdyyc)
 if not allclose(VDYU, vdyyc):
@@ -581,6 +632,7 @@ for i in range(1,N+1):
     opc = load_hdf5_state("./output/op{0}.h5".format(i))
     print 'operator ',i, allclose(opc, PsiOpInvList[N-i].flatten())
 
+exit(1)
 RHSvec =pickle.load(open("./output/RHSVECtest.pickle", 'r'))
 
 DYYYPSI = dot(MDY, dot(MDY, dot(MDY, PSI)))

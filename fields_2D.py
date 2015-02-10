@@ -417,17 +417,17 @@ def to_physical(in2D, CNSTS):
 
     M = CNSTS['M']
     N = CNSTS['N']
+    Mf = CNSTS['Mf']
+    Nf = CNSTS['Nf']
 
-    tmp = copy(in2D)
-    
-    if CNSTS['dealiasing']:
-        tmp[:, 2*N/3 + 2 : 2*N+1 - 2*N/3] = 0 
-        tmp[2*M/3:, :] = 0
+    tmp = zeros((M, 2*Nf+1), dtype='complex')
+    tmp[:,:N+1] = in2D[:,:N+1]
+    tmp[:,2*Nf+1-N:] = in2D[:,N+1:]
 
     # Perform the FFT across the x and z directions   
 
-    _realtmp = zeros((2*M-2, 2*N+1), dtype='double')
-    out2D = zeros((2*M-2, 2*N+1), dtype='complex')
+    _realtmp = zeros((2*Mf-2, 2*Nf+1), dtype='double')
+    out2D = zeros((2*Mf-2, 2*Nf+1), dtype='complex')
 
     out2D[:M, :] = fftpack.ifft(tmp, axis=-1)
 
@@ -445,11 +445,11 @@ def to_physical(in2D, CNSTS):
     # The second half contains the vector on the Gauss-Labatto points excluding
     # the first and last elements and in reverse order
     # do this before filling out the first half! 
-    _realtmp[M:, :] = _realtmp[M-2:0:-1, :]
+    _realtmp[Mf:, :] = _realtmp[Mf-2:0:-1, :]
 
     # The first half contains the vector on the Gauss-Labatto points * c_k
     _realtmp[0, :] = 2*_realtmp[0, :]
-    _realtmp[M-1, :] = 2*_realtmp[M-1, :]
+    _realtmp[Mf-1, :] = 2*_realtmp[Mf-1, :]
 
     # Perform the transformation
     out2D = 0.5*fftpack.rfft(_realtmp, axis=0 )
@@ -460,7 +460,7 @@ def to_physical(in2D, CNSTS):
 
     out2D = real(out2D)
     
-    return out2D[0:M, :]
+    return out2D[0:Mf, :] * (2*Nf+1)
 
 def to_physical_2(in2D, CNSTS):
     """
@@ -496,9 +496,12 @@ def to_physical_2(in2D, CNSTS):
 
     # take complex conjugate (because actually want to do the inverse FFT) and
     # renormalise because only the ifft does renormalisation for you 
+    # move renormalisation to to_spectral. that way we should be able to keep
+    # the spectra with the same normalisation as the matrix code.
 
-    out2D[:M, :N+1] = conj(in2D[:,:N+1]) / (2*Nf+1)
-    out2D[:M, 2*Nf+1-N:] = conj(in2D[:,N+1:]) / (2*Nf+1)
+    out2D[:M, 0] = conj(in2D[:,0]) #/ (2*Nf+1)
+    out2D[:M, 1:N+1] = conj(in2D[:,1:N+1]) #/ (2*Nf+1)
+    out2D[:M, 2*Nf+1-N:] = conj(in2D[:,N+1:]) #/ (2*Nf+1)
 
     #if CNSTS['dealiasing']:
     #    out2D[:, 2*N/3 + 1 : 2*N+1 - 2*N/3] = 0 
@@ -527,6 +530,44 @@ def to_physical_2(in2D, CNSTS):
     
     return out2D[0:Mf, :]
 
+def to_physical_3(in2D, CNSTS):
+    """
+       Use the ifft this time.  
+    """
+
+    M = CNSTS['M']
+    N = CNSTS['N']
+
+    Mf = CNSTS['Mf']
+    Nf = CNSTS['Nf']
+
+    # Prepare the field.
+
+    out2D = zeros((2*Mf-2, 2*Nf+1), dtype='complex')
+    scratch2D = zeros((2*Mf-2, 2*Nf+1), dtype='complex')
+
+    out2D[:M, 0] = in2D[:,0] 
+    out2D[:M, 1:N+1] = in2D[:,1:N+1] 
+    out2D[:M, 2*Nf+1-N:] = in2D[:,N+1:] 
+
+    # The second half contains the vector on the Chebyshev modes excluding
+    # the first and last elements and in reverse order
+    # do this before filling out the first half! 
+    scratch2D[2*Mf-M:, :] = out2D[M-2:0:-1, :]
+
+    # The first half contains the vector on the Chebyshev modes * ck/2
+    scratch2D[0, :] = 2*out2D[0, :]
+    scratch2D[1:Mf-1, :] = out2D[1:Mf-1, :]
+    scratch2D[Mf-1, :] = 2*out2D[Mf-1, :]
+
+    # Perform the iFFT across the x and z directions   
+
+    out2D = 0.5*fftpack.ifft2(scratch2D) 
+
+    #out2D = real(out2D)
+    
+    return out2D[0:Mf, :] * (2*Mf-2) * (2*Nf+1)
+
 def to_spectral(in2D, CNSTS): 
     """
     Full 2 dimensional transform from real space to spectral space.
@@ -539,48 +580,43 @@ def to_spectral(in2D, CNSTS):
 
     M = CNSTS['M']
     N = CNSTS['N']
+    Mf = CNSTS['Mf']
+    Nf = CNSTS['Nf']
 
 
     # Perform the FFT across the x direction   
-    _realtmp = zeros((2*M-2, 2*N+1), dtype='double')
+    _realtmp = zeros((2*Mf-2, 2*Nf+1), dtype='double')
     out2D = zeros((M, 2*N+1), dtype='complex')
 
     # The first half contains the vector on the Gauss-Labatto points
-    _realtmp[:M, :] = real(in2D)
+    _realtmp[:Mf, :] = real(in2D)
 
     # The second half contains the vector on the Gauss-Labatto points excluding
     # the first and last elements and in reverse order
-    _realtmp[M:, :] = _realtmp[M-2:0:-1, :]
+    _realtmp[Mf:, :] = _realtmp[Mf-2:0:-1, :]
 
     # Perform the transformation on this temporary vector
     # TODO: Think about antialiasing here
     _realtmp = fftpack.rfft(_realtmp, axis=0)
 
-    out2D = _realtmp[:M, :]
-
     # Renormalise and divide by c_k to convert to Chebyshev polynomials
-    out2D[0, :] = (0.5/(M-1.0))*out2D[0, :]
-    out2D[1:M-1, :] = (1.0/(M-1.0))*out2D[1:M-1, :]
-    out2D[M-1, :] = (0.5/(M-1.0))*out2D[M-1, :]
+    _realtmp[0, :] = (0.5/(Mf-1.0))*_realtmp[0, :]
+    _realtmp[1:Mf-1, :] = (1.0/(Mf-1.0))*_realtmp[1:Mf-1, :]
+    _realtmp[Mf-1, :] = (0.5/(Mf-1.0))*_realtmp[Mf-1, :]
 
     # test imaginary part of the fft is zero
-    normImag = linalg.norm(imag(out2D))
+    normImag = linalg.norm(imag(_realtmp))
     if normImag > 1e-12:
         print "output of cheb transform in to_spectral is not real, norm = ", normImag 
         print 'highest x, z modes:'
-        print imag(out2D)[0, N-3:N+1, L-3:L+1]
+        print imag(_realtmp)[0, N-3:N+1, L-3:L+1]
 
-    out2D = fftpack.fft(out2D)
+    _realtmp[:Mf, :] = fftpack.fft(_realtmp[:Mf, :])
 
-    if CNSTS['dealiasing']:
+    out2D[:, :N+1] = _realtmp[:M, :N+1]
+    out2D[:, N+1:] = _realtmp[:M, 2*Nf+1-N:]
 
-        # zero modes for Fourier dealiasing
-
-        out2D[:, 2*N/3 + 2 : 2*N+1 - 2*N/3] = 0 
-
-        # TODO: zero modes for Chebyshev dealiasing?
-
-    return out2D
+    return out2D / (2*Nf+1)
 
 def to_spectral_2(in2D, CNSTS): 
     """
@@ -608,7 +644,7 @@ def to_spectral_2(in2D, CNSTS):
     out2D = zeros((M, 2*N+1), dtype='complex')
 
     # The first half contains the vector on the Gauss-Labatto points
-    tmp[:Mf, :] = real(in2D) 
+    tmp[:Mf, :] = real(in2D)
 
     # The second half contains the vector on the Gauss-Labatto points excluding
     # the first and last elements and in reverse order
@@ -620,9 +656,9 @@ def to_spectral_2(in2D, CNSTS):
     tmp = fftpack.fft2(tmp)
 
     ## Renormalise and divide by c_k to convert to Chebyshev polynomials
-    tmp[0, :] = (0.5/(Mf-1.0))*tmp[0, :]
-    tmp[1:Mf-1, :] = (1.0/(Mf-1.0))*tmp[1:Mf-1, :]
-    tmp[Mf-1, :] = (0.5/(Mf-1.0))*tmp[Mf-1, :]
+    tmp[0, :] = (0.5/(Mf-1.))*tmp[0, :]
+    tmp[1:Mf-1, :] = (1.0/(Mf-1.))*tmp[1:Mf-1, :]
+    tmp[Mf-1, :] = (0.5/(Mf-1.))*tmp[Mf-1, :]
 
     ## remove the aliased modes and copy into output
     out2D[:, :N+1] = tmp[:M, :N+1]
@@ -632,7 +668,7 @@ def to_spectral_2(in2D, CNSTS):
     #print "is the output matrix spectrum of real space?",
     #print allclose(out2D[:, 1:N+1], conj(out2D[:M, 2*N+1:N:-1])) 
 
-    return out2D
+    return out2D / (2*Nf+1)
 
 def increase_resolution(vec, NOld, MOld, CNSTS):
     """increase resolution from Nold, Mold to N, M and return the higher res
@@ -681,6 +717,48 @@ def decide_resolution(vec, NOld, MOld, CNSTS):
 
     return ovec
 
+def stupid_transform(GLreal, CNSTS):
+    """
+    apply the Chebyshev transform the stupid way.
+    """
+
+    M = CNSTS['M']
+    Ly = CNSTS['Ly']
+
+    out = zeros(M)
+
+    for i in range(M):
+        out[i] += (1./(M-1.))*GLreal[0]
+        for j in range(1,M-1):
+            out[i] += (2./(M-1.))*GLreal[j]*cos(pi*i*j/(M-1))
+        out[i] += (1./(M-1.))*GLreal[M-1]*cos(pi*i)
+    del i,j
+
+    out[0] = out[0]/2.
+    out[M-1] = out[M-1]/2.
+
+    return out
+
+def stupid_transform_i(GLspec, CNSTS):
+    """
+    apply the Chebyshev transform the stupid way.
+    """
+
+    M = CNSTS['M']
+    Mf = CNSTS['Mf']
+    Ly = CNSTS['Ly']
+
+    out = zeros(Mf)
+
+    for i in range(Mf):
+        out[i] += GLspec[0]
+        for j in range(1,M-1):
+            out[i] += GLspec[j]*cos(pi*i*j/(Mf-1))
+        out[i] += GLspec[M-1]*cos(pi*i)
+    del i,j
+
+    return out
+
 def load_hdf5_state(filename):
     f = h5py.File(filename, "r")
     inarr = array(f["psi"])
@@ -718,7 +796,7 @@ def test_roll_profile(CNSTS):
 
     Normal = ( cos(p)*cosh(gamma) ) / ( cosh(gamma) - cos(p) )
     V = 0.5 * Normal * V
-    actualSpec = (2*Nf+1) * V
+    actualSpec = V
 
     y_points = cos(pi*arange(Mf)/(Mf-1))
     #x_points = linspace(0, 2.-(2./(2*Nf+1)), 2*Nf+1)
@@ -734,9 +812,11 @@ def test_roll_profile(CNSTS):
         # x dependence
         GLreal[:,i] = GLreal[:, i]*cos(kx*x_points[i])
 
+    print 'values at realspace endpoints x: ', GLreal[0,0], GLreal[0,2*Nf]
+
     actualRYderiv = zeros((Mf, 2*Nf+1), 'complex')
 
-    for i in range(2*N+1):
+    for i in range(2*Nf+1):
         # y dependence
         actualRYderiv[:,i] = - Normal*p*sin(p*y_points) / cos(p)
         actualRYderiv[:,i] += - Normal*gamma*sinh(gamma*y_points) / cosh(gamma)
@@ -753,6 +833,11 @@ def test_roll_profile(CNSTS):
     Test Transformations:
     -----------------------
     """
+    print """
+    --------------
+    Orthogonality 
+    --------------
+    """
 
     ## transform is inverse of inverse transform?
     inverseTest1 = to_spectral(to_physical(actualSpec, CNSTS), CNSTS)
@@ -765,30 +850,48 @@ def test_roll_profile(CNSTS):
     print '1 2D transform method', allclose(actualSpec, inverseTest2)
     print '1 2D transform method', allclose(actualSpec, inverseTest3)
 
+    print 'if you start from real space? ', allclose(GLreal, to_physical(to_spectral(GLreal, CNSTS), CNSTS))
+    print '1 2D transform', allclose(GLreal,
+                                     to_physical_2(to_spectral_2(GLreal, CNSTS), CNSTS))
 
-    if CNSTS['dealiasing'] == False:
-        print 'and if you start from real space? ', allclose(GLreal, to_physical(to_spectral(GLreal, CNSTS), CNSTS))
-        print '1 2D transform', allclose(GLreal,
-                                         to_physical_2(to_spectral_2(GLreal, CNSTS), CNSTS))
-    else:
-        print 'and if you start from real space? '
-        print """
-        doesnt make sense to do this: real space contains information that we
-        zero out when we dealias
-        """
+
+    print 'to physical ifft is same as fft?'
+    result1 =  to_physical(actualSpec, CNSTS)
+    result2 = to_physical_3(actualSpec, CNSTS)
+    print allclose(result1,result2)
+    #print linalg.norm( (result1-result2))
+    #imshow(real(result2), origin='lower')
+    #colorbar()
+    #show()
+    #imshow(real(result1), origin='lower')
+    #colorbar()
+    #show()
+
 
     ## Backwards Test ##
+    print """
+    --------------------------------------
+    Test transformation to physical space.
+    --------------------------------------
+    """
+
+    stupid = stupid_transform_i(2*actualSpec[:,1], CNSTS)
+    print 'stupid transfrom the same as analytic GLpoints'
+    print allclose(GLreal[:,0], stupid)
 
     physicalTest = to_physical(actualSpec, CNSTS)
+    physicalTest2 = real(to_physical_2(actualSpec,CNSTS))
+    physicalTest3 = real(to_physical_3(actualSpec,CNSTS))
+
 
     print 'actual real space = transformed analytic spectrum?', allclose(GLreal,
                                                                          physicalTest)
 
-    # To get both transforms to be forward transforms, need to flip Fourier
-    # modes and renormalise
-    physicalTest2 = real(to_physical_2(actualSpec,CNSTS))
-    print '2D transform is the same as 2 1D transforms?', allclose(physicalTest, 
-                                        physicalTest2)
+    print '2D transform is the same as 2 1D transforms with conj fft?', allclose(physicalTest, 
+                                                                   physicalTest2)
+
+    print '2D transform is the same as 2 1D transforms with ifft?', allclose(physicalTest, 
+                                                                   physicalTest3)
     
     #print 'difference: ', linalg.norm(physicalTest2-physicalTest)
     #print 'difference Fourier dir: ', (physicalTest2-physicalTest)[M/2,:]
@@ -812,6 +915,11 @@ def test_roll_profile(CNSTS):
     #print 'the maximum difference in the arrays ', amax(real(GLreal) -real(physicalTest))
 
     ## Forwards test ##
+    print """
+    --------------------------------------
+    Test transformation to spectral space.
+    --------------------------------------
+    """
     cSpec = to_spectral(GLreal, CNSTS)
 
     print 'analytic spectrum = transformed GL spectrum?', allclose(actualSpec,
@@ -836,7 +944,30 @@ def test_roll_profile(CNSTS):
     #print 'difference Fourier dir: ', (SpectralTest2-cSpec)[1,:]
     #print 'difference Cheby dir: ', (SpectralTest2-cSpec)[:,1]
 
+    # Products
+    tsm.initTSM(N_=N, M_=M, kx_=kx)
+    
+    flatSpec = fftshift(actualSpec, axes=1)
+    flatSpec = flatSpec.T.flatten()
+    matprod = dot(tsm.prod_mat(flatSpec), flatSpec)
+    matprod = matprod.reshape(2*N+1, M).T 
+    matprod = ifftshift(matprod, axes=-1)
 
+    print 'compare matrix product code with python fft products'
+
+    pyprod = to_spectral(physicalTest2*physicalTest2, CNSTS) # * (2*Nf+1)**2
+    #imshow(real(physicalTest2*physicalTest2))
+    #colorbar()
+    #show()
+    #imshow(real(to_physical(matprod, CNSTS)))
+    #colorbar()
+    #show()
+    
+    print allclose(pyprod, matprod)
+    #print linalg.norm(pyprod - matprod)
+    #imshow(real(pyprod -matprod))
+    #colorbar()
+    #show()
 
     print """
     -----------------------
@@ -975,25 +1106,23 @@ def test_c_version(CNSTS):
 
     #Normal = ( cos(p)*cosh(gamma) ) / ( cosh(gamma) - cos(p) )
     #V = 0.5 * Normal * V
-    #actualSpec = (2*N+1) * V
+    #actualSpec = V
 
-    #actualSpec, _ = pickle.load(open('pf-N5-M40-kx1.31-Re3000.0.pickle', 'r'))
-    #actualSpec = decide_resolution(actualSpec, 5, 40, CNSTS)
-    #actualSpec = actualSpec.reshape(2*N+1, M).T
-    #actualSpec = ifftshift(actualSpec, axes=1)
-    #actualSpec[:,5] = 0
-    #actualSpec[:,2*N-4] = 0
+    actualSpec, _ = pickle.load(open('pf-N5-M40-kx1.31-Re3000.0.pickle', 'r'))
+    actualSpec = decide_resolution(actualSpec, 5, 40, CNSTS)
+    actualSpec = actualSpec.reshape(2*N+1, M).T
+    actualSpec = ifftshift(actualSpec, axes=1)
 
 
     # insert stupider spectrum
-    actualSpec = zeros((M,2*N+1), dtype='complex')
+    #actualSpec = zeros((M,2*N+1), dtype='complex')
     #actualSpec[:M/3,5] = r_[M/3:0:-1]
     #actualSpec[:M/3, 0] = r_[M/3:0:-1]
-    actualSpec[2*M/3:,0] = actualSpec[2*M/3:,0] * 1e-6 * rand(M-2*M/3)*1.j
-    actualSpec[2*M/3:,5] = actualSpec[2*M/3:,5] * 1e-6 * rand(M-2*M/3)*1.j
+    #actualSpec[2*M/3:,0] = actualSpec[2*M/3:,0] * 1e-6 * rand(M-2*M/3)*1.j
+    #actualSpec[2*M/3:,5] = actualSpec[2*M/3:,5] * 1e-6 * rand(M-2*M/3)*1.j
     #actualSpec[:,2*N-4] = r_[0:M]
     #actualSpec[:2*M/3,1:2*N/3 + 1] = rand(2*M/3, 2*N/3) + 1.j*rand(2*M/3, 2*N/3)
-    actualSpec[:, N+1:] = conj(fliplr(actualSpec[:, 1:N+1]))
+    #actualSpec[:, N+1:] = conj(fliplr(actualSpec[:, 1:N+1]))
     #actualSpec[:M, 1:N + 1] = rand(M, N) + 1.j*rand(M, N)
     #actualSpec[:, N+1:] = conj(fliplr(actualSpec[:, 1:N+1]))
 
@@ -1115,70 +1244,26 @@ def test_c_version(CNSTS):
     flatspec = fftshift(actualSpec, axes=1)
     flatspec = flatspec.T.flatten()
     matdx = dot(MDX, flatspec)
+
     matdyypsi = dot( dot(MDY, MDY), flatspec)
 
+    matdxpsi2D = matdx.reshape(2*N+1, M).T
+    matdxpsi2D = ifftshift(matdxpsi2D,axes=-1)
+
     print 'checking matrix deriv is the same as the python looped derivative'
-    for n in range(1,N):
-        print "mode", n, linalg.norm(matdx[(N+n)*M:(N+1+n)*M] - dxSpec[:, n])
-        print "mode", -n, linalg.norm(matdx[(N-n)*M: (N+1-n)*M] - dxSpec[:, 2*N+1-n])
+    print allclose(matdxpsi2D, dxSpec)
+    if not allclose(matdxpsi2D, dxSpec):
+        for n in range(1,N):
+            print "mode", n, linalg.norm(matdx[(N+n)*M:(N+1+n)*M] - dxSpec[:, n])
+            print "mode", -n, linalg.norm(matdx[(N-n)*M: (N+1-n)*M] - dxSpec[:, 2*N+1-n])
 
     print """
     -----------------------
     Test Transformations:
     -----------------------
     """
-    print 'checking python fft products are equal to matrix method products'
-    # print 'vdyypsi'
 
-    # matvdyypsi = dot(tsm.prod_mat(-matdx), matdyypsi)/(2*N+1)
-
-
-    # physv = to_physical_2(-dxSpec, CNSTS)
-    # physdyy = to_physical_2(dy(dy(actualSpec, CNSTS), CNSTS), CNSTS)
-    # vdyypsi = to_spectral_2(physv*physdyy, CNSTS)
-
-    # print "mode", 0, linalg.norm(matvdyypsi[(N)*M:(N+1)*M] - vdyypsi[:, 0])
-    # for n in range(1,N+1):
-    #     print "mode", n, linalg.norm(matvdyypsi[(N+n)*M:(N+1+n)*M] - vdyypsi[:, n])
-    #     print "mode", -n, linalg.norm(matvdyypsi[(N-n)*M: (N+1-n)*M] - vdyypsi[:, 2*N+1-n])
-
-    # matvdyypsi2D = matvdyypsi.reshape(2*N+1, M).T
-    # matvdyypsi2D = ifftshift(matvdyypsi2D, axes=-1) 
-
-    # print allclose(matvdyypsi2D, vdyypsi)
-    # print linalg.norm(matvdyypsi2D - vdyypsi)
-    # print matvdyypsi2D[:, 2]
-    # print vdyypsi[:, 2]
-
-    print 'psipsi'
-    psiR = to_physical_2(actualSpec, CNSTS)
-    psipsi = to_spectral_2(psiR*psiR, CNSTS)
-    matpsipsi = dot(tsm.prod_mat(flatspec), flatspec)/(2*N+1)
-    matpsipsi2D = matpsipsi.reshape(2*N+1, M).T
-    matpsipsi2D = ifftshift(matpsipsi2D, axes=-1) 
-
-    if not allclose(matpsipsi2D, psipsi):
-        print "mode", 0, linalg.norm(matpsipsi[(N)*M:(N+1)*M] - psipsi[:, 0])
-        for n in range(1,N+1):
-            print "mode", n, linalg.norm(matpsipsi[(N+n)*M:(N+1+n)*M] - psipsi[:, n])
-            print "mode", -n, linalg.norm(matpsipsi[(N-n)*M: (N+1-n)*M] - psipsi[:, 2*N+1-n])
-
-        matpsipsi2D = matpsipsi.reshape(2*N+1, M).T
-        matpsipsi2D = ifftshift(matpsipsi2D, axes=-1)
-
-        print linalg.norm(matpsipsi2D - psipsi)
-        print "pick on one mode 0,2", psipsi[0,1], matpsipsi2D[0,1]
-        imshow(real(psiR*psiR), origin='lower')
-        colorbar()
-        show()
-        rsmat =real(to_physical_2(matpsipsi2D, CNSTS))
-        imshow(rsmat, origin='lower')
-        colorbar()
-        show()
-        print linalg.norm(rsmat-psiR*psiR)
-        exit(1)
-
-
+    print (2*Nf+1)*(2*Mf-2) 
     # the normalisation factor comes in becuase we are doing a single 2D fft
     #ctestPhys = load_hdf5_state("testPhysicalT.h5").reshape(2*N+1, 2*M-2).T[:M, :] 
     ctestPhys = load_hdf5_state("testPhysicalT.h5").reshape(2*Nf+1, 2*Mf-2).T[:Mf, :]
@@ -1191,10 +1276,14 @@ def test_c_version(CNSTS):
         print "\ndifference: ", linalg.norm(ctestPhys - actualPhys)
         print "complex residue", linalg.norm(imag(ctestPhys))
 
-        imshow(real(actualPhys), origin='lower')
+        print 'max diff', amax(ctestPhys - actualPhys)
+        print 'argmax diff', argmax(ctestPhys - actualPhys)
+
+        imshow(real(ctestPhys - actualPhys), origin='lower')
+        colorbar()
         show()
-        imshow(real(ctestPhys), origin='lower')
-        show()
+        #imshow(real(ctestPhys), origin='lower')
+        #show()
     
     #ctestSpec = load_hdf5_state("testSpectralT.h5").reshape(2*N+1, 2*M-2).T[:M, :] 
     #ctestSpec = load_hdf5_state("testSpectralT.h5").reshape(2*Nf+1, 2*Mf-2).T
@@ -1205,6 +1294,10 @@ def test_c_version(CNSTS):
 
     if testBool == False:
         print "\ndifference: ", linalg.norm(ctestSpec - python2spec)
+
+        print 'max diff', amax(ctestSpec - actualSpec)
+        print 'argmax diff', argmax(ctestSpec - actualSpec)
+
         print "\nmodal differences\n"
         print "mode", 0, linalg.norm(ctestSpec[:, 0] - python2spec[:, 0])
         for n in range(1,N+1):
@@ -1214,13 +1307,16 @@ def test_c_version(CNSTS):
                                            conj(python2spec[:,2*N+1-n]))
             print "c real?", allclose(ctestSpec[:, n], 
                                            conj(ctestSpec[:,2*N+1-n]))
+            print "ratio of terms", real(ctestSpec[0,n]/python2spec[0,n])
+            print "ratio of terms", real(ctestSpec[1,n]/python2spec[1,n])
+            print "ratio of terms", real(ctestSpec[2,n]/python2spec[2,n])
 
 
     phystest = zeros((Mf, 2*Nf+1), dtype='complex')
 
     for i in range(2*Nf+1):
         for j in range(Mf):
-	    phystest[j,i] = cos(i*pi/(2.*Nf)) * tanh(j*pi/(Mf-1.))
+	    phystest[j,i] =  cos(i*pi/(2.*Nf)) * tanh(j*pi/(Mf-1.))
 	    #phystest[j,i] = i + j
 
     pythonSpec3 = to_spectral_2(phystest, CNSTS)
@@ -1228,7 +1324,7 @@ def test_c_version(CNSTS):
     ctestSpec3 = load_hdf5_state("testSpectralT2.h5").reshape(2*N+1, M).T 
     cphystest = load_hdf5_state("phystest2.h5").reshape(2*Nf+1, 2*Mf-2).T[:Mf, :]
 
-    print allclose(cphystest, phystest)
+    print 'c code has same test?', allclose(cphystest, phystest)
     print 'From real space problem to spectral space, comparision of python and C'
     testBool =  allclose(pythonSpec3, ctestSpec3)
     print testBool
@@ -1245,8 +1341,16 @@ def test_c_version(CNSTS):
         print ctestSpec3[M-1, 0]
         print 2*ctestSpec3[M-1, 0] - pythonSpec3[M-1,0]
 
+        imshow(real(ctestSpec3), origin='lower')
+        colorbar()
+        show()
+        imshow(real(pythonSpec3), origin='lower')
+        colorbar()
+        show()
+
+
     print 'From real space problem to spectral space and back again, comparision of python and C'
-    pythonPhys4 = to_physical_2(pythonSpec3, CNSTS)
+    pythonPhys4 = to_physical(pythonSpec3, CNSTS)
     ctestPhys4 = load_hdf5_state("testPhysT4.h5").reshape(2*Nf+1, (2*Mf-2)).T[:Mf, :] 
     testBool = allclose(pythonPhys4, ctestPhys4)
 
@@ -1259,6 +1363,83 @@ def test_c_version(CNSTS):
     del i
 
     testBool = allclose(python2spec, python2specR)
+
+    print 'checking python fft products are equal to matrix method products'
+    print 'vdyypsi'
+
+    matvdyypsi = dot(tsm.prod_mat(-matdx), matdyypsi)
+
+
+    physv = to_physical_2(-dxSpec, CNSTS)
+    physdyy = to_physical_2(dy(dy(actualSpec, CNSTS), CNSTS), CNSTS)
+    vdyypsi = to_spectral_2(physv*physdyy, CNSTS)
+
+    # print "mode", 0, linalg.norm(matvdyypsi[(N)*M:(N+1)*M] - vdyypsi[:, 0])
+    # for n in range(1,N+1):
+    #     print "mode", n, linalg.norm(matvdyypsi[(N+n)*M:(N+1+n)*M] - vdyypsi[:, n])
+    #     print "mode", -n, linalg.norm(matvdyypsi[(N-n)*M: (N+1-n)*M] - vdyypsi[:, 2*N+1-n])
+
+    matvdyypsi2D = matvdyypsi.reshape(2*N+1, M).T
+    matvdyypsi2D = ifftshift(matvdyypsi2D, axes=-1) 
+
+    print allclose(matvdyypsi2D, vdyypsi)
+    print linalg.norm(matvdyypsi2D - vdyypsi)
+
+
+    print 'psipsi'
+    psiR = real(to_physical(actualSpec, CNSTS))
+    psipsi = to_spectral(psiR*psiR, CNSTS)
+    matpsipsi = dot(tsm.prod_mat(flatspec), flatspec)
+    matpsipsi2D = matpsipsi.reshape(2*N+1, M).T
+    matpsipsi2D = ifftshift(matpsipsi2D, axes=-1) 
+
+    print allclose(matpsipsi2D, psipsi)
+
+    if not allclose(matpsipsi2D, psipsi):
+        print "mode", 0, linalg.norm(matpsipsi[(N)*M:(N+1)*M] - psipsi[:, 0])
+        for n in range(1,N+1):
+            print "mode", n, linalg.norm(matpsipsi[(N+n)*M:(N+1+n)*M] - psipsi[:, n])
+            print "mode", -n, linalg.norm(matpsipsi[(N-n)*M: (N+1-n)*M] - psipsi[:, 2*N+1-n])
+
+        matpsipsi2D = matpsipsi.reshape(2*N+1, M).T
+        matpsipsi2D = ifftshift(matpsipsi2D, axes=-1)
+        
+        diff = matpsipsi2D - psipsi
+        print linalg.norm(diff)
+        print diff.flatten()[argmax(diff)]
+
+        imshow(real(psiR*psiR), origin='lower')
+        colorbar()
+        show()
+        rsmat =real(to_physical_2(matpsipsi2D, CNSTS))
+        imshow(rsmat, origin='lower')
+        colorbar()
+        show()
+        print 'difference between physical space representations', linalg.norm(rsmat-psiR*psiR)
+
+    print 'check c products by fft_convolve function are same as normal c products'
+
+    psipsic = load_hdf5_state("psipsi.h5").reshape(2*N+1, M).T
+    psipsic2 = load_hdf5_state("fft_convolve.h5").reshape(2*N+1, M).T
+    testBool = allclose(psipsic, psipsic2)
+    print testBool
+    if not testBool:
+        print linalg.norm(psipsic-psipsic2)
+
+
+    print 'Checking c products are the same as python products'
+
+    psipsicR = load_hdf5_state("psipsiR.h5").reshape(2*Nf+1, 2*Mf-2).T[:Mf,:]
+
+    print allclose(psipsic, psipsi)
+    if not allclose(psipsic, psipsi):
+        print linalg.norm(psipsic-psipsi)
+        print 'difference between their physical representations '
+        print linalg.norm(psipsicR - (psiR*psiR))
+        imshow(real(psipsicR), origin='lower')
+        colorbar()
+        show()
+
 
     print "Repeated Transforms: python field is stable after 100 transforms?",testBool
     if testBool == False:
@@ -1282,13 +1463,13 @@ def test_c_version(CNSTS):
 
 if __name__ == "__main__":
 
-    CNSTS = set_constants(M=40, N=20, kx=1.31, dealiasing=True)
+    CNSTS = set_constants(M=60, N=10, kx=1.31, dealiasing=True)
 
-    #test_roll_profile(CNSTS)
+    test_roll_profile(CNSTS)
 
     #test_diff(CNSTS, testFunc=lambda x: 1-x**2)
 
     #test_prods(CNSTS)
 
-    test_c_version(CNSTS)
+    #test_c_version(CNSTS)
 
