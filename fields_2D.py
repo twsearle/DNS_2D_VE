@@ -119,8 +119,8 @@ def set_constants(M=16, N=16,
     """
 
     if dealiasing:
-        Mf = 3*M/2
-        Nf = 3*N/2
+        Mf = (3*M)/2
+        Nf = (3*N)/2 + 1
     else:
         Mf = M
         Nf = N
@@ -670,6 +670,47 @@ def to_spectral_2(in2D, CNSTS):
 
     return out2D / (2*Nf+1)
 
+def forward_cheb_transform(GLreal, CNSTS):
+    """
+    Use a real FFT to transform a single array from the Gauss-Labatto grid to
+    Chebyshev polynomials.
+
+    Note, this uses a real FFT therefore you must apply the transformations in
+    the other directions before this one, otherwise you will loose the data from
+    the imaginary parts.
+    """
+
+    M = CNSTS['M']
+    Mf = CNSTS['Mf']
+    dealiasing = CNSTS['dealiasing']
+
+    Ly = CNSTS['Ly']
+
+    # Define the temporary vector for the transformation
+    tmp = zeros(2*Mf-2)
+
+    # The first half contains the vector on the Gauss-Labatto points
+    tmp[:Mf] = real(GLreal)
+
+    # The second half contains the vector on the Gauss-Labatto points excluding
+    # the first and last elements and in reverse order
+    tmp[Mf:] = real(GLreal[Mf-2:0:-1])
+
+    # Perform the transformation on this temporary vector
+    # TODO: Think about antialiasing here
+    tmp = real(fftpack.rfft(tmp))
+
+    out = zeros(M, dtype='complex')
+    # Renormalise and divide by c_k to convert to Chebyshev polynomials
+    out[0] = (0.5/(Mf-1.0)) * tmp[0]
+    out[1:M-1] = (1.0/(Mf-1.0)) * tmp[1:M-1]
+    if dealiasing:
+        out[M-1] = (1.0/(Mf-1.0)) * tmp[M-1]
+    else:
+        out[M-1] = (0.5/(Mf-1.0)) * tmp[M-1]
+
+    return out
+
 def increase_resolution(vec, NOld, MOld, CNSTS):
     """increase resolution from Nold, Mold to N, M and return the higher res
     vector"""
@@ -1134,11 +1175,11 @@ def test_c_version(CNSTS):
 
     # call the c program
     subprocess.call(["./test_fields"])
+    subprocess.call(["./test_fields_1"])
 
     # Read in the c programs output
     # Reshape is because fft insists on 1D double complex arrays.
     # T is because this program uses fortran order not c order for y and x.
-    # TODO: Fix fortran order
     # slice is because the rest of the array is junk I carry round the c program
     # to speed up the transforms.
     
@@ -1265,10 +1306,9 @@ def test_c_version(CNSTS):
 
     print (2*Nf+1)*(2*Mf-2) 
     # the normalisation factor comes in becuase we are doing a single 2D fft
-    #ctestPhys = load_hdf5_state("testPhysicalT.h5").reshape(2*N+1, 2*M-2).T[:M, :] 
     ctestPhys = load_hdf5_state("testPhysicalT.h5").reshape(2*Nf+1, 2*Mf-2).T[:Mf, :]
 
-    actualPhys = real(to_physical_2(actualSpec,CNSTS))
+    actualPhys = real(to_physical(actualSpec,CNSTS))
     testBool = allclose(actualPhys, real(ctestPhys))
     print "Physical Transform: C transform is the same as python transform?",testBool
 
@@ -1284,9 +1324,10 @@ def test_c_version(CNSTS):
         show()
         #imshow(real(ctestPhys), origin='lower')
         #show()
-    
-    #ctestSpec = load_hdf5_state("testSpectralT.h5").reshape(2*N+1, 2*M-2).T[:M, :] 
-    #ctestSpec = load_hdf5_state("testSpectralT.h5").reshape(2*Nf+1, 2*Mf-2).T
+    ctestPhys1D = load_hdf5_state("testPhys_1D.h5").reshape(2*Nf+1, 2*Mf-2).T[:Mf, :]
+    testBool = allclose(actualPhys, ctestPhys1D)
+    print "Physical Transform: C 1D transform is the same as python transform?",testBool
+
     ctestSpec = load_hdf5_state("testSpectralT.h5").reshape(2*N+1, M).T 
     python2spec = to_spectral_2(actualPhys, CNSTS)
     testBool = allclose(python2spec, ctestSpec)
@@ -1319,11 +1360,12 @@ def test_c_version(CNSTS):
 	    phystest[j,i] =  cos(i*pi/(2.*Nf)) * tanh(j*pi/(Mf-1.))
 	    #phystest[j,i] = i + j
 
-    pythonSpec3 = to_spectral_2(phystest, CNSTS)
+    pythonSpec3 = to_spectral(phystest, CNSTS)
     #ctestSpec3 = load_hdf5_state("testSpectralT2.h5").reshape(2*Nf+1, 2*Mf-2).T
     ctestSpec3 = load_hdf5_state("testSpectralT2.h5").reshape(2*N+1, M).T 
     cphystest = load_hdf5_state("phystest2.h5").reshape(2*Nf+1, 2*Mf-2).T[:Mf, :]
 
+    print 'Spectral Transform: '
     print 'c code has same test?', allclose(cphystest, phystest)
     print 'From real space problem to spectral space, comparision of python and C'
     testBool =  allclose(pythonSpec3, ctestSpec3)
@@ -1348,7 +1390,33 @@ def test_c_version(CNSTS):
         colorbar()
         show()
 
+    ctestSpec_1D = load_hdf5_state("testSpec_1D.h5").reshape(2*N+1, M).T 
 
+    pythonSpecCheb = zeros((Mf, 2*Nf+1), dtype='complex')
+    pythonSpecCheb = to_spectral(phystest,CNSTS)
+    #for i in range(2*Nf+1):
+    #    pythonSpecCheb[:,i] = forward_cheb_transform(phystest[:,i], CNSTS)
+
+    testBool =  allclose(pythonSpecCheb, ctestSpec_1D)
+
+    print 'Spectral Transform: '
+    print 'From real space problem to spectral space, comparision of python and C 1D'
+    print testBool
+    if not testBool:
+        print 'c'
+        imshow(real(ctestSpec_1D))
+        colorbar()
+        show()
+        print 'p'
+        imshow(real(pythonSpecCheb))
+        colorbar()
+        show()
+        print 'p-c'
+        imshow(real(pythonSpecCheb-ctestSpec_1D))
+        colorbar()
+        show()
+
+    print 'Spectral Transform: '
     print 'From real space problem to spectral space and back again, comparision of python and C'
     pythonPhys4 = to_physical(pythonSpec3, CNSTS)
     ctestPhys4 = load_hdf5_state("testPhysT4.h5").reshape(2*Nf+1, (2*Mf-2)).T[:Mf, :] 
@@ -1370,14 +1438,22 @@ def test_c_version(CNSTS):
     matvdyypsi = dot(tsm.prod_mat(-matdx), matdyypsi)
 
 
-    physv = to_physical_2(-dxSpec, CNSTS)
-    physdyy = to_physical_2(dy(dy(actualSpec, CNSTS), CNSTS), CNSTS)
-    vdyypsi = to_spectral_2(physv*physdyy, CNSTS)
+    physv = to_physical(-dxSpec, CNSTS)
+    physdyy = to_physical(dy(dy(actualSpec, CNSTS), CNSTS), CNSTS)
 
-    # print "mode", 0, linalg.norm(matvdyypsi[(N)*M:(N+1)*M] - vdyypsi[:, 0])
-    # for n in range(1,N+1):
-    #     print "mode", n, linalg.norm(matvdyypsi[(N+n)*M:(N+1+n)*M] - vdyypsi[:, n])
-    #     print "mode", -n, linalg.norm(matvdyypsi[(N-n)*M: (N+1-n)*M] - vdyypsi[:, 2*N+1-n])
+    matdx = fftshift(dxSpec, axes=-1)
+    matdx = matdx.T.flatten()
+    matdyypsi = fftshift(dy(dy(actualSpec, CNSTS), CNSTS), axes=-1)
+    matdyypsi = matdyypsi.T.flatten()
+
+    matvdyypsi = dot(tsm.prod_mat(-matdx), matdyypsi)
+
+    vdyypsi = to_spectral(physv*physdyy, CNSTS)
+
+    #print "mode", 0, linalg.norm(matvdyypsi[(N)*M:(N+1)*M] - vdyypsi[:, 0])
+    #for n in range(1,N+1):
+    #    print "mode", n, linalg.norm(matvdyypsi[(N+n)*M:(N+1+n)*M] - vdyypsi[:, n])
+    #    print "mode", -n, linalg.norm(matvdyypsi[(N-n)*M: (N+1-n)*M] - vdyypsi[:, 2*N+1-n])
 
     matvdyypsi2D = matvdyypsi.reshape(2*N+1, M).T
     matvdyypsi2D = ifftshift(matvdyypsi2D, axes=-1) 
@@ -1432,6 +1508,7 @@ def test_c_version(CNSTS):
     psipsicR = load_hdf5_state("psipsiR.h5").reshape(2*Nf+1, 2*Mf-2).T[:Mf,:]
 
     print allclose(psipsic, psipsi)
+    print 'difference ', linalg.norm(psipsic-psipsi)
     if not allclose(psipsic, psipsi):
         print linalg.norm(psipsic-psipsi)
         print 'difference between their physical representations '
@@ -1463,13 +1540,13 @@ def test_c_version(CNSTS):
 
 if __name__ == "__main__":
 
-    CNSTS = set_constants(M=60, N=10, kx=1.31, dealiasing=True)
+    CNSTS = set_constants(M=50, N=5, kx=1.31, dealiasing=True)
 
-    test_roll_profile(CNSTS)
+    #test_roll_profile(CNSTS)
 
     #test_diff(CNSTS, testFunc=lambda x: 1-x**2)
 
     #test_prods(CNSTS)
 
-    #test_c_version(CNSTS)
+    test_c_version(CNSTS)
 

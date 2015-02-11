@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon  9 Feb 22:57:22 2015
+// Last modified: Wed 11 Feb 19:03:03 2015
 
 /* Program Description:
  *
@@ -221,7 +221,6 @@ int main(int argc, char **argv)
 
     scratchin = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
     scratchout = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
-
     scratchp1 = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
     scratchp2 = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
 
@@ -331,7 +330,9 @@ int main(int argc, char **argv)
           save_hdf5_state("./output/v.h5", &v[0], params);
       }
 
-	//to_physical(v, scratchp2, scratchin, scratchout, &phys_plan, params);
+      to_physical(psi, scratchp2, scratchin, scratchout, &phys_plan, params);
+      //exit(1);
+      to_spectral(scratchp2, psi, scratchin, scratchout, &spec_plan, params);
 
 	// lplpsi dyy(psi) + dxx(psi)
 
@@ -427,6 +428,7 @@ int main(int argc, char **argv)
 	if(timeStep==0)
 	{
 	    save_hdf5_state("./output/vdylplpsi.h5", &vdylplpsi[0], params);
+
 	}
 	
 	//vdyypsi = vdyu
@@ -584,6 +586,8 @@ int main(int argc, char **argv)
 
     fftw_free(scratch);
     fftw_free(scratch2);
+    fftw_free(scratch3);
+    fftw_free(scratch4);
     fftw_free(psi);
     fftw_free(u);
     fftw_free(v);

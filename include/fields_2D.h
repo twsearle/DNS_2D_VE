@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon  9 Feb 22:53:11 2015
+// Last modified: Wed 11 Feb 16:03:52 2015
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -33,9 +33,21 @@ void dx(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts);
 
 void dy(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts);
 
+void to_physical_1(fftw_complex *arrin, fftw_complex *arrout,
+		 fftw_complex *scratchFin, fftw_complex *scratchFout,
+		 fftw_complex *scratchCin, fftw_complex *scratchCout,
+		 fftw_plan *phys_fou_plan, fftw_plan *phys_cheb_plan,
+		 flow_params cnsts);
+
 void to_physical(fftw_complex *arrin, fftw_complex *arrout,
 		 fftw_complex *scratchin, fftw_complex *scratchout,
 		 fftw_plan *phys_plan,  flow_params cnsts);
+
+void to_spectral_1(fftw_complex *arrin, fftw_complex *arrout, fftw_complex *scratch,
+		 fftw_complex *scratchFin, fftw_complex *scratchFout,
+		 fftw_complex *scratchCin, fftw_complex *scratchCout,
+		 fftw_plan *spec_fou_plan, fftw_plan *spec_cheb_plan,
+		 flow_params cnsts);
 
 void to_spectral(fftw_complex *arrin, fftw_complex *arrout,
 		 fftw_complex *scratchin, fftw_complex *scratchout,

@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Mon  9 Feb 22:59:35 2015
+#   Last modified: Wed 11 Feb 19:00:19 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -66,9 +66,10 @@ beta = 1.0
 kx = config.getfloat('General', 'kx')
 
 dealiasing = False
+
 if dealiasing:
-    Nf = 3*N/2
-    Mf = 3*M/2
+    Nf = (3*N)/2 +1
+    Mf = (3*M)/2
 else:
     Nf = N
     Mf = M

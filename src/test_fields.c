@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Tue 10 Feb 11:20:41 2015
+// Last modified: Wed 11 Feb 17:39:04 2015
 
 /* Program Description:
  *
@@ -57,8 +57,8 @@ int main()
 {
     flow_params params;
 
-    params.N = 10;
-    params.M = 60;
+    params.N = 5;
+    params.M = 50;
     params.Ly = 2.;
     params.kx = 1.31;
     params.Re = 400;
@@ -68,8 +68,8 @@ int main()
 
     if (params.dealiasing)
     {
-	params.Nf = 3*params.N/2;
-	params.Mf = 3*params.M/2;
+	params.Nf = (3*params.N)/2 +1 ;
+	params.Mf = (3*params.M)/2;
     } else
     {
 	params.Nf = params.N;
