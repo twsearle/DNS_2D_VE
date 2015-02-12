@@ -9,10 +9,11 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu 12 Feb 03:00:07 2015
+// Last modified: Thu 12 Feb 15:21:23 2015
 
 #include<stdio.h>
 #include<stdlib.h>
+#include<unistd.h>
 #include<math.h>
 #include<complex.h>
 #include"hdf5.h"
@@ -61,6 +62,9 @@ void fft_convolve(fftw_complex *arr1, fftw_complex *arr2, fftw_complex *arrout,
 void save_hdf5_state(char *filename, fftw_complex *arr, flow_params cnsts);
 
 void save_hdf5_arr(char *filename, fftw_complex *arr, int size);
+
+void save_hdf5_snapshot(hid_t *file_id, hid_t *filetype_id, hid_t *datatype_id,
+	fftw_complex *arr, double time, flow_params cnsts);
 
 void save_state(FILE *fp, fftw_complex *arr, flow_params cnsts);
 

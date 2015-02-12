@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Thu 12 Feb 11:11:43 2015
+#   Last modified: Thu 12 Feb 15:39:13 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -678,8 +678,8 @@ for i in range(0,N+1):
     print 'max difference', amax(RHSVec[(N+i)*M:(N+1+i)*M]- RHSvecc)
     maxarg_ = argmax(RHSVec[(N+i)*M:(N+1+i)*M]- RHSvecc)
     print 'argmax difference', maxarg_
-    print RHSVec[(N+i)*M+maxarg_]
-    print RHSvecc[maxarg_]
+    #print RHSVec[(N+i)*M+maxarg_]
+    #print RHSvecc[maxarg_]
 
 psi2c = load_hdf5_state("./output/psi2.h5").reshape(2*N+1, M).T 
 
@@ -697,10 +697,13 @@ PSI22D = ifftshift(PSI22D, axes=-1)
 
 print 'psi2 = psi2c?', allclose(PSI22D, psi2c)
 
-print psi2c[1,:]
-
 print 'mode', 0, allclose(PSI22D[:, 0], psi2c[:, 0])
 print 'difference', linalg.norm(PSI22D[:, 0]-psi2c[:, 0])
+print 'max difference', amax(PSI22D[:, 0]-psi2c[:, 0])
+maxarg_ = argmax(PSI22D[:, 0]-psi2c[:, 0])
+print 'argmax difference', maxarg_
+print PSI22D[maxarg_, 0]
+print psi2c[maxarg_, 0]
 
 if not allclose(PSI22D, psi2c):
     for i in range(1,N+1):

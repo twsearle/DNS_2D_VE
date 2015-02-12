@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu 12 Feb 03:00:41 2015
+// Last modified: Thu 12 Feb 15:28:31 2015
 
 #include"fields_2D.h"
 
@@ -155,6 +155,51 @@ void save_hdf5_state(char *filename, fftw_complex *arr, flow_params cnsts)
 
     // close the file
     status = H5Fclose(file_id);
+
+}
+
+void save_hdf5_snapshot(hid_t *file_id, hid_t *filetype_id, hid_t *datatype_id,
+	fftw_complex *arr, double time, flow_params cnsts)
+{
+    int N = cnsts.N;
+    int M = cnsts.M;
+    int i;
+    char dataset_name[30];
+
+    hid_t  dataset_id, dataspace_id;
+    herr_t status;
+    complex_hdf *wdata;
+
+    hsize_t arr_size[1];
+    arr_size[0] = (2*N+1)*M;
+
+    // create the dataspace
+    dataspace_id = H5Screate_simple(1, arr_size, NULL);
+
+    // create the dataset
+    // TODO: look into how to use nested datasets.
+    sprintf(dataset_name, "/t%f", time);
+
+    dataset_id = H5Dcreate(*file_id, dataset_name, *filetype_id, dataspace_id, H5P_DEFAULT,
+			  H5P_DEFAULT, H5P_DEFAULT);
+
+    // set up the data for writing
+    wdata = (complex_hdf *) malloc (arr_size[0] * sizeof (complex_hdf));
+
+    for (i=0; i<(2*N+1)*M; i++)
+    {
+	wdata[i].r = creal(arr[i]);
+	wdata[i].i = cimag(arr[i]);
+    }
+    
+    // write the file 
+    status = H5Dwrite(dataset_id, *datatype_id, H5S_ALL, H5S_ALL, 
+		      H5P_DEFAULT, wdata); 
+
+    // clean up 
+    status = H5Dclose(dataset_id);
+    status = H5Sclose(dataspace_id);
+    free(wdata);
 
 }
 

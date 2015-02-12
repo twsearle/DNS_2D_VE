@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu 12 Feb 11:55:22 2015
+// Last modified: Thu 12 Feb 15:28:07 2015
 
 /* Program Description:
  *
@@ -57,8 +57,6 @@
  */
 
 // Headers
-
-#include<unistd.h>
 
 #include"fields_2D.h"
 
@@ -161,16 +159,37 @@ int main(int argc, char **argv)
     printf("\nNumber of Time Steps\t %d ", numTimeSteps);
     printf("\nTime Steps per frame\t %d \n", stepsPerFrame);
 
-    // Declare variables
     FILE *tracefp;
+    char *trace_fn, *traj_fn;
     int i, j, l;
     int N = params.N;
     int M = params.M;
     int Nf = params.Nf;
     int Mf = params.Mf;
 
+    trace_fn = "./output/trace.dat";
+    traj_fn = "./output/traj_psi.h5";
 
-    tracefp = fopen("./output/trace.dat", "w");
+    tracefp = fopen(trace_fn, "w");
+
+    // Variables for HDF5 output
+    hid_t hdf5fp, datatype_id, filetype_id;
+    herr_t status;
+    
+    // create the datatype for scipy complex numbers
+    datatype_id = H5Tcreate(H5T_COMPOUND, sizeof (complex_hdf));
+    status = H5Tinsert(datatype_id, "r",
+                HOFFSET(complex_hdf, r), H5T_NATIVE_DOUBLE);
+    status = H5Tinsert(datatype_id, "i",
+                HOFFSET(complex_hdf, i), H5T_NATIVE_DOUBLE);
+
+    // create the filetype for the scipy complex numbers
+    filetype_id = H5Tcreate(H5T_COMPOUND, 8 + 8);
+    status = H5Tinsert(filetype_id, "r", 0, H5T_NATIVE_DOUBLE);
+    status = H5Tinsert(filetype_id, "i", 8, H5T_NATIVE_DOUBLE);
+
+    // create Hdf5 output file
+    hdf5fp = H5Fcreate(traj_fn, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 
     // field arrays are declared as pointers and then I malloc.
     fftw_complex *scratch, *scratch2, *scratch3, *scratch4, *tmpop;
@@ -180,8 +199,7 @@ int main(int argc, char **argv)
     fftw_complex *scratchp1, *scratchp2;
 
     fftw_complex *RHSvec;
-    double norm;
-    double time;
+    double time = 0;
     double oneOverRe = 1./params.Re;
     
     fftw_complex *opsList;
@@ -558,12 +576,17 @@ int main(int argc, char **argv)
 
 	    printf("%e\t\t%e\t\t%e\n", time, KE0, KE1);
 
-	    char fn[30];
-	    sprintf(fn, "./output/t%e.h5", time);
-	    save_hdf5_state(fn, &psi[0], params);
-
+	    //char fn[30];
+	    //sprintf(fn, "./output/t%e.h5", time);
+	    //save_hdf5_state(fn, &psi[0], params);
+	    
+	    save_hdf5_snapshot(&hdf5fp, &filetype_id, &datatype_id,
+		    psi, time, params);
+	    
 	    fprintf(tracefp, "%e\t\t%e\t\t%e\n", time, KE0, KE1);
+
 	    fflush(tracefp);
+	    H5Fflush(hdf5fp, H5F_SCOPE_GLOBAL);
 
 	}
 
@@ -573,6 +596,11 @@ int main(int argc, char **argv)
     save_hdf5_state("./output/final.h5", &psi[0], params);
 
     fclose(tracefp);
+
+    // clean up hdf5
+    status = H5Tclose(datatype_id);
+    status = H5Tclose(filetype_id);
+    status = H5Fclose(hdf5fp);
 
     // garbage collection
     fftw_destroy_plan(phys_plan);
