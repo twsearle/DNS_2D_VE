@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Fri  6 Feb 21:49:39 2015
+#   Last modified: Thu 12 Feb 03:01:58 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -66,7 +66,16 @@ kx = config.getfloat('General', 'kx')
 dt = config.getfloat('Time Iteration', 'dt')
 totTime = config.getfloat('Time Iteration', 'totTime')
 numFrames = config.getint('Time Iteration', 'numFrames')
+dealiasing = config.getboolean('Time Iteration', 'Dealiasing')
+
 fp.close()
+
+if dealiasing:
+    Nf = (3*N)/2 + 1
+    Mf = (3*M)/2
+else:
+    Nf = N
+    Mf = M
 
 numTimeSteps = int(totTime / dt)
 assert totTime % dt, "non-integer number of time steps!"
@@ -74,8 +83,8 @@ assert Wi != 0.0, "cannot have Wi = 0!"
 
 NOld = N 
 MOld = M
-kwargs = {'N': N, 'M': M, 'Re': Re,'Wi': Wi, 'beta': beta, 'kx': kx,'time':
-          totTime, 'dt':dt }
+kwargs = {'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf, 'Re': Re, 'Wi': Wi, 'beta': beta,
+          'kx': kx,'time': totTime, 'dt':dt, 'dealiasing':dealiasing}
 baseFileName  = "-N{N}-M{M}-kx{kx}-Re{Re}.pickle".format(**kwargs)
 outFileName  = "pf{0}".format(baseFileName)
 outFileNameTrace = "trace{0}.dat".format(baseFileName[:-7])
@@ -116,6 +125,59 @@ def append_save_array(array, fp):
         fp.write('\n')
 
 
+def load_hdf5_state(filename):
+    f = h5py.File(filename, "r")
+    inarr = array(f["psi"])
+    f.close()
+    return inarr
+
+
+def increase_resolution(vec, NOld, MOld, CNSTS):
+    """increase resolution from Nold, Mold to N, M and return the higher res
+    vector"""
+    N = CNSTS["N"]
+    M = CNSTS["M"]
+
+    highMres = zeros((2*NOld+1)*M, dtype ='complex')
+
+    for n in range(2*NOld+1):
+        highMres[n*M:n*M + MOld] = vec[n*MOld:(n+1)*MOld]
+    del n
+    fullres = zeros((2*N+1)*M, dtype='complex')
+    fullres[(N-NOld)*M:(N-NOld)*M + M*(2*NOld+1)] = highMres[0:M*(2*NOld+1)]
+    return fullres
+
+def decrease_resolution(vec, NOld, MOld, CNSTS):
+    """ 
+    decrease both the N and M resolutions
+    """
+    N = CNSTS["N"]
+    M = CNSTS["M"]
+
+    lowMvec = zeros((2*NOld+1)*M, dtype='complex')
+    for n in range(2*NOld+1):
+        lowMvec[n*M:(n+1)*M] = vec[n*MOld:n*MOld + M]
+    del n
+
+    lowNMvec = zeros((2*N+1)*M, dtype='D')
+    lowNMvec = lowMvec[(NOld-N)*M:(NOld-N)*M + (2*N+1)*M]
+
+    return lowNMvec
+
+def decide_resolution(vec, NOld, MOld, CNSTS):
+    """
+    Choose to increase or decrease resolution depending on values of N,M
+    NOld,MOld.
+    """
+    N = CNSTS["N"]
+    M = CNSTS["M"]
+    if N >= NOld and M >= MOld:
+        ovec = increase_resolution(vec, NOld, MOld, CNSTS)
+
+    elif N <= NOld and M <= MOld:
+        ovec = decrease_resolution(vec, NOld, MOld, CNSTS)
+
+    return ovec
 
 
 # -----------------------------------------------------------------------------
@@ -171,16 +233,19 @@ del j
 #### The initial stream-function
 PSI = zeros((2*N+1)*M,dtype='complex')
 
-# not sure, hope this is Poiseuille flow 
-#PSI[N*M]   += 2.0/3.0
-#PSI[N*M+1] += 3.0/4.0
-#PSI[N*M+2] += 0.0
-#PSI[N*M+3] += -1.0/12.0
-#
-#PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
+# This is Poiseuille flow 
+PSI[N*M]   += 2.0/3.0
+PSI[N*M+1] += 3.0/4.0
+PSI[N*M+2] += 0.0
+PSI[N*M+3] += -1.0/12.0
+
+PSI[(N-1)*M + 3] += 1e-10
+PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
+
+print 'performing linear stability of Poiseuille flow test'
 
 # Read in stream function from file
-(PSI, Nu) = pickle.load(open(inFileName,'r'))
+#(PSI, Nu) = pickle.load(open(inFileName,'r'))
 
 # Form the operators
 PsiOpInvList = []
@@ -264,12 +329,34 @@ stepsPerFrame = numTimeSteps/numFrames
 # Run program in C
 
 # pass the flow variables and the time iteration settings to the C code
-cargs = ["./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M",
-         "{0:d}".format(CNSTS["M"]), "-L", "2.0", "-k", "{0:e}".format(CNSTS["kx"]),
-         "-R", "{0:e}".format(CNSTS["Re"]), "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-         "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]), "-s",
-         "{0:d}".format(stepsPerFrame), "-T", "{0:d}".format(numTimeSteps)]
+if dealiasing:
+    cargs = ["./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M",
+             "{0:d}".format(CNSTS["M"]), "-L", "2.0", "-k", "{0:e}".format(CNSTS["kx"]),
+             "-R", "{0:e}".format(CNSTS["Re"]), "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
+             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]), "-s",
+             "{0:d}".format(stepsPerFrame), "-T", "{0:d}".format(numTimeSteps),
+            "-d"]
+    print "./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M", \
+          "{0:d}".format(CNSTS["M"]), "-L", "2.0", "-k", \
+            "{0:e}".format(CNSTS["kx"]),"-R", \
+            "{0:e}".format(CNSTS["Re"]), "-W", "{0:e}".format(CNSTS["Wi"]),\
+            "-b", "{0:e}".format(CNSTS["beta"]), "-t", \
+            "{0:e}".format(CNSTS["dt"]), "-s",\
+          "{0:d}".format(stepsPerFrame), "-T", "{0:d}".format(numTimeSteps),"-d"
 
+else:
+    cargs = ["./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M",
+             "{0:d}".format(CNSTS["M"]), "-L", "2.0", "-k", "{0:e}".format(CNSTS["kx"]),
+             "-R", "{0:e}".format(CNSTS["Re"]), "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
+             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]), "-s",
+             "{0:d}".format(stepsPerFrame), "-T", "{0:d}".format(numTimeSteps)]
+    print "./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M", \
+          "{0:d}".format(CNSTS["M"]), "-L", "2.0", "-k", \
+            "{0:e}".format(CNSTS["kx"]),"-R", \
+            "{0:e}".format(CNSTS["Re"]), "-W", "{0:e}".format(CNSTS["Wi"]),\
+            "-b", "{0:e}".format(CNSTS["beta"]), "-t", \
+            "{0:e}".format(CNSTS["dt"]), "-s",\
+          "{0:d}".format(stepsPerFrame), "-T", "{0:d}".format(numTimeSteps)
 
 subprocess.call(cargs)
 

@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu 12 Feb 02:17:22 2015
+// Last modified: Thu 12 Feb 03:01:28 2015
 
 /* Program Description:
  *
@@ -72,6 +72,7 @@ int main(int argc, char **argv)
     int timeStep = 0;
     double dt = 0;
     double KE0 = 1.0;
+    double KE1 = 1.0;
 
     opterr = 0;
     int shortArg;
@@ -161,11 +162,15 @@ int main(int argc, char **argv)
     printf("\nTime Steps per frame\t %d \n", stepsPerFrame);
 
     // Declare variables
+    FILE *tracefp;
     int i, j, l;
     int N = params.N;
     int M = params.M;
     int Nf = params.Nf;
     int Mf = params.Mf;
+
+
+    tracefp = fopen("./output/trace.dat", "w");
 
     // field arrays are declared as pointers and then I malloc.
     fftw_complex *scratch, *scratch2, *scratch3, *scratch4, *tmpop;
@@ -273,9 +278,13 @@ int main(int argc, char **argv)
 	    &phys_plan, &spec_plan, params);
 
     KE0 = (15./ 8.) * calc_KE0(u, params);
-    printf("N %d, M %d, Nf %d, Mf %d\n", N, M, Nf, Mf);
+    KE1 = calc_KE1(u, params) * (15.0/ 8.0);
 
-    printf("%e\t\t%e\n", time, KE0);
+    printf("%e\t\t%e\t\t%e\n", time, KE0, KE1);
+
+    fprintf(tracefp, "%e\t\t%e\t\t%e\n", time, KE0, KE1);
+
+    fflush(tracefp);
 
 
     for (timeStep=0; timeStep<numTimeSteps; timeStep++)
@@ -537,22 +546,29 @@ int main(int argc, char **argv)
 	// output some information at every frame
 	if ((timeStep % stepsPerFrame) == 0 )
 	{
-	  time = timeStep*dt;
-	  fft_convolve(u, u, u, scratchp1, scratchp2, scratchin, scratchout,
-	    &phys_plan, &spec_plan, params);
-	  KE0 = calc_KE0(u, params) * (15.0/ 8.0);
+	    time = timeStep*dt;
+	    fft_convolve(u, u, u, scratchp1, scratchp2, scratchin, scratchout,
+		    &phys_plan, &spec_plan, params);
+	    KE0 = calc_KE0(u, params) * (15.0/ 8.0);
+	    KE1 = calc_KE1(u, params) * (15.0/ 8.0);
 
-	  printf("%e\t\t%e\n", time, KE0);
+	    printf("%e\t\t%e\t\t%e\n", time, KE0, KE1);
 
 	    char fn[30];
 	    sprintf(fn, "./output/t%e.h5", time);
 	    save_hdf5_state(fn, &psi[0], params);
+
+	    fprintf(tracefp, "%e\t\t%e\t\t%e\n", time, KE0, KE1);
+	    fflush(tracefp);
+
 	}
 
     }
 
     // save the final state
     save_hdf5_state("./output/final.h5", &psi[0], params);
+
+    fclose(tracefp);
 
     // garbage collection
     fftw_destroy_plan(phys_plan);

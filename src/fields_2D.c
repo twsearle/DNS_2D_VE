@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu 12 Feb 01:45:22 2015
+// Last modified: Thu 12 Feb 03:00:41 2015
 
 #include"fields_2D.h"
 
@@ -869,4 +869,24 @@ double calc_KE0(fftw_complex *arrin, flow_params cnsts)
     KE0 = 0.5 * integral0th;
     
     return KE0;
+}
+
+double calc_KE1(fftw_complex *arrin, flow_params cnsts)
+{
+    fftw_complex integral0th = 0;
+    double KE1 = 0;
+
+    int m=0;
+    int M=cnsts.M;
+    int N=cnsts.N;
+
+    for (m=0; m<M; m+=2)
+    {
+	integral0th += (2. / (1.-m*m)) * arrin[ind(1,m)];
+	integral0th += (2. / (1.-m*m)) * arrin[ind(2*N,m)];
+    }
+
+    KE1 = 0.5 * creal(integral0th);
+    
+    return KE1;
 }

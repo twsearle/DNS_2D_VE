@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 11 Feb 16:03:52 2015
+// Last modified: Thu 12 Feb 03:00:07 2015
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -73,6 +73,8 @@ void load_operator(FILE *fp, fftw_complex *arr, flow_params cnsts);
 void load_hdf5_operator(char *filename, fftw_complex *arr, flow_params cnsts);
 
 double calc_KE0(fftw_complex *arrin, flow_params cnsts);
+
+double calc_KE1(fftw_complex *arrin, flow_params cnsts);
 
 struct flow_params {
     int N;
