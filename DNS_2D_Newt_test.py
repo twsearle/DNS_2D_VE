@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Thu 12 Feb 02:23:11 2015
+#   Last modified: Thu 12 Feb 11:11:43 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -323,8 +323,23 @@ PSI = decide_resolution(PSI, NOld, MOld, CNSTS)
 
 # Form the operators
 PsiOpInvList = []
-for i in range(N):
-    n = i-N
+
+# zeroth mode
+Psi0thOp = zeros((M,M), dtype='complex')
+Psi0thOp = SMDY - 0.5*dt*oneOverRe*SMDYYY + 0j
+
+# Apply BCs
+
+# dypsi0(+-1) = 0
+Psi0thOp[M-3, :] = DERIVTOP
+Psi0thOp[M-2, :] = DERIVBOT
+# psi0(-1) =  0
+Psi0thOp[M-1, :] = BBOT
+
+PsiOpInvList.append(linalg.inv(Psi0thOp))
+
+for i in range(1, N+1):
+    n = i
 
     PSIOP = zeros((2*M, 2*M), dtype='complex')
     SLAPLAC = -n*n*kx*kx*SII + SMDYY
@@ -352,35 +367,19 @@ for i in range(N):
 
 del PSIOP
 
-# zeroth mode
-Psi0thOp = zeros((M,M), dtype='complex')
-Psi0thOp = SMDY - 0.5*dt*oneOverRe*SMDYYY + 0j
-
-# Apply BCs
-
-# dypsi0(+-1) = 0
-Psi0thOp[M-3, :] = DERIVTOP
-Psi0thOp[M-2, :] = DERIVBOT
-# psi0(-1) =  0
-Psi0thOp[M-1, :] = BBOT
-
-PsiOpInvList.append(linalg.inv(Psi0thOp))
-
 PsiOpInvList = array(PsiOpInvList)
 
 #### SAVE THE OPERATORS AND INITIAL STATE FOR THE C CODE
 
 for i in range(N+1):
-    # operator order in list is -N->0
-    n = N-i
-    print n, i
+    # operator order in list is 0->N
+    n = i
+    print n
     opFn = "./operators/op{0}.h5".format(n)
     print opFn
     f = h5py.File(opFn, "w")
     dset = f.create_dataset("op", (M*M,), dtype='complex')
     dset[...] = PsiOpInvList[i].flatten()
-    if n is 0:
-        print dset[:6]
 
     f.close()
 
@@ -562,7 +561,7 @@ if not allclose(DXLPLPSI, dxlplc):
     print "mode 0", linalg.norm(DXLPLPSI[N*M:(N+1)*M]-dxlplc[N*M:(N+1)*M])
     for n in range(1,N+1):
         print "mode", n, linalg.norm(DXLPLPSI[(N+n)*M:(N+n+1)*M]-dxlplc[(N+n)*M:(N+n+1)*M])
-        print "mode", -n,linalg.norm(DXLPLPSI[(N-n)*M:(N+1-n)*M]-dxlplc[(N-n)*M:(N+1-n)*M])
+        print "mode", -n,linalg.norm(DXLPLPSI[(N-n)*M:(N+2-n)*M]-dxlplc[(N-n)*M:(N+1-n)*M])
 
     print "mode 0", linalg.norm(dxlplc[N*M:(N+1)*M])
     for n in range(1,N+1):
@@ -627,16 +626,16 @@ if not allclose(VDYU, vdyyc):
 
 op0c = load_hdf5_state("./output/op0.h5")#.reshape(M, M).T 
 
-print 'operator 0', allclose(op0c, PsiOpInvList[N].flatten())
+print 'operator 0', allclose(op0c, PsiOpInvList[0].flatten())
 
-if not allclose(op0c, PsiOpInvList[N].flatten()):
-    print 'difference', linalg.norm(op0c-PsiOpInvList[N].flatten())
+if not allclose(op0c, PsiOpInvList[0].flatten()):
+    print 'difference', linalg.norm(op0c-PsiOpInvList[0].flatten())
     print op0c[:6]
     print PsiOpInvList[N].flatten()[:6]
 
 for i in range(1,N+1):
     opc = load_hdf5_state("./output/op{0}.h5".format(i))
-    print 'operator ',i, allclose(opc, PsiOpInvList[N-i].flatten())
+    print 'operator ',i, allclose(opc, PsiOpInvList[i].flatten())
 
 
 DYYYPSI = dot(MDY, dot(MDY, dot(MDY, PSI)))
@@ -682,8 +681,34 @@ for i in range(0,N+1):
     print RHSVec[(N+i)*M+maxarg_]
     print RHSvecc[maxarg_]
 
-#psi2c = load("./output/psi2.h5").reshape(2*N+1, 2*M-2).T[:M, :] 
+psi2c = load_hdf5_state("./output/psi2.h5").reshape(2*N+1, M).T 
 
-#print psi2c[N*M:(N+1)*M]
+PSI[N*M:(N+1)*M] = dot(PsiOpInvList[0], RHSVec[N*M:(N+1)*M])
 
-#print 'U ?', allclose(, psi2c)
+for n in range(1,N+1):
+    PSI[(N+n)*M:(N+n+1)*M] = dot(PsiOpInvList[n], RHSVec[(N+n)*M:(N+n+1)*M])
+    del n  
+
+for n in range(0,N):
+    PSI[n*M:(n+1)*M] = conj(PSI[(2*N-n)*M:(2*N+1-n)*M])
+
+PSI22D = PSI.reshape(2*N+1, M).T
+PSI22D = ifftshift(PSI22D, axes=-1)
+
+print 'psi2 = psi2c?', allclose(PSI22D, psi2c)
+
+print psi2c[1,:]
+
+print 'mode', 0, allclose(PSI22D[:, 0], psi2c[:, 0])
+print 'difference', linalg.norm(PSI22D[:, 0]-psi2c[:, 0])
+
+if not allclose(PSI22D, psi2c):
+    for i in range(1,N+1):
+        print 'mode', i, allclose(PSI22D[:, i], psi2c[:, i])
+        print 'difference', linalg.norm(PSI22D[:, i]-psi2c[:, i])
+        print 'mode', -i, allclose(PSI22D[:, 2*N+1-i], psi2c[:, 2*N+1-i])
+        print 'difference', linalg.norm(PSI22D[:, 2*N+1-i]-psi2c[:, 2*N+1-i])
+
+        print 'conjugation', allclose(PSI22D[:,i], conj(PSI22D[:, 2*N+1-i]))
+        print 'conjugation', allclose(psi2c[:,i], conj(psi2c[:, 2*N+1-i]))
+

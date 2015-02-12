@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu 12 Feb 03:01:28 2015
+// Last modified: Thu 12 Feb 11:55:22 2015
 
 /* Program Description:
  *
@@ -469,11 +469,15 @@ int main(int argc, char **argv)
 	    {
 		psi[ind(i,j)] = 0;
 		psi[ind(2*N+1-i,j)] = 0;
+
 	        for (l=0; l<M; l++)
 	        {
-	            psi[ind(i,j)] += opsList[(i*M + j)*M + l] * conj(RHSvec[l]);
-		    psi[ind(2*N+1-i,j)] += conj(psi[ind(i,j)]);
+	            psi[ind(i,j)] += opsList[(i*M + j)*M + l] * RHSvec[l];
 	        }
+
+		psi[ind(2*N+1-i,j)] = conj(psi[ind(i,j)]);
+		//printf("%f + %fj\n", creal(psi[ind(i,j)]), cimag(psi[ind(i,j)]));
+		//printf("%f + %fj\n", creal(psi[ind(2*N+1-i,j)]), cimag(psi[ind(2*N+1-i,j)]) );
 	    }
 
 	}
