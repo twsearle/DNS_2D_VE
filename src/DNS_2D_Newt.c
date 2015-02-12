@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 11 Feb 19:03:03 2015
+// Last modified: Thu 12 Feb 02:17:22 2015
 
 /* Program Description:
  *
@@ -76,17 +76,19 @@ int main(int argc, char **argv)
     opterr = 0;
     int shortArg;
 
-    //params.N = 5;
-    //params.M = 40;
-    //params.Ly = 2.;
-    //params.kx = 1.31;
-    //params.Re = 400;
-    //params.Wi = 1e-05;
-    //params.beta = 1.0;
+    //default parameters
+    params.N = 5;
+    params.M = 40;
+    params.Ly = 2.;
+    params.kx = 1.31;
+    params.Re = 400;
+    params.Wi = 1e-05;
+    params.beta = 1.0;
+    params.dealiasing = 0;
 
     // Read in parameters from cline args.
 
-    while ((shortArg = getopt (argc, argv, "N:M:L:k:R:W:b:t:s:T:d")) != -1)
+    while ((shortArg = getopt (argc, argv, "dN:M:L:k:R:W:b:t:s:T:")) != -1)
 	switch (shortArg)
 	  {
 	  case 'N':
@@ -121,6 +123,7 @@ int main(int argc, char **argv)
 	    break;
 	  case 'd':
 	    params.dealiasing = 1;
+	    printf("Dealiasing on\n");
 	    break;
 	  case '?':
 	    fprintf (stderr, "Option -%c requires an argument.\n", optopt);
@@ -137,14 +140,13 @@ int main(int argc, char **argv)
 
     if (params.dealiasing == 1)
     {
-	params.Nf = 3*params.N/2;
-	params.Mf = 3*params.M/2;
+	params.Nf = (3*params.N)/2 + 1;
+	params.Mf = (3*params.M)/2;
     } else
     {
 	params.Nf = params.N;
 	params.Mf = params.M;
     }
-
 
     printf("PARAMETERS: ");
     printf("\nN                   \t %d ", params.N);
@@ -159,13 +161,11 @@ int main(int argc, char **argv)
     printf("\nTime Steps per frame\t %d \n", stepsPerFrame);
 
     // Declare variables
-    FILE *fpi = NULL;
-
     int i, j, l;
     int N = params.N;
     int M = params.M;
-    int Nf = params.N;
-    int Mf = params.M;
+    int Nf = params.Nf;
+    int Mf = params.Mf;
 
     // field arrays are declared as pointers and then I malloc.
     fftw_complex *scratch, *scratch2, *scratch3, *scratch4, *tmpop;
@@ -179,15 +179,7 @@ int main(int argc, char **argv)
     double time;
     double oneOverRe = 1./params.Re;
     
-    // Ops list is an array of arrays. Inner arrays are flattened 2D operators.
-    // outer array is just so that we keep al the operators together
     fftw_complex *opsList;
-    // fftw_complex **opsList;
-    // opsList = malloc(N+1 * sizeof * (opsList));
-    // for (i=0; i<N+1; i++) 
-    // {
-    //     (opsList)[i] = malloc(M*M * sizeof * (opsList)[i]);
-    // }
 
     fftw_plan phys_plan, spec_plan;
 
@@ -236,11 +228,6 @@ int main(int argc, char **argv)
     printf("\n------\nLoading initial streamfunction and operators\n------\n");
 
     // load the initial field from scipy
-
-    // fpi = fopen("initial.dat", "r");
-    // load_state(fpi, psi, params);
-    // fclose(fpi);
-
     load_hdf5_state("initial.h5", psi, params);
 
     // load the operators from scipy 
@@ -281,7 +268,12 @@ int main(int argc, char **argv)
 
     time = timeStep*dt;
     dy(psi, u, params);
+
+    fft_convolve(u, u, u, scratchp1, scratchp2, scratchin, scratchout,
+	    &phys_plan, &spec_plan, params);
+
     KE0 = (15./ 8.) * calc_KE0(u, params);
+    printf("N %d, M %d, Nf %d, Mf %d\n", N, M, Nf, Mf);
 
     printf("%e\t\t%e\n", time, KE0);
 
@@ -302,18 +294,6 @@ int main(int argc, char **argv)
 	    save_hdf5_state("./output/u.h5",  &u[0], params);
 	}
 
-	//if((timeStep==1) || (timeStep==0) )
-	//{
-	//    printf("\n");
-	//    for (j=0;j<M;j++)
-	//    {
-	//	printf(" %f ", creal(u[ind(0,j)]));
-	//    }
-	//    printf("\n");
-	//}
-	
-
-      // to_physical(u, scratchp1, scratchin, scratchout, &phys_plan, params);
 
       // v
       dx(psi, v, params);
@@ -442,10 +422,10 @@ int main(int argc, char **argv)
 	    save_hdf5_state("./output/vdyypsi.h5", &vdyypsi[0], params);
 	}
 
-	// RHSVec = dt*0.5*oneOverRe*dot(BIHARM, PSI) 
-	// 	+ dot(LAPLAC, PSI) 
-	// 	- dt*dot(MMU, dot(MDXLAPLAC, PSI)) 
-	// 	- dt*dot(MMV, dot(MDYLAPLAC, PSI)) 
+	// RHSVec = dt*0.5*oneOverRe*BIHARMPSI \
+	// 	+ LPLPSI \
+	// 	- dt*UDXLPLPSI \
+	// 	- dt*VDYLPLPSI 
 
 	for (i=1; i<N+1; i++)
 	{
@@ -457,10 +437,6 @@ int main(int argc, char **argv)
 			    - dt*udxlplpsi[ind(i,j)]
 			    - dt*vdylplpsi[ind(i,j)];
 			    
-		//printf("%p\n", &RHSvec[0]);
-		//printf("%f\n", creal(RHSvec[0]));
-		//printf("%p\n", &opsList[4*M*M]);
-		//printf("%f\n", creal(opsList[4*M*M]));
 
 	    }
 
@@ -474,7 +450,7 @@ int main(int argc, char **argv)
 		char fn[30];
 		sprintf(fn, "./output/RHSVec%d.h5", i);
 		printf("writing %s\n", fn);
-		save_hdf5_arr(fn, &RHSvec[0], shape2[0]);
+		save_hdf5_arr(fn, &RHSvec[0], M);
 	    }
 
 
@@ -492,7 +468,6 @@ int main(int argc, char **argv)
 	    }
 
 	}
-
 
 
 	// # Zeroth mode
@@ -520,9 +495,6 @@ int main(int argc, char **argv)
 	RHSvec[M-3] = 0; 
 	RHSvec[M-2] = 0; 
 	RHSvec[M-1] = 0; 
-
-	//printf("0th element RHSVEC: %f %f\n", creal(RHSvec[0]), cimag(RHSvec[0]));
-	//printf("2nd element RHSVEC: %f %f\n", creal(RHSvec[2]), cimag(RHSvec[2]));
 
 	// step the zeroth mode
 	
@@ -566,6 +538,8 @@ int main(int argc, char **argv)
 	if ((timeStep % stepsPerFrame) == 0 )
 	{
 	  time = timeStep*dt;
+	  fft_convolve(u, u, u, scratchp1, scratchp2, scratchin, scratchout,
+	    &phys_plan, &spec_plan, params);
 	  KE0 = calc_KE0(u, params) * (15.0/ 8.0);
 
 	  printf("%e\t\t%e\n", time, KE0);
@@ -584,6 +558,8 @@ int main(int argc, char **argv)
     fftw_destroy_plan(phys_plan);
     fftw_destroy_plan(spec_plan);
 
+    fftw_free(tmpop);
+    fftw_free(opsList);
     fftw_free(scratch);
     fftw_free(scratch2);
     fftw_free(scratch3);
@@ -595,12 +571,15 @@ int main(int argc, char **argv)
     fftw_free(vdylplpsi);
     fftw_free(lplpsi);
     fftw_free(biharmpsi);
+    fftw_free(scratchin);
+    fftw_free(scratchout);
     fftw_free(scratchp1);
     fftw_free(scratchp2);
     fftw_free(dyyypsi);
     fftw_free(dypsi);
     fftw_free(vdyypsi);
     fftw_free(RHSvec);
+
     printf("quitting c program\n");
 
     return 0;

@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 11 Feb 17:39:04 2015
+// Last modified: Wed 11 Feb 21:51:56 2015
 
 /* Program Description:
  *
@@ -58,7 +58,7 @@ int main()
     flow_params params;
 
     params.N = 5;
-    params.M = 50;
+    params.M = 40;
     params.Ly = 2.;
     params.kx = 1.31;
     params.Re = 400;
@@ -244,9 +244,12 @@ int main()
     fftw_destroy_plan(spec_plan);
     fftw_free(arrin);
     fftw_free(physout);
+    fftw_free(physout2);
+    fftw_free(derivout);
     fftw_free(specout);
     fftw_free(specout2);
     fftw_free(phystest);
+    fftw_free(scratch);
     fftw_free(scratchin);
     fftw_free(scratchout);
 

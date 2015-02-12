@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 11 Feb 18:54:00 2015
+// Last modified: Thu 12 Feb 01:45:22 2015
 
 #include"fields_2D.h"
 
@@ -91,6 +91,7 @@ void save_hdf5_arr(char *filename, fftw_complex *arr, int size)
     status = H5Dclose(dataset_id);
     status = H5Sclose(dataspace_id);
     status = H5Tclose(datatype_id);
+    status = H5Tclose(filetype_id);
     free(wdata);
 
     // close the file
@@ -149,6 +150,7 @@ void save_hdf5_state(char *filename, fftw_complex *arr, flow_params cnsts)
     status = H5Dclose(dataset_id);
     status = H5Sclose(dataspace_id);
     status = H5Tclose(datatype_id);
+    status = H5Tclose(filetype_id);
     free(wdata);
 
     // close the file
@@ -494,28 +496,25 @@ void to_physical(fftw_complex *arrin, fftw_complex *arrout,
     int Nf = cnsts.Nf;
     int Mf = cnsts.Mf;
     int i,j;
-    fftw_complex normalise = 1;
 
-    // take the complex conjugate, because we need both transforms to be forward.
+    // This uses an inverse FT. sign is +1.
     // factor of 2*N+1 is just here because my other method I am comparing with
     // has transforms in the inverse direction which pick up a normalisation
     // factor. 
-    // Careful! we want an orthogonal transform. need to normalise in both
-    // places so that a full transform will do the right thing
 
     if (cnsts.dealiasing)
     {
         for (j=0; j<M; j++)
         {
-            scratchin[indfft(0,j)] = arrin[ind(0,j)] /normalise;
+            scratchin[indfft(0,j)] = arrin[ind(0,j)];
         }
 
         for (i=1; i<N+1; i++)
         {
             for (j=0; j<M; j++)
             {
-        	scratchin[indfft(i,j)] = arrin[ind(i,j)] / normalise;
-        	scratchin[indfft(2*Nf+1-i, j)] = arrin[ind(2*N+1-i,j)] / normalise;
+        	scratchin[indfft(i,j)] = arrin[ind(i,j)];
+        	scratchin[indfft(2*Nf+1-i, j)] = arrin[ind(2*N+1-i,j)];
             }
         }
 
@@ -543,7 +542,7 @@ void to_physical(fftw_complex *arrin, fftw_complex *arrout,
         {
             for (j=0; j<M; j++)
             {
-        	scratchin[indfft(i,j)] = arrin[ind(i,j)]/normalise;
+        	scratchin[indfft(i,j)] = arrin[ind(i,j)];
             }
         }
     }

@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Wed 11 Feb 19:00:19 2015
+#   Last modified: Thu 12 Feb 02:23:11 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -52,6 +52,7 @@ import matplotlib.pyplot as plt
 import ConfigParser
 import subprocess
 import h5py
+import TobySpectralMethods as tsm
 
 # SETTINGS---------------------------------------------------------------------
 
@@ -65,10 +66,10 @@ Wi = 0.0
 beta = 1.0
 kx = config.getfloat('General', 'kx')
 
-dealiasing = False
+dealiasing = True
 
 if dealiasing:
-    Nf = (3*N)/2 +1
+    Nf = (3*N)/2 + 1
     Mf = (3*M)/2
 else:
     Nf = N
@@ -404,6 +405,11 @@ f.close()
 
 stepsPerFrame = numTimeSteps/numFrames
 
+
+tsm.initTSM(N_=N,M_=M,kx_=kx)
+MDY = mk_diff_y()
+MDX = mk_diff_x()
+
 # Run program in C
 
 # pass the flow variables and the time iteration settings to the C code
@@ -448,15 +454,16 @@ print 'initial streamfunction?', allclose(PSI,psic)
 #print 'difference', linalg.norm(psic-PSI)
 #print 'zeroth mode c-python', psic[:M]- PSI[:M]
 
-MDY = mk_diff_y()
-MDX = mk_diff_x()
-
 # switch PSI back to normal ordering for F modes
 PSI = fftshift(PSI, axes=1)
 PSI = PSI.T.flatten()
 
 # u
 U = dot(MDY, PSI)
+USQ = dot(tsm.prod_mat(U), U)
+
+INTY = mk_cheb_int()
+print 'KE0: ', (15.0/16.0)*dot(INTY, USQ[N*M:(N+1)*M])
 
 # read in and make it 2D to get rid of the junk Cheby modes.
 # Then take transpose and flatten to return to 2*N+1 chunks of M length.
@@ -465,8 +472,6 @@ Uc = fftshift(Uc, axes=1)
 Uc = Uc.T.flatten()
 
 print 'U ?', allclose(U, Uc)
-INTY = mk_cheb_int()
-print 'KE0: ', (15.0/16.0)*dot(INTY, U[N*M:(N+1)*M])
 
 #print 'difference', linalg.norm(U-Uc)
 #print 'U1', U[M: 2*M]
@@ -537,8 +542,8 @@ biharmc = biharmc.T.flatten()
 BIHARMPSI = dot(dot(MDY,MDY) + dot(MDX,MDX), LPLPSI)
 
 print 'biharm psi ?', allclose(BIHARMPSI, biharmc)
+print 'difference', linalg.norm(BIHARMPSI-biharmc)
 if not allclose(BIHARMPSI, biharmc):
-    print 'difference', linalg.norm(BIHARMPSI-biharmc)
     #print 'BIHARMPSI1', BIHARMPSI[M: 2*M]
     #print 'BIHARMPSI1c', biharmc[M: 2*M]
     print 'difference', (BIHARMPSI-biharmc)[N*M+38::M]
@@ -633,22 +638,49 @@ for i in range(1,N+1):
     opc = load_hdf5_state("./output/op{0}.h5".format(i))
     print 'operator ',i, allclose(opc, PsiOpInvList[N-i].flatten())
 
-exit(1)
-RHSvec =pickle.load(open("./output/RHSVECtest.pickle", 'r'))
 
 DYYYPSI = dot(MDY, dot(MDY, dot(MDY, PSI)))
 
+RHSVec = dt*0.5*oneOverRe*BIHARMPSI \
+        + LPLPSI \
+        - dt*UDXLPLPSI \
+        - dt*VDYLPLPSI 
+
+
+# Zeroth mode
+RHSVec[N*M:(N+1)*M] = 0
+RHSVec[N*M:(N+1)*M] = dt*0.5*oneOverRe*DYYYPSI[N*M:(N+1)*M] \
+        + U[N*M:(N+1)*M] \
+        - dt*VDYU[N*M:(N+1)*M]
+RHSVec[N*M] += dt*2*oneOverRe
+
+# Apply BC's
+
+for n in range (N+1): 
+    # dyPsi(+-1) = 0  
+    # Only impose the BC which is actually present in the inverse operator
+    # we are dealing with. Remember that half the Boundary Conditions were
+    # imposed on phi, which was accounted for implicitly when we ignored it.
+    RHSVec[(N+n)*M + M-2] = 0
+    RHSVec[(N+n)*M + M-1] = 0
+del n
+
+# dyPsi0(+-1) = 0
+RHSVec[N*M + M-3] = 0
+RHSVec[N*M + M-2] = 0
+
+# Psi0(-1) = 0
+RHSVec[N*M + M-1] = 0
+
 for i in range(0,N+1):
     RHSvecc = load_hdf5_state("./output/RHSvec{0}.h5".format(i))
-    print "RHSvec for mode ", i, allclose(RHSvec[(N+i)*M:(N+1+i)*M], RHSvecc)
-    print 'difference', linalg.norm(RHSvec[(N+i)*M:(N+1+i)*M]- RHSvecc)
-
-    if i == 0:
-        print RHSvec[(N+i)*M:(N+1+i)*M]
-        print RHSvecc 
-        print VDYU[N*M:(N+1)*M]
-        print DYYYPSI[N*M:(N+1)*M]
-        print U[N*M:(N+1)*M]
+    print "RHSvec for mode ", i, allclose(RHSVec[(N+i)*M:(N+1+i)*M], RHSvecc)
+    print 'difference', linalg.norm(RHSVec[(N+i)*M:(N+1+i)*M]- RHSvecc)
+    print 'max difference', amax(RHSVec[(N+i)*M:(N+1+i)*M]- RHSvecc)
+    maxarg_ = argmax(RHSVec[(N+i)*M:(N+1+i)*M]- RHSvecc)
+    print 'argmax difference', maxarg_
+    print RHSVec[(N+i)*M+maxarg_]
+    print RHSvecc[maxarg_]
 
 #psi2c = load("./output/psi2.h5").reshape(2*N+1, 2*M-2).T[:M, :] 
 

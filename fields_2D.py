@@ -1540,7 +1540,7 @@ def test_c_version(CNSTS):
 
 if __name__ == "__main__":
 
-    CNSTS = set_constants(M=50, N=5, kx=1.31, dealiasing=True)
+    CNSTS = set_constants(M=40, N=5, kx=1.31, dealiasing=True)
 
     #test_roll_profile(CNSTS)
 

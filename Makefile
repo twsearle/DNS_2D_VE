@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS = -ggdb -Wall -fpic -Iinclude $(TOBYCPATHS) #-L/opt/local/lib -I/opt/local/include 
+CFLAGS = -g -ggdb -Wall -fpic -Iinclude $(TOBYCPATHS) #-L/opt/local/lib -I/opt/local/include 
 
 DNS_2D_Newt : obj/fields_2D.o obj/DNS_2D_Newt.o
 	$(CC) -o DNS_2D_Newt obj/DNS_2D_Newt.o obj/fields_2D.o $(CFLAGS) -lhdf5 -lhdf5_hl -lfftw3 -lm
