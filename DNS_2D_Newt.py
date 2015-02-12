@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Thu 12 Feb 03:01:58 2015
+#   Last modified: Thu 12 Feb 12:03:14 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -249,8 +249,23 @@ print 'performing linear stability of Poiseuille flow test'
 
 # Form the operators
 PsiOpInvList = []
-for i in range(N):
-    n = i-N
+
+# zeroth mode
+Psi0thOp = zeros((M,M), dtype='complex')
+Psi0thOp = SMDY - 0.5*dt*oneOverRe*SMDYYY + 0j
+
+# Apply BCs
+
+# dypsi0(+-1) = 0
+Psi0thOp[M-3, :] = DERIVTOP
+Psi0thOp[M-2, :] = DERIVBOT
+# psi0(-1) =  0
+Psi0thOp[M-1, :] = BBOT
+
+PsiOpInvList.append(linalg.inv(Psi0thOp))
+
+for i in range(1, N+1):
+    n = i
 
     PSIOP = zeros((2*M, 2*M), dtype='complex')
     SLAPLAC = -n*n*kx*kx*SII + SMDYY
@@ -297,8 +312,9 @@ PsiOpInvList = array(PsiOpInvList)
 #### SAVE THE OPERATORS AND INITIAL STATE FOR THE C CODE
 
 for i in range(N+1):
-    # operator order in list is -N->0
-    n = N-i
+    # operator order in list is 0->N
+    n = i
+    print n
     opFn = "./operators/op{0}.h5".format(n)
     print "writing ", opFn
     f = h5py.File(opFn, "w")
