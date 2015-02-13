@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu 12 Feb 15:28:07 2015
+// Last modified: Thu 12 Feb 17:27:19 2015
 
 /* Program Description:
  *
@@ -553,7 +553,7 @@ int main(int argc, char **argv)
 	//printf("psi[2] %f + %fj\n", creal(psi[2]), cimag(psi[2]));
 	//printf("psi[3] %f + %fj\n", creal(psi[3]), cimag(psi[3]));
 
-	if(timeStep==0)
+	if(timeStep==1)
 	{
 	    save_hdf5_state("./output/psi2.h5", &psi[0], params);
 	}

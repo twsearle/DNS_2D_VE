@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu 12 Feb 15:28:31 2015
+// Last modified: Fri 13 Feb 22:29:52 2015
 
 #include"fields_2D.h"
 
@@ -618,7 +618,7 @@ void to_physical(fftw_complex *arrin, fftw_complex *arrout,
     {
         for (j=0; j<Mf; j++)
         {
-            arrout[indfft(i,j)] = 0.5*scratchout[indfft(i,j)];
+            arrout[indfft(i,j)] = 0.5*creal(scratchout[indfft(i,j)]);
         }
     }
 }

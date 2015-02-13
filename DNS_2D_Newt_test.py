@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Thu 12 Feb 15:39:13 2015
+#   Last modified: Thu 12 Feb 17:33:25 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -319,6 +319,7 @@ PSI = zeros((2*N+1)*M,dtype='complex')
 # Read in stream function from file
 (PSI, Nu) = pickle.load(open(inFileName,'r'))
 PSI = decide_resolution(PSI, NOld, MOld, CNSTS)
+PSI[:] = 1.
 
 
 # Form the operators
@@ -618,6 +619,7 @@ vdyyc = vdyyc.T.flatten()
 VDYU = dot(prod_mat(V), dot(MDY, dot(MDY, PSI))) 
 
 print 'vdyypsi ?', allclose(VDYU, vdyyc)
+print 'difference', linalg.norm(VDYU-vdyyc)
 if not allclose(VDYU, vdyyc):
     print 'difference', linalg.norm(VDYU-vdyyc)
     #print 'VDYU1', VDYU[M: 2*M]
@@ -652,6 +654,7 @@ RHSVec[N*M:(N+1)*M] = dt*0.5*oneOverRe*DYYYPSI[N*M:(N+1)*M] \
         + U[N*M:(N+1)*M] \
         - dt*VDYU[N*M:(N+1)*M]
 RHSVec[N*M] += dt*2*oneOverRe
+
 
 # Apply BC's
 
@@ -692,6 +695,8 @@ for n in range(1,N+1):
 for n in range(0,N):
     PSI[n*M:(n+1)*M] = conj(PSI[(2*N-n)*M:(2*N+1-n)*M])
 
+#PSI = pickle.load(open('./output/PSI10test.pickle', 'r')) 
+
 PSI22D = PSI.reshape(2*N+1, M).T
 PSI22D = ifftshift(PSI22D, axes=-1)
 
@@ -705,13 +710,13 @@ print 'argmax difference', maxarg_
 print PSI22D[maxarg_, 0]
 print psi2c[maxarg_, 0]
 
-if not allclose(PSI22D, psi2c):
-    for i in range(1,N+1):
-        print 'mode', i, allclose(PSI22D[:, i], psi2c[:, i])
-        print 'difference', linalg.norm(PSI22D[:, i]-psi2c[:, i])
-        print 'mode', -i, allclose(PSI22D[:, 2*N+1-i], psi2c[:, 2*N+1-i])
-        print 'difference', linalg.norm(PSI22D[:, 2*N+1-i]-psi2c[:, 2*N+1-i])
+#if not allclose(PSI22D, psi2c):
+for i in range(1,N+1):
+    print 'mode', i, allclose(PSI22D[:, i], psi2c[:, i])
+    print 'difference', linalg.norm(PSI22D[:, i]-psi2c[:, i])
+    print 'mode', -i, allclose(PSI22D[:, 2*N+1-i], psi2c[:, 2*N+1-i])
+    print 'difference', linalg.norm(PSI22D[:, 2*N+1-i]-psi2c[:, 2*N+1-i])
 
-        print 'conjugation', allclose(PSI22D[:,i], conj(PSI22D[:, 2*N+1-i]))
-        print 'conjugation', allclose(psi2c[:,i], conj(psi2c[:, 2*N+1-i]))
+    print 'conjugation', allclose(PSI22D[:,i], conj(PSI22D[:, 2*N+1-i]))
+    print 'conjugation', allclose(psi2c[:,i], conj(psi2c[:, 2*N+1-i]))
 

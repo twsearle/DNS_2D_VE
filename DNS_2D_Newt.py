@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Thu 12 Feb 12:03:14 2015
+#   Last modified: Thu 12 Feb 16:41:10 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -239,7 +239,7 @@ PSI[N*M+1] += 3.0/4.0
 PSI[N*M+2] += 0.0
 PSI[N*M+3] += -1.0/12.0
 
-PSI[(N-1)*M + 3] += 1e-10
+#PSI[(N-1)*M + 3] += 1e-10
 PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
 
 print 'performing linear stability of Poiseuille flow test'
