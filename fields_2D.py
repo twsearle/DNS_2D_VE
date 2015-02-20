@@ -1023,6 +1023,18 @@ def test_roll_profile(CNSTS):
 
     print 'dy of the spectrum in real space = real space analytic derivative? ',\
             allclose(to_physical(yDerivTest, CNSTS), actualRYderiv)
+    print 'difference ' , linalg.norm(to_physical(yDerivTest, CNSTS) -
+                                      actualRYderiv)
+    print 'dy by python = dy by matrix multiplication? '
+    MDY = tsm.mk_diff_y()
+    matdy = dot(MDY, flatSpec)
+    matdy = matdy.reshape(2*N+1, M).T
+    matdy = ifftshift(matdy, axes=-1)
+    print allclose(matdy, yDerivTest)
+    print linalg.norm(matdy - yDerivTest)
+    print 'Chebyshev modes check'
+    for m in range(M):
+        print 'mode', m, linalg.norm(matdy[m,:] - yDerivTest[m,:])
 
     tmpTest = dyy(actualSpec, CNSTS)
 
@@ -1151,6 +1163,10 @@ def test_c_version(CNSTS):
 
     actualSpec, _ = pickle.load(open('pf-N5-M40-kx1.31-Re3000.0.pickle', 'r'))
     actualSpec = decide_resolution(actualSpec, 5, 40, CNSTS)
+
+    actualSpec[:] = rand((2*N+1)*M) + 1.j*rand((2*N+1)*M)
+    actualSpec[N*M:(N+1)*M] = rand(M) 
+
     actualSpec = actualSpec.reshape(2*N+1, M).T
     actualSpec = ifftshift(actualSpec, axes=1)
 
@@ -1175,7 +1191,7 @@ def test_c_version(CNSTS):
 
     # call the c program
     subprocess.call(["./test_fields"])
-    subprocess.call(["./test_fields_1"])
+    #subprocess.call(["./test_fields_1"])
 
     # Read in the c programs output
     # Reshape is because fft insists on 1D double complex arrays.
@@ -1214,10 +1230,13 @@ def test_c_version(CNSTS):
 
     print "Python and C code give the same derivative: ", allclose(ctestdySpec,
                                                                   dySpec)
+    print "\t\tdifference ", linalg.norm(ctestdySpec - dySpec)
+
     d4ySpec = dy(dy(dy(dySpec, CNSTS), CNSTS), CNSTS)
     ctestd4ySpec = load_hdf5_state("testd4y.h5").reshape(2*N+1, M).T
     print "Python and C code give the same d4y: ", allclose(ctestd4ySpec,
                                                                   d4ySpec)
+    print "\t\tdifference ", linalg.norm(ctestd4ySpec-d4ySpec)
     if not allclose(ctestd4ySpec, d4ySpec):
         print "fourier modes"
         print "mode", 0, linalg.norm(ctestd4ySpec[:,0] - d4ySpec[:, 0])
@@ -1232,6 +1251,7 @@ def test_c_version(CNSTS):
             print "mode", m, linalg.norm(ctestd4ySpec[m, :] - d4ySpec[m, :])
 
 
+    exit(1)
 
     flatspec = fftshift(actualSpec, axes=1)
     flatspec = flatspec.T.flatten()
@@ -1241,14 +1261,23 @@ def test_c_version(CNSTS):
     MDX = tsm.mk_diff_x()
     MDY = tsm.mk_diff_y()
 
+    #MDYud = MDY[::-1, :]
+    #matd4ySpecud = dot(MDYud, dot(MDYud, dot(MDYud, dot(MDYud,
+    #                                flatspec)[::-1])[::-1])[::-1])[::-1] 
+    #matd4ySpecud = matd4ySpecud.reshape(2*N+1, M).T
+    #matd4ySpecud = ifftshift(matd4ySpecud, axes=-1)
+
     matd4ySpec = dot(MDY, dot(MDY, dot(MDY, dot(MDY, flatspec)))) 
     matd4ySpec = matd4ySpec.reshape(2*N+1, M).T
     matd4ySpec = ifftshift(matd4ySpec, axes=-1)
 
+    #print "was that a good test?", linalg.norm(matd4ySpec - matd4ySpecud)
+
     print "Python and matrix method give the same d4y: ", allclose(matd4ySpec,
                                                                   d4ySpec)
+    print "difference, ", linalg.norm(matd4ySpec-d4ySpec) / sqrt((2*N+1)*M)
 
-    if not allclose(matd4ySpec, d4ySpec):
+    if not linalg.norm(matd4ySpec-d4ySpec) == 0:
         print "fourier modes"
         print "mode", 0, linalg.norm(matd4ySpec[:,0] - d4ySpec[:, 0])
         for n in range(1,N):
@@ -1324,9 +1353,10 @@ def test_c_version(CNSTS):
         show()
         #imshow(real(ctestPhys), origin='lower')
         #show()
-    ctestPhys1D = load_hdf5_state("testPhys_1D.h5").reshape(2*Nf+1, 2*Mf-2).T[:Mf, :]
-    testBool = allclose(actualPhys, ctestPhys1D)
-    print "Physical Transform: C 1D transform is the same as python transform?",testBool
+
+    #ctestPhys1D = load_hdf5_state("testPhys_1D.h5").reshape(2*Nf+1, 2*Mf-2).T[:Mf, :]
+    #testBool = allclose(actualPhys, ctestPhys1D)
+    #print "Physical Transform: C 1D transform is the same as python transform?",testBool
 
     ctestSpec = load_hdf5_state("testSpectralT.h5").reshape(2*N+1, M).T 
     python2spec = to_spectral_2(actualPhys, CNSTS)
@@ -1390,31 +1420,31 @@ def test_c_version(CNSTS):
         colorbar()
         show()
 
-    ctestSpec_1D = load_hdf5_state("testSpec_1D.h5").reshape(2*N+1, M).T 
+    #ctestSpec_1D = load_hdf5_state("testSpec_1D.h5").reshape(2*N+1, M).T 
 
     pythonSpecCheb = zeros((Mf, 2*Nf+1), dtype='complex')
     pythonSpecCheb = to_spectral(phystest,CNSTS)
     #for i in range(2*Nf+1):
     #    pythonSpecCheb[:,i] = forward_cheb_transform(phystest[:,i], CNSTS)
 
-    testBool =  allclose(pythonSpecCheb, ctestSpec_1D)
+    #testBool =  allclose(pythonSpecCheb, ctestSpec_1D)
 
-    print 'Spectral Transform: '
-    print 'From real space problem to spectral space, comparision of python and C 1D'
-    print testBool
-    if not testBool:
-        print 'c'
-        imshow(real(ctestSpec_1D))
-        colorbar()
-        show()
-        print 'p'
-        imshow(real(pythonSpecCheb))
-        colorbar()
-        show()
-        print 'p-c'
-        imshow(real(pythonSpecCheb-ctestSpec_1D))
-        colorbar()
-        show()
+    #print 'Spectral Transform: '
+    #print 'From real space problem to spectral space, comparision of python and C 1D'
+    #print testBool
+    #if not testBool:
+    #    print 'c'
+    #    imshow(real(ctestSpec_1D))
+    #    colorbar()
+    #    show()
+    #    print 'p'
+    #    imshow(real(pythonSpecCheb))
+    #    colorbar()
+    #    show()
+    #    print 'p-c'
+    #    imshow(real(pythonSpecCheb-ctestSpec_1D))
+    #    colorbar()
+    #    show()
 
     print 'Spectral Transform: '
     print 'From real space problem to spectral space and back again, comparision of python and C'
@@ -1540,7 +1570,7 @@ def test_c_version(CNSTS):
 
 if __name__ == "__main__":
 
-    CNSTS = set_constants(M=40, N=5, kx=1.31, dealiasing=True)
+    CNSTS = set_constants(M=100, N=5, kx=1.31, dealiasing=True)
 
     #test_roll_profile(CNSTS)
 

@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu 12 Feb 17:27:19 2015
+// Last modified: Fri 20 Feb 2015 18:09:23 GMT
 
 /* Program Description:
  *
@@ -197,10 +197,12 @@ int main(int argc, char **argv)
     fftw_complex *psi, *u, *v, *udxlplpsi, *vdylplpsi, *biharmpsi, *lplpsi;
     fftw_complex *dyyypsi, *dypsi, *vdyypsi;
     fftw_complex *scratchp1, *scratchp2;
+    fftw_complex *psibkp;
 
     fftw_complex *RHSvec;
     double time = 0;
     double oneOverRe = 1./params.Re;
+    fftw_complex sum =0;
     
     fftw_complex *opsList;
 
@@ -224,6 +226,7 @@ int main(int argc, char **argv)
     scratch4 = (fftw_complex*) fftw_malloc((M)*(2*N+1) * sizeof(fftw_complex));
 
     psi = (fftw_complex*) fftw_malloc((M)*(2*N+1) * sizeof(fftw_complex));
+    psibkp = (fftw_complex*) fftw_malloc((M)*(2*N+1) * sizeof(fftw_complex));
     u = (fftw_complex*) fftw_malloc((M)*(2*N+1) * sizeof(fftw_complex));
     v = (fftw_complex*) fftw_malloc((M)*(2*N+1) * sizeof(fftw_complex));
     udxlplpsi = (fftw_complex*) fftw_malloc((M)*(2*N+1) * sizeof(fftw_complex));
@@ -252,6 +255,7 @@ int main(int argc, char **argv)
 
     // load the initial field from scipy
     load_hdf5_state("initial.h5", psi, params);
+    load_hdf5_state("initial.h5", psibkp, params);
 
     // load the operators from scipy 
     for (i=0; i<N+1; i++) 
@@ -335,11 +339,41 @@ int main(int argc, char **argv)
       if(timeStep==0)
       {
           save_hdf5_state("./output/v.h5", &v[0], params);
+	    sum=0;
+	    for (i=0; i<2*N+1; i++)
+	    {
+		for (j=0; j<M; j++)
+		{
+		    sum += (psibkp[ind(i,j)] - psi[ind(i,j)])*conj((psibkp[ind(i,j)] - psi[ind(i,j)]));
+		}
+	    }
+	    sum = sqrt(creal(sum));
+	    printf("LLLLLLLOOOOOOOOOOOOOOOKKKKKKKKK HEEEEEERRRRRRREEEEEEEE----------------\n");
+	    printf("%e + %e j\n", creal(sum), cimag(sum));
+	    printf("LLLLLLLOOOOOOOOOOOOOOOKKKKKKKKK HEEEEEERRRRRRREEEEEEEE----------------\n");
       }
 
-      to_physical(psi, scratchp2, scratchin, scratchout, &phys_plan, params);
+      //to_physical(psi, scratchp2, scratchin, scratchout, &phys_plan, params);
       //exit(1);
-      to_spectral(scratchp2, psi, scratchin, scratchout, &spec_plan, params);
+      //to_spectral(scratchp2, psi, scratchin, scratchout, &spec_plan, params);
+
+      if(timeStep==0)
+      {
+	    sum =0;
+	    for (i=0; i<2*N+1; i++)
+	    {
+		for (j=0; j<M; j++)
+		{
+		    sum += (psibkp[ind(i,j)] - psi[ind(i,j)])*conj((psibkp[ind(i,j)] - psi[ind(i,j)]));
+		}
+	    }
+	    sum = sqrt(creal(sum));
+	    printf("LLLLLLLOOOOOOOOOOOOOOOKKKKKKKKK HEEEEEERRRRRRREEEEEEEE----------------\n");
+	    printf("%e + %e j\n", creal(sum), cimag(sum));
+	    printf("LLLLLLLOOOOOOOOOOOOOOOKKKKKKKKK HEEEEEERRRRRRREEEEEEEE----------------\n");
+      }
+
+
 
 	// lplpsi dyy(psi) + dxx(psi)
 
@@ -363,7 +397,15 @@ int main(int argc, char **argv)
 	// biharmpsi (dyy + dxx)lplpsi
 	
 	dy(u, scratch, params);
+	if(timeStep==0)
+	{
+	    save_hdf5_state("./output/d2ypsi.h5", &scratch[0], params);
+	}
 	dy(scratch, scratch2, params);
+	if(timeStep==0)
+	{
+	    save_hdf5_state("./output/d3ypsi.h5", &scratch2[0], params);
+	}
 	dy(scratch2, scratch, params);
 	if(timeStep==0)
 	{
@@ -372,6 +414,10 @@ int main(int argc, char **argv)
 
 	dx(psi, scratch, params);
 	dx(scratch, scratch2, params);
+	if(timeStep==0)
+	{
+	    save_hdf5_state("./output/d2xpsi.h5", &scratch2[0], params);
+	}
 	dx(scratch2, scratch, params);
 	dx(scratch, scratch2, params);
 	if(timeStep==0)
@@ -435,7 +481,6 @@ int main(int argc, char **argv)
 	if(timeStep==0)
 	{
 	    save_hdf5_state("./output/vdylplpsi.h5", &vdylplpsi[0], params);
-
 	}
 	
 	//vdyypsi = vdyu
@@ -510,9 +555,9 @@ int main(int argc, char **argv)
 	
 	for (j=0; j<M; j++)
 	{
-	    RHSvec[j] = 0.5*dt*oneOverRe*dyyypsi[ind(0,j)]
-			+ u[ind(0,j)]
-			- dt*vdyypsi[ind(0,j)];
+	    RHSvec[j] = + dt*0.5*oneOverRe*dyyypsi[ind(0,j)];
+	    RHSvec[j] += u[ind(0,j)];
+			//- dt*vdyypsi[ind(0,j)];
 	}
 	RHSvec[0] += 2*dt*oneOverRe;
 

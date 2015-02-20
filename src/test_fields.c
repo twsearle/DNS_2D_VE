@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 11 Feb 21:51:56 2015
+// Last modified: Wed 18 Feb 2015 14:04:53 GMT
 
 /* Program Description:
  *
@@ -58,7 +58,7 @@ int main()
     flow_params params;
 
     params.N = 5;
-    params.M = 40;
+    params.M = 100;
     params.Ly = 2.;
     params.kx = 1.31;
     params.Re = 400;

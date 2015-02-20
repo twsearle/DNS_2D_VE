@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Thu 12 Feb 17:33:25 2015
+#   Last modified: Fri 20 Feb 2015 18:06:18 GMT
 #
 #-----------------------------------------------------------------------------
 
@@ -301,11 +301,11 @@ del j
 #### The initial stream-function
 PSI = zeros((2*N+1)*M,dtype='complex')
 
-# not sure, hope this is Poiseuille flow 
-#PSI[N*M]   += 2.0/3.0
-#PSI[N*M+1] += 3.0/4.0
-#PSI[N*M+2] += 0.0
-#PSI[N*M+3] += -1.0/12.0
+# this is Poiseuille flow 
+PSI[N*M]   += 2.0/3.0
+PSI[N*M+1] += 3.0/4.0
+PSI[N*M+2] += 0.0
+PSI[N*M+3] += -1.0/12.0
 
 # some junk to put in as a test.
 #PSI[(N-2)*M+ 0]   += 1
@@ -317,9 +317,13 @@ PSI = zeros((2*N+1)*M,dtype='complex')
 #PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
 
 # Read in stream function from file
-(PSI, Nu) = pickle.load(open(inFileName,'r'))
-PSI = decide_resolution(PSI, NOld, MOld, CNSTS)
-PSI[:] = 1.
+#(PSI, Nu) = pickle.load(open(inFileName,'r'))
+#PSI = decide_resolution(PSI, NOld, MOld, CNSTS)
+#PSI[:] = rand((2*N+1)*M) + 1.j*rand((2*N+1)*M)
+#PSI[N*M:(N+1)*M] = rand(M)
+#PSI[:] = 1j
+#for i in range(2*N+1):
+#    PSI[i*M:(i+1)*M] = r_[0:M][::-1]
 
 
 # Form the operators
@@ -451,12 +455,13 @@ print "check variables are properly calculated in c code"
 psic = load_hdf5_state("./output/psi.h5").reshape(2*N+1, M).T 
 
 print 'initial streamfunction?', allclose(PSI,psic)
-#print 'difference', linalg.norm(psic-PSI)
+print 'difference', linalg.norm(psic-PSI)
 #print 'zeroth mode c-python', psic[:M]- PSI[:M]
 
 # switch PSI back to normal ordering for F modes
 PSI = fftshift(PSI, axes=1)
 PSI = PSI.T.flatten()
+PSIbkp = copy(PSI)
 
 # u
 U = dot(MDY, PSI)
@@ -472,10 +477,9 @@ Uc = fftshift(Uc, axes=1)
 Uc = Uc.T.flatten()
 
 print 'U ?', allclose(U, Uc)
-
-#print 'difference', linalg.norm(U-Uc)
-#print 'U1', U[M: 2*M]
-#print 'U1c', Uc[M: 2*M]
+print 'difference', linalg.norm(U-Uc)
+print 'U0', U[N*M: (N+1)*M]
+print 'U0c', Uc[N*M: (N+1)*M]
 
 # v
 V = -dot(MDX, PSI)
@@ -487,6 +491,7 @@ Vc = fftshift(Vc, axes=1)
 Vc = Vc.T.flatten()
 
 print 'V ?', allclose(V, Vc)
+print 'difference', linalg.norm(V-Vc)
 
 if not allclose(V, Vc):
     print 'difference', linalg.norm(V-Vc)
@@ -508,6 +513,28 @@ if not allclose(LPLPSI, lplc):
     #print 'LPLPSI1c', lplc[M: 2*M]
     print 'difference', (LPLPSI-lplc)[N*M+38::M]
 
+d2yc = load_hdf5_state("./output/d2ypsi.h5").reshape(2*N+1, M).T 
+d2yc = fftshift(d2yc, axes=1)
+d2yc = d2yc.T.flatten()
+
+D2YPSI = dot(MDY, dot(MDY,PSI) )
+D2YPSIud = dot(MDY[:, ::-1], dot(MDY[:, ::-1],PSI[::-1])[::-1] )
+
+print 'd2y psi ?', allclose(D2YPSI, d2yc)
+print 'difference', linalg.norm(D2YPSI-d2yc)
+print 'ud difference', linalg.norm(D2YPSIud-d2yc)
+
+d3yc = load_hdf5_state("./output/d3ypsi.h5").reshape(2*N+1, M).T 
+d3yc = fftshift(d3yc, axes=1)
+d3yc = d3yc.T.flatten()
+
+D3YPSI = dot(MDY, dot(MDY, dot(MDY,PSI) ) )
+
+print 'd3y psi ?', allclose(D3YPSI, d3yc)
+print 'difference', linalg.norm(D3YPSI-d3yc)
+print 'd3y0', D3YPSI[N*M:(N+1)*M]
+print 'd3yc0', d3yc[N*M:(N+1)*M]
+
 d4yc = load_hdf5_state("./output/d4ypsi.h5").reshape(2*N+1, M).T 
 d4yc = fftshift(d4yc, axes=1)
 d4yc = d4yc.T.flatten()
@@ -516,7 +543,26 @@ D4YPSI = dot(MDY, dot(MDY, dot(MDY, dot(MDY,PSI) ) ) )
 
 print 'd4y psi ?', allclose(D4YPSI, d4yc)
 print 'difference', linalg.norm(D4YPSI-d4yc)
+print "mode 0", linalg.norm(D4YPSI[N*M:(N+1)*M]-d4yc[N*M:(N+1)*M])
+for n in range(1,N+1):
+    print "mode", n, linalg.norm(D4YPSI[(N+n)*M:(N+n+1)*M]-d4yc[(N+n)*M:(N+n+1)*M])
+    print "mode", -n,linalg.norm(D4YPSI[(N-n)*M:(N+1-n)*M]-d4yc[(N-n)*M:(N+1-n)*M])
     
+d2xc = load_hdf5_state("./output/d2xpsi.h5").reshape(2*N+1, M).T 
+d2xc = fftshift(d2xc, axes=1)
+d2xc = d2xc.T.flatten()
+
+D2XPSI = dot(MDX, dot(MDX,PSI) )
+#print 'difference', linalg.norm(D2XPSI-PSIbkp)
+
+print 'd2x psi ?', allclose(D2XPSI, d2xc)
+print 'difference', linalg.norm(D2XPSI-d2xc)
+
+print "mode 0", linalg.norm(D2XPSI[N*M:(N+1)*M]-d2xc[N*M:(N+1)*M])
+for n in range(1,N+1):
+    print "mode", n, linalg.norm(D2XPSI[(N+n)*M:(N+n+1)*M]-d2xc[(N+n)*M:(N+n+1)*M])
+    print "mode", -n,linalg.norm(D2XPSI[(N-n)*M:(N+1-n)*M]-d2xc[(N-n)*M:(N+1-n)*M])
+
 d4xc = load_hdf5_state("./output/d4xpsi.h5").reshape(2*N+1, M).T 
 d4xc = fftshift(d4xc, axes=1)
 d4xc = d4xc.T.flatten()
@@ -525,6 +571,11 @@ D4XPSI = dot(MDX, dot(MDX, dot(MDX, dot(MDX,PSI) ) ) )
 
 print 'd4x psi ?', allclose(D4XPSI, d4xc)
 print 'difference', linalg.norm(D4XPSI-d4xc)
+
+print "mode 0", linalg.norm(D4XPSI[N*M:(N+1)*M]-d4xc[N*M:(N+1)*M])
+for n in range(1,N+1):
+    print "mode", n, linalg.norm(D4XPSI[(N+n)*M:(N+n+1)*M]-d4xc[(N+n)*M:(N+n+1)*M])
+    print "mode", -n,linalg.norm(D4XPSI[(N-n)*M:(N+1-n)*M]-d4xc[(N-n)*M:(N+1-n)*M])
     
 d2xd2yc = load_hdf5_state("./output/d2xd2ypsi.h5").reshape(2*N+1, M).T 
 d2xd2yc = fftshift(d2xd2yc, axes=1)
@@ -651,8 +702,8 @@ RHSVec = dt*0.5*oneOverRe*BIHARMPSI \
 # Zeroth mode
 RHSVec[N*M:(N+1)*M] = 0
 RHSVec[N*M:(N+1)*M] = dt*0.5*oneOverRe*DYYYPSI[N*M:(N+1)*M] \
-        + U[N*M:(N+1)*M] \
-        - dt*VDYU[N*M:(N+1)*M]
+        + U[N*M:(N+1)*M] #\
+        #- dt*VDYU[N*M:(N+1)*M]
 RHSVec[N*M] += dt*2*oneOverRe
 
 
@@ -675,7 +726,7 @@ RHSVec[N*M + M-2] = 0
 RHSVec[N*M + M-1] = 0
 
 for i in range(0,N+1):
-    RHSvecc = load_hdf5_state("./output/RHSvec{0}.h5".format(i))
+    RHSvecc = load_hdf5_state("./output/RHSVec{0}.h5".format(i))
     print "RHSvec for mode ", i, allclose(RHSVec[(N+i)*M:(N+1+i)*M], RHSvecc)
     print 'difference', linalg.norm(RHSVec[(N+i)*M:(N+1+i)*M]- RHSvecc)
     print 'max difference', amax(RHSVec[(N+i)*M:(N+1+i)*M]- RHSvecc)
@@ -683,6 +734,29 @@ for i in range(0,N+1):
     print 'argmax difference', maxarg_
     #print RHSVec[(N+i)*M+maxarg_]
     #print RHSvecc[maxarg_]
+
+    if i ==0:
+        #print 'c', RHSvecc
+        #print 'mat', RHSVec[N*M:(N+1)*M]
+        #print RHSvecc - RHSVec[N*M:(N+1)*M]
+        print RHSvecc - Uc[N*M:(N+1)*M] - 0.5*dt*oneOverRe*d3yc[N*M:(N+1)*M] \
+                -2*dt*oneOverRe
+        print RHSvecc - U[N*M:(N+1)*M] - 0.5*dt*oneOverRe*d3yc[N*M:(N+1)*M] \
+                -2*dt*oneOverRe
+        print RHSVec[N*M:(N+1)*M] - U[N*M:(N+1)*M] + 0.5*dt*oneOverRe*2 \
+                -2*dt*oneOverRe
+        print RHSvecc - Uc[N*M:(N+1)*M] -2*dt*oneOverRe
+#*D3YPSI[N*M:(N+1)*M]
+        Uought = zeros(M, dtype='complex')
+        Uought[0] = 0.5
+        Uought[2] = -0.5
+        print Uc[N*M:(N+1)*M] - Uought
+        D3YPSIought = zeros(M, dtype='complex')
+        D3YPSIought[0] = -2.0
+        D3YPSIought[2] = 0
+        print "%40.30g" % real(d3yc[N*M:(N+1)*M]-D3YPSIought)[0] #- D3YPSIought
+        
+        exit(1)
 
 psi2c = load_hdf5_state("./output/psi2.h5").reshape(2*N+1, M).T 
 

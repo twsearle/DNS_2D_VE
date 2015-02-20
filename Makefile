@@ -21,19 +21,20 @@ obj/DNS_2D_Newt.o : src/DNS_2D_Newt.c include/fields_2D.h
 obj/test_fields.o : src/test_fields.c include/fields_2D.h
 	$(CC) -c src/test_fields.c -o obj/test_fields.o $(CFLAGS)
 
-obj/test_fields_1.o : src/test_fields_1.c include/fields_2D.h
-	$(CC) -c src/test_fields_1.c -o obj/test_fields_1.o $(CFLAGS)
-
-obj/test_fields_2.o : src/test_fields_2.c include/fields_2D.h
-	$(CC) -c src/test_fields_2.c -o obj/test_fields_2.o $(CFLAGS)
+#obj/test_fields_1.o : src/test_fields_1.c include/fields_2D.h
+#	$(CC) -c src/test_fields_1.c -o obj/test_fields_1.o $(CFLAGS)
+#
+#obj/test_fields_2.o : src/test_fields_2.c include/fields_2D.h
+#	$(CC) -c src/test_fields_2.c -o obj/test_fields_2.o $(CFLAGS)
 
 obj/fields_2D.o : src/fields_2D.c include/fields_2D.h
 	$(CC) -c src/fields_2D.c -o obj/fields_2D.o $(CFLAGS) 
 
-all : obj/fields_2D.o obj/DNS_2D_Newt.o obj/test_fields.o obj/test_fields_1.o obj/test_fields_2.o
+all : obj/fields_2D.o obj/DNS_2D_Newt.o obj/test_fields.o 
+	#obj/test_fields_1.o obj/test_fields_2.o
 	$(CC) -o test_fields obj/test_fields.o obj/fields_2D.o $(CFLAGS) -lhdf5 -lhdf5_hl -lfftw3 -lm
-	$(CC) -o test_fields_1 obj/test_fields_1.o obj/fields_2D.o $(CFLAGS) -lhdf5 -lhdf5_hl -lfftw3 -lm
-	$(CC) -o test_fields_2 obj/test_fields_2.o obj/fields_2D.o $(CFLAGS) -lhdf5 -lhdf5_hl -lfftw3 -lm
+#	$(CC) -o test_fields_1 obj/test_fields_1.o obj/fields_2D.o $(CFLAGS) -lhdf5 -lhdf5_hl -lfftw3 -lm
+#	$(CC) -o test_fields_2 obj/test_fields_2.o obj/fields_2D.o $(CFLAGS) -lhdf5 -lhdf5_hl -lfftw3 -lm
 	$(CC) -o DNS_2D_Newt obj/DNS_2D_Newt.o obj/fields_2D.o $(CFLAGS) -lhdf5 -lhdf5_hl -lfftw3 -lm
 
 .PHONY : clean
