@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Fri 20 Feb 2015 18:06:18 GMT
+#   Last modified: Tue 24 Feb 15:35:13 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -739,22 +739,31 @@ for i in range(0,N+1):
         #print 'c', RHSvecc
         #print 'mat', RHSVec[N*M:(N+1)*M]
         #print RHSvecc - RHSVec[N*M:(N+1)*M]
+        print 'RHSVecC - RHSvec components'
         print RHSvecc - Uc[N*M:(N+1)*M] - 0.5*dt*oneOverRe*d3yc[N*M:(N+1)*M] \
                 -2*dt*oneOverRe
-        print RHSvecc - U[N*M:(N+1)*M] - 0.5*dt*oneOverRe*d3yc[N*M:(N+1)*M] \
+        print RHSvecc - U[N*M:(N+1)*M] - 0.5*dt*oneOverRe*D3YPSI[N*M:(N+1)*M] \
                 -2*dt*oneOverRe
-        print RHSVec[N*M:(N+1)*M] - U[N*M:(N+1)*M] + 0.5*dt*oneOverRe*2 \
+        print 'RHSVec - RHSvec components'
+        print RHSVec[N*M:(N+1)*M] - U[N*M:(N+1)*M] - 0.5*dt*oneOverRe*D3YPSI[N*M:(N+1)*M] \
                 -2*dt*oneOverRe
+        print 'RHSVecC - U - 2dt/Re'
         print RHSvecc - Uc[N*M:(N+1)*M] -2*dt*oneOverRe
+        print linalg.norm(RHSvecc - Uc[N*M:(N+1)*M] -2*dt*oneOverRe )
+                       #-0.5*dt*d3yc[N*M:(N+1)*M])
+        print 'RHSVecC - 0.5*dt*d3yc'
+        print (RHSvecc - 0.5*dt*d3yc[N*M:(N+1)*M])
+        print linalg.norm(RHSvecc - 0.5*dt*d3yc[N*M:(N+1)*M])
+
 #*D3YPSI[N*M:(N+1)*M]
-        Uought = zeros(M, dtype='complex')
-        Uought[0] = 0.5
-        Uought[2] = -0.5
-        print Uc[N*M:(N+1)*M] - Uought
-        D3YPSIought = zeros(M, dtype='complex')
-        D3YPSIought[0] = -2.0
-        D3YPSIought[2] = 0
-        print "%40.30g" % real(d3yc[N*M:(N+1)*M]-D3YPSIought)[0] #- D3YPSIought
+        #Uought = zeros(M, dtype='complex')
+        #Uought[0] = 0.5
+        #Uought[2] = -0.5
+        #print Uc[N*M:(N+1)*M] - Uought
+        #D3YPSIought = zeros(M, dtype='complex')
+        #D3YPSIought[0] = -2.0
+        #D3YPSIought[2] = 0
+        #print "%40.30g" % real(d3yc[N*M:(N+1)*M]-D3YPSIought)[0] #- D3YPSIought
         
         exit(1)
 

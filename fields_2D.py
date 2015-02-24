@@ -609,7 +609,7 @@ def to_spectral(in2D, CNSTS):
     if normImag > 1e-12:
         print "output of cheb transform in to_spectral is not real, norm = ", normImag 
         print 'highest x, z modes:'
-        print imag(_realtmp)[0, N-3:N+1, L-3:L+1]
+        print imag(_realtmp)[0, N-3:N+1]
 
     _realtmp[:Mf, :] = fftpack.fft(_realtmp[:Mf, :])
 
@@ -1161,6 +1161,12 @@ def test_c_version(CNSTS):
     #V = 0.5 * Normal * V
     #actualSpec = V
 
+<<<<<<< local
+    #actualSpec, _ = pickle.load(open('pf-N5-M40-kx1.31-Re3000.0.pickle', 'r'))
+    #actualSpec = decide_resolution(actualSpec, 5, 40, CNSTS)
+    #actualSpec = actualSpec.reshape(2*N+1, M).T
+    #actualSpec = ifftshift(actualSpec, axes=1)
+=======
     actualSpec, _ = pickle.load(open('pf-N5-M40-kx1.31-Re3000.0.pickle', 'r'))
     actualSpec = decide_resolution(actualSpec, 5, 40, CNSTS)
 
@@ -1169,10 +1175,12 @@ def test_c_version(CNSTS):
 
     actualSpec = actualSpec.reshape(2*N+1, M).T
     actualSpec = ifftshift(actualSpec, axes=1)
+>>>>>>> other
 
 
     # insert stupider spectrum
     #actualSpec = zeros((M,2*N+1), dtype='complex')
+    actualSpec = ones((M,2*N+1), dtype='complex')
     #actualSpec[:M/3,5] = r_[M/3:0:-1]
     #actualSpec[:M/3, 0] = r_[M/3:0:-1]
     #actualSpec[2*M/3:,0] = actualSpec[2*M/3:,0] * 1e-6 * rand(M-2*M/3)*1.j

@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri 13 Feb 22:29:52 2015
+// Last modified: Tue 24 Feb 16:38:11 2015
 
 #include"fields_2D.h"
 
@@ -435,6 +435,32 @@ void dy(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
     
 }
 
+void matdy(fftw_complex *matarr, flow_params cnsts)
+{
+    int i, j;
+    int M = cnsts.M;
+
+    for (i=0; i<M*M; i++)
+    {
+	matarr[i] = 0;
+    }
+
+
+    for (j=1; j<M; j=j+2)
+    {
+	matarr[j] = j;
+    }
+
+    for (i=1; i<M; i++)
+    {
+	for (j=i+1; j<M; j=j+2)
+	{
+	    matarr[M*i + j] = 2*j;
+	}
+    }
+
+}
+
 void to_physical_1(fftw_complex *arrin, fftw_complex *arrout,
 		 fftw_complex *scratchFin, fftw_complex *scratchFout,
 		 fftw_complex *scratchCin, fftw_complex *scratchCout,
@@ -528,6 +554,97 @@ void to_physical_1(fftw_complex *arrin, fftw_complex *arrout,
         for (j=0; j<Mf; j++)
         {
             arrout[indfft(i,j)] = scratchCout[j];
+        }
+    }
+}
+
+void to_physical_r(complex *arrin, double *arrout,
+	fftw_complex *scratchin, fftw_complex *scratchout,
+	fftw_plan *phys_plan,  flow_params cnsts)
+{
+    int N = cnsts.N;
+    int M = cnsts.M;
+    int Nf = cnsts.Nf;
+    int Mf = cnsts.Mf;
+    int i,j;
+
+    // This uses an inverse FT. sign is +1.
+    // factor of 2*N+1 is just here because my other method I am comparing with
+    // has transforms in the inverse direction which pick up a normalisation
+    // factor. 
+
+    if (cnsts.dealiasing)
+    {
+        for (j=0; j<M; j++)
+        {
+            scratchin[indfft(0,j)] = arrin[ind(0,j)];
+        }
+
+        for (i=1; i<N+1; i++)
+        {
+            for (j=0; j<M; j++)
+            {
+        	scratchin[indfft(i,j)] = arrin[ind(i,j)];
+        	scratchin[indfft(2*Nf+1-i, j)] = arrin[ind(2*N+1-i,j)];
+            }
+        }
+
+        // zero off the rest of the fourier modes
+        for(i=N+1; i<2*Nf+1-N; i++)
+        {
+            for(j=0; j<Mf; j++)
+            {
+        	scratchin[indfft(i,j)] = 0;
+            }
+        }
+
+        // zero off the rest of the Chebyshev modes
+        for(i=0; i<2*Nf+1; i++)
+        {
+            for(j=M; j<Mf; j++)
+            {
+        	scratchin[indfft(i,j)] = 0;
+            }
+        }
+    }
+    else
+    {
+        for (i=0; i<2*N+1; i++)
+        {
+            for (j=0; j<M; j++)
+            {
+        	scratchin[indfft(i,j)] = arrin[ind(i,j)];
+            }
+        }
+    }
+
+
+    //out2D[M:, :] = out2D[M-2:0:-1, :]
+
+    for (i=0; i<2*Nf+1; i++)
+    {
+        for (j=2; j<Mf; j++)
+        {
+            scratchin[indfft(i, Mf-2+j)] = scratchin[indfft(i, Mf-j)];
+        }
+
+        //out2D[0, :] = 2*out2D[0, :]
+        scratchin[indfft(i, 0)] = 2*scratchin[indfft(i, 0)];
+
+        //out2D[Mf-1, :] = 2*out2D[Mf-1, :]
+        scratchin[indfft(i, Mf-1)] = 2*scratchin[indfft(i, Mf-1)];
+    }
+
+    ////perform the 2D ifft?.
+    ////out2D = 0.5*fftpack.ifft2(out2D)
+
+    fftw_execute(*phys_plan);
+
+    for (i=0; i<2*Nf+1; i++)
+    {
+        for (j=0; j<Mf; j++)
+        {
+            arrout[indfft(i,j)] = 0.5*creal(scratchout[indfft(i,j)]);
         }
     }
 }
@@ -744,6 +861,112 @@ void to_spectral_1(fftw_complex *arrin, fftw_complex *arrout, fftw_complex *scra
     // }
 }
 
+void to_spectral_r(double *arrin, complex *arrout,
+	fftw_complex *scratchin, fftw_complex *scratchout,
+	fftw_plan *spec_plan,  flow_params cnsts)
+{
+    int N = cnsts.N;
+    int M = cnsts.M;
+    int Nf = cnsts.Nf;
+    int Mf = cnsts.Mf;
+    int i,j;
+
+    fftw_complex normalise = 2*Nf+1;
+
+    // Perform the FFT across the x direction   
+
+    // The first half contains the vector on the Gauss-Labatto points
+    // out2D[:M, :] = real(in2D)
+    // include normalisation here so that spectral space has same normalisation as it	   
+    // started with.
+
+    for (i=0; i<2*Nf+1; i++)
+    {
+	for (j=0; j<Mf; j++)
+	{
+	    scratchin[indfft(i,j)] = arrin[indfft(i,j)]/normalise;
+	}
+    }
+
+    // The second half contains the vector on the Gauss-Labatto points excluding
+    // the first and last elements and in reverse order
+    // out2D[M:, :] = out2D[M-2:0:-1, :]
+
+    for (i=0; i<2*Nf+1; i++)
+    {
+	for (j=2; j<Mf; j++)
+	{
+	    scratchin[indfft(i, Mf-2+j)] = scratchin[indfft(i, Mf-j)];
+	}
+    }
+
+    // Perform the transformation on this temporary vector
+    // out2D = fftpack.fft2(out2D)
+    fftw_execute(*spec_plan);
+    if (cnsts.dealiasing)
+    {
+	// copy zeroth and positive modes into output
+
+	// out2D[0, :] = (0.5/(M-1.0))*out2D[0, :]
+	arrout[ind(0,0)] = (0.5/(Mf-1.0)) * scratchout[indfft(0,0)]; 
+
+	// when dealiasing this will be still x 1.0 not 0.5, because it isn't
+	// the last element in the transformed array
+	for (j=1; j<M; j++)
+	{
+	    // out2D[1:M-1, :] = (1.0/(M-1.0))*out2D[1:M-1, :]
+	    arrout[ind(0,j)] = (1.0/(Mf-1.0))*scratchout[indfft(0,j)];
+	}
+
+
+	for (i=1; i<N+1; i++)
+	{
+	    arrout[ind(i,0)] = (0.5/(Mf-1.0)) * scratchout[indfft(i,0)]; 
+
+	    // when dealiasing this will be still x 1.0 not 0.5, because it isn't
+	    // the last element in the transformed array
+	    for (j=1; j<M; j++)
+	    {
+		arrout[ind(i,j)] = (1.0/(Mf-1.0))*scratchout[indfft(i,j)];
+	    }
+	}
+
+	// copy negative modes into output
+	for (i=1; i<N+1; i++)
+	{
+	    // out2D[0, :] = (0.5/(M-1.0))*out2D[0, :]
+	    arrout[ind(2*N+1-i,0)] = (0.5/(Mf-1.0)) * scratchout[indfft(2*Nf+1-i,0)]; 
+
+	    // when dealiasing this will be still x 1.0 not 0.5, because it isn't
+	    // the last element in the transformed array
+	    for (j=1; j<M; j++)
+	    {
+		// out2D[1:M-1, :] = (1.0/(M-1.0))*out2D[1:M-1, :]
+		arrout[ind(2*N+1-i,j)] = (1.0/(Mf-1.0))*scratchout[indfft(2*Nf+1-i,j)];
+	    }
+	}
+    }
+
+    else
+    {
+	for (i=0; i<2*N+1; i++)
+	{
+	    // out2D[0, :] = (0.5/(M-1.0))*out2D[0, :]
+	    arrout[ind(i,0)] = (0.5/(M-1.0)) * scratchout[indfft(i,0)]; 
+
+	    for (j=1; j<M-1; j++)
+	    {
+		// out2D[1:M-1, :] = (1.0/(M-1.0))*out2D[1:M-1, :]
+		arrout[ind(i,j)] = (1.0/(M-1.0))*scratchout[indfft(i,j)];
+	    }
+
+	    //out2D[M-1, :] = (0.5/(M-1.0))*out2D[M-1, :]
+	    arrout[ind(i,M-1)] = (0.5/(M-1.0)) * scratchout[indfft(i,M-1)]; 
+	}
+    }
+
+}
+
 void to_spectral(fftw_complex *arrin, fftw_complex *arrout,
 	fftw_complex *scratchin, fftw_complex *scratchout,
 	fftw_plan *spec_plan,  flow_params cnsts)
@@ -899,6 +1122,33 @@ void fft_convolve(fftw_complex *arr1, fftw_complex *arr2, fftw_complex *arrout,
     to_spectral(scratchp1, arrout, scratchin, scratchout, spec_plan, cnsts);
 }
 
+void fft_convolve_r(complex *arr1, complex *arr2, complex *arrout,
+	double *scratchp1, double *scratchp2, fftw_complex
+	*scratchin, fftw_complex *scratchout, fftw_plan *phys_plan, fftw_plan
+	*spec_plan, flow_params cnsts)
+{
+    // all scratch arrays must be different
+    // out array may be the same as one in array
+
+    int Nf = cnsts.Nf;
+    int Mf = cnsts.Mf;
+
+    int i, j;
+
+    to_physical_r(arr1, scratchp1, scratchin, scratchout, phys_plan, cnsts);
+    to_physical_r(arr2, scratchp2, scratchin, scratchout, phys_plan, cnsts);
+
+    for (i=0; i<(2*Nf+1); i++)
+    {
+	for(j=0; j<Mf; j++)
+	{
+	    scratchp1[indfft(i,j)] = scratchp2[indfft(i,j)]*scratchp1[indfft(i,j)];
+	}
+    }
+
+    to_spectral_r(scratchp1, arrout, scratchin, scratchout, spec_plan, cnsts);
+}
+
 double calc_KE0(fftw_complex *arrin, flow_params cnsts)
 {
     double integral0th = 0;
@@ -934,4 +1184,24 @@ double calc_KE1(fftw_complex *arrin, flow_params cnsts)
     KE1 = 0.5 * creal(integral0th);
     
     return KE1;
+}
+
+double calc_KE2(fftw_complex *arrin, flow_params cnsts)
+{
+    fftw_complex integral = 0;
+    double KE2 = 0;
+
+    int m=0;
+    int M=cnsts.M;
+    int N=cnsts.N;
+
+    for (m=0; m<M; m+=2)
+    {
+	integral += (2. / (1.-m*m)) * arrin[ind(2,m)];
+	integral += (2. / (1.-m*m)) * arrin[ind(2*N-1,m)];
+    }
+
+    KE2 = 0.5 * creal(integral);
+    
+    return KE2;
 }

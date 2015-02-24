@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Thu 12 Feb 16:41:10 2015
+#   Last modified: Tue 24 Feb 16:11:13 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -234,18 +234,19 @@ del j
 PSI = zeros((2*N+1)*M,dtype='complex')
 
 # This is Poiseuille flow 
-PSI[N*M]   += 2.0/3.0
-PSI[N*M+1] += 3.0/4.0
-PSI[N*M+2] += 0.0
-PSI[N*M+3] += -1.0/12.0
-
+#PSI[N*M]   += 2.0/3.0
+#PSI[N*M+1] += 3.0/4.0
+#PSI[N*M+2] += 0.0
+#PSI[N*M+3] += -1.0/12.0
+#
 #PSI[(N-1)*M + 3] += 1e-10
-PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
-
-print 'performing linear stability of Poiseuille flow test'
+#PSI[(N-2)*M + 3] += 1e-10
+#PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
+#
+#print 'performing linear stability of Poiseuille flow test'
 
 # Read in stream function from file
-#(PSI, Nu) = pickle.load(open(inFileName,'r'))
+(PSI, Nu) = pickle.load(open(inFileName,'r'))
 
 # Form the operators
 PsiOpInvList = []

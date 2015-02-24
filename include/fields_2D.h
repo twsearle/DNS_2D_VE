@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu 12 Feb 15:21:23 2015
+// Last modified: Tue 24 Feb 16:37:21 2015
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -34,11 +34,17 @@ void dx(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts);
 
 void dy(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts);
 
+void matdy(fftw_complex *matarr, flow_params cnsts);
+
 void to_physical_1(fftw_complex *arrin, fftw_complex *arrout,
 		 fftw_complex *scratchFin, fftw_complex *scratchFout,
 		 fftw_complex *scratchCin, fftw_complex *scratchCout,
 		 fftw_plan *phys_fou_plan, fftw_plan *phys_cheb_plan,
 		 flow_params cnsts);
+
+void to_physical_r(complex *arrin, double *arrout,
+	fftw_complex *scratchin, fftw_complex *scratchout,
+	fftw_plan *phys_plan,  flow_params cnsts);
 
 void to_physical(fftw_complex *arrin, fftw_complex *arrout,
 		 fftw_complex *scratchin, fftw_complex *scratchout,
@@ -50,6 +56,10 @@ void to_spectral_1(fftw_complex *arrin, fftw_complex *arrout, fftw_complex *scra
 		 fftw_plan *spec_fou_plan, fftw_plan *spec_cheb_plan,
 		 flow_params cnsts);
 
+void to_spectral_r(double *arrin, complex *arrout,
+	fftw_complex *scratchin, fftw_complex *scratchout,
+	fftw_plan *spec_plan,  flow_params cnsts);
+
 void to_spectral(fftw_complex *arrin, fftw_complex *arrout,
 		 fftw_complex *scratchin, fftw_complex *scratchout,
 		 fftw_plan *spec_plan,  flow_params cnsts);
@@ -57,6 +67,11 @@ void to_spectral(fftw_complex *arrin, fftw_complex *arrout,
 void fft_convolve(fftw_complex *arr1, fftw_complex *arr2, fftw_complex *arrout,
 	fftw_complex *scratchp1, fftw_complex *scratchp2, fftw_complex
 	*scratchin, fftw_complex *scratchout, fftw_plan *physplan, fftw_plan
+	*spec_plan, flow_params cnsts);
+
+void fft_convolve_r(complex *arr1, complex *arr2, complex *arrout,
+	double *scratchp1, double *scratchp2, fftw_complex
+	*scratchin, fftw_complex *scratchout, fftw_plan *phys_plan, fftw_plan
 	*spec_plan, flow_params cnsts);
 
 void save_hdf5_state(char *filename, fftw_complex *arr, flow_params cnsts);
@@ -79,6 +94,8 @@ void load_hdf5_operator(char *filename, fftw_complex *arr, flow_params cnsts);
 double calc_KE0(fftw_complex *arrin, flow_params cnsts);
 
 double calc_KE1(fftw_complex *arrin, flow_params cnsts);
+
+double calc_KE2(fftw_complex *arrin, flow_params cnsts);
 
 struct flow_params {
     int N;

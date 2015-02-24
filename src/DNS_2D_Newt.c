@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri 20 Feb 2015 18:09:23 GMT
+// Last modified: Tue 24 Feb 16:03:24 2015
 
 /* Program Description:
  *
@@ -70,7 +70,8 @@ int main(int argc, char **argv)
     int timeStep = 0;
     double dt = 0;
     double KE0 = 1.0;
-    double KE1 = 1.0;
+    double KE1 = 0.0;
+    double KE2 = 0.0;
 
     opterr = 0;
     int shortArg;
@@ -301,10 +302,11 @@ int main(int argc, char **argv)
 
     KE0 = (15./ 8.) * calc_KE0(u, params);
     KE1 = calc_KE1(u, params) * (15.0/ 8.0);
+    KE2 = calc_KE2(u, params) * (15.0/ 8.0);
 
-    printf("%e\t\t%e\t\t%e\n", time, KE0, KE1);
+    printf("%e\t%e\t%e\t%e\n", time, KE0, KE1, KE2);
 
-    fprintf(tracefp, "%e\t\t%e\t\t%e\n", time, KE0, KE1);
+    fprintf(tracefp, "%e\t%e\t%e\t%e\n", time, KE0, KE1, KE2);
 
     fflush(tracefp);
 
@@ -348,32 +350,8 @@ int main(int argc, char **argv)
 		}
 	    }
 	    sum = sqrt(creal(sum));
-	    printf("LLLLLLLOOOOOOOOOOOOOOOKKKKKKKKK HEEEEEERRRRRRREEEEEEEE----------------\n");
 	    printf("%e + %e j\n", creal(sum), cimag(sum));
-	    printf("LLLLLLLOOOOOOOOOOOOOOOKKKKKKKKK HEEEEEERRRRRRREEEEEEEE----------------\n");
       }
-
-      //to_physical(psi, scratchp2, scratchin, scratchout, &phys_plan, params);
-      //exit(1);
-      //to_spectral(scratchp2, psi, scratchin, scratchout, &spec_plan, params);
-
-      if(timeStep==0)
-      {
-	    sum =0;
-	    for (i=0; i<2*N+1; i++)
-	    {
-		for (j=0; j<M; j++)
-		{
-		    sum += (psibkp[ind(i,j)] - psi[ind(i,j)])*conj((psibkp[ind(i,j)] - psi[ind(i,j)]));
-		}
-	    }
-	    sum = sqrt(creal(sum));
-	    printf("LLLLLLLOOOOOOOOOOOOOOOKKKKKKKKK HEEEEEERRRRRRREEEEEEEE----------------\n");
-	    printf("%e + %e j\n", creal(sum), cimag(sum));
-	    printf("LLLLLLLOOOOOOOOOOOOOOOKKKKKKKKK HEEEEEERRRRRRREEEEEEEE----------------\n");
-      }
-
-
 
 	// lplpsi dyy(psi) + dxx(psi)
 
@@ -397,16 +375,20 @@ int main(int argc, char **argv)
 	// biharmpsi (dyy + dxx)lplpsi
 	
 	dy(u, scratch, params);
+
 	if(timeStep==0)
 	{
 	    save_hdf5_state("./output/d2ypsi.h5", &scratch[0], params);
 	}
-	dy(scratch, scratch2, params);
+
+	dy(scratch, dyyypsi, params);
+
 	if(timeStep==0)
 	{
-	    save_hdf5_state("./output/d3ypsi.h5", &scratch2[0], params);
+	    save_hdf5_state("./output/d3ypsi.h5", &dyyypsi[0], params);
 	}
-	dy(scratch2, scratch, params);
+
+	dy(dyyypsi, scratch, params);
 	if(timeStep==0)
 	{
 	    save_hdf5_state("./output/d4ypsi.h5", &scratch[0], params);
@@ -555,9 +537,9 @@ int main(int argc, char **argv)
 	
 	for (j=0; j<M; j++)
 	{
-	    RHSvec[j] = + dt*0.5*oneOverRe*dyyypsi[ind(0,j)];
-	    RHSvec[j] += u[ind(0,j)];
-			//- dt*vdyypsi[ind(0,j)];
+	    //RHSvec[j] = u[ind(0,j)];
+	    RHSvec[j] = u[ind(0,j)] + dt*0.5*oneOverRe*dyyypsi[ind(0,j)];
+			- dt*vdyypsi[ind(0,j)];
 	}
 	RHSvec[0] += 2*dt*oneOverRe;
 
@@ -571,6 +553,14 @@ int main(int argc, char **argv)
 	RHSvec[M-3] = 0; 
 	RHSvec[M-2] = 0; 
 	RHSvec[M-1] = 0; 
+
+	if(timeStep==0)
+	{
+	    char fn[30];
+	    sprintf(fn, "./output/RHSVec%d.h5", 0);
+	    save_hdf5_arr(fn, &RHSvec[0], shape2[0]);
+	}
+	
 
 	// step the zeroth mode
 	
@@ -603,13 +593,6 @@ int main(int argc, char **argv)
 	    save_hdf5_state("./output/psi2.h5", &psi[0], params);
 	}
 
-	if(timeStep==0)
-	{
-	    char fn[30];
-	    sprintf(fn, "./output/RHSVec%d.h5", 0);
-	    save_hdf5_arr(fn, &RHSvec[0], shape2[0]);
-	}
-	
 	// output some information at every frame
 	if ((timeStep % stepsPerFrame) == 0 )
 	{
@@ -618,8 +601,10 @@ int main(int argc, char **argv)
 		    &phys_plan, &spec_plan, params);
 	    KE0 = calc_KE0(u, params) * (15.0/ 8.0);
 	    KE1 = calc_KE1(u, params) * (15.0/ 8.0);
+	    KE2 = calc_KE2(u, params) * (15.0/ 8.0);
 
-	    printf("%e\t\t%e\t\t%e\n", time, KE0, KE1);
+	    printf("%e\t%e\t%e\t%e\n", time, KE0, KE1, KE2);
+
 
 	    //char fn[30];
 	    //sprintf(fn, "./output/t%e.h5", time);
@@ -628,7 +613,7 @@ int main(int argc, char **argv)
 	    save_hdf5_snapshot(&hdf5fp, &filetype_id, &datatype_id,
 		    psi, time, params);
 	    
-	    fprintf(tracefp, "%e\t\t%e\t\t%e\n", time, KE0, KE1);
+	    fprintf(tracefp, "%e\t%e\t%e\t%e\n", time, KE0, KE1, KE2);
 
 	    fflush(tracefp);
 	    H5Fflush(hdf5fp, H5F_SCOPE_GLOBAL);
