@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Tue 24 Feb 16:03:24 2015
+// Last modified: Wed 25 Feb 13:35:45 2015
 
 /* Program Description:
  *
@@ -538,7 +538,7 @@ int main(int argc, char **argv)
 	for (j=0; j<M; j++)
 	{
 	    //RHSvec[j] = u[ind(0,j)];
-	    RHSvec[j] = u[ind(0,j)] + dt*0.5*oneOverRe*dyyypsi[ind(0,j)];
+	    RHSvec[j] = u[ind(0,j)] + dt*0.5*oneOverRe*dyyypsi[ind(0,j)]
 			- dt*vdyypsi[ind(0,j)];
 	}
 	RHSvec[0] += 2*dt*oneOverRe;
