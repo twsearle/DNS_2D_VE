@@ -9,5 +9,9 @@ syntax: glob
 *.h5
 *.dat
 *.pickle
+*.vtr
+*.pvd
+*.txt
+*.log
 DNS_2D_Newt
 test_fields

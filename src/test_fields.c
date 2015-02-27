@@ -7,11 +7,8 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-<<<<<<< local
-// Last modified: Fri 13 Feb 23:53:45 2015
-=======
-// Last modified: Wed 18 Feb 2015 14:04:53 GMT
->>>>>>> other
+// Last modified: Thu 26 Feb 10:13:37 2015
+// Last modified: Thu 26 Feb 10:13:37 2015
 
 /* Program Description:
  *

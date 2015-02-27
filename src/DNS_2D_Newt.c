@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 25 Feb 13:35:45 2015
+// Last modified: Thu 26 Feb 10:15:30 2015
 
 /* Program Description:
  *
@@ -72,6 +72,7 @@ int main(int argc, char **argv)
     double KE0 = 1.0;
     double KE1 = 0.0;
     double KE2 = 0.0;
+    double normU = 0.0;
 
     opterr = 0;
     int shortArg;
@@ -160,7 +161,7 @@ int main(int argc, char **argv)
     printf("\nNumber of Time Steps\t %d ", numTimeSteps);
     printf("\nTime Steps per frame\t %d \n", stepsPerFrame);
 
-    FILE *tracefp;
+    FILE *tracefp, *traceU;
     char *trace_fn, *traj_fn;
     int i, j, l;
     int N = params.N;
@@ -172,6 +173,7 @@ int main(int argc, char **argv)
     traj_fn = "./output/traj_psi.h5";
 
     tracefp = fopen(trace_fn, "w");
+    traceU = fopen("./output/traceU.dat", "w");
 
     // Variables for HDF5 output
     hid_t hdf5fp, datatype_id, filetype_id;
@@ -597,8 +599,20 @@ int main(int argc, char **argv)
 	if ((timeStep % stepsPerFrame) == 0 )
 	{
 	    time = timeStep*dt;
+
+	    normU = 0;
+
+	    for (j=M-1; j>=0; j=j-1)
+	    {
+		normU += creal(u[ind(1,j)]*u[ind(2*N,j)]); 
+	    }
+	    normU = sqrt(normU);
+
+	    fprintf(traceU, "%e\t%e\t\n", time, normU);
+
 	    fft_convolve(u, u, u, scratchp1, scratchp2, scratchin, scratchout,
 		    &phys_plan, &spec_plan, params);
+
 	    KE0 = calc_KE0(u, params) * (15.0/ 8.0);
 	    KE1 = calc_KE1(u, params) * (15.0/ 8.0);
 	    KE2 = calc_KE2(u, params) * (15.0/ 8.0);
@@ -615,6 +629,7 @@ int main(int argc, char **argv)
 	    
 	    fprintf(tracefp, "%e\t%e\t%e\t%e\n", time, KE0, KE1, KE2);
 
+	    fflush(traceU);
 	    fflush(tracefp);
 	    H5Fflush(hdf5fp, H5F_SCOPE_GLOBAL);
 
@@ -626,6 +641,7 @@ int main(int argc, char **argv)
     save_hdf5_state("./output/final.h5", &psi[0], params);
 
     fclose(tracefp);
+    fclose(traceU);
 
     // clean up hdf5
     status = H5Tclose(datatype_id);

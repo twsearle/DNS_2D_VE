@@ -1161,12 +1161,10 @@ def test_c_version(CNSTS):
     #V = 0.5 * Normal * V
     #actualSpec = V
 
-<<<<<<< local
     #actualSpec, _ = pickle.load(open('pf-N5-M40-kx1.31-Re3000.0.pickle', 'r'))
     #actualSpec = decide_resolution(actualSpec, 5, 40, CNSTS)
     #actualSpec = actualSpec.reshape(2*N+1, M).T
     #actualSpec = ifftshift(actualSpec, axes=1)
-=======
     actualSpec, _ = pickle.load(open('pf-N5-M40-kx1.31-Re3000.0.pickle', 'r'))
     actualSpec = decide_resolution(actualSpec, 5, 40, CNSTS)
 
@@ -1175,7 +1173,6 @@ def test_c_version(CNSTS):
 
     actualSpec = actualSpec.reshape(2*N+1, M).T
     actualSpec = ifftshift(actualSpec, axes=1)
->>>>>>> other
 
 
     # insert stupider spectrum
