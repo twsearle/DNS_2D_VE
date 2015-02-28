@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Fri 27 Feb 16:31:30 2015
+#   Last modified: Sat 28 Feb 18:36:10 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -240,8 +240,8 @@ PSI = zeros((2*N+1)*M,dtype='complex')
 #PSI[N*M+2] += 0.0
 #PSI[N*M+3] += -1.0/12.0
 
-#PSI[(N-1)*M + 3] += 1e-11
-#PSI[(N-2)*M + 3] += 1e-11
+#PSI[(N-1)*M + 3] += 1e-10
+#PSI[(N-2)*M + 3] += 1e-10
 #PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
 
 #print 'performing linear stability of Poiseuille flow test'
@@ -266,7 +266,6 @@ PSI[(N-2)*M + 5] += 1e-4 - 1e-4j
 
 PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
 PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
-
 
 # Form the operators
 PsiOpInvList = []
