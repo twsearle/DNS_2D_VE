@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Tue 24 Feb 16:38:11 2015
+// Last modified: Sat 28 Feb 16:21:13 2015
 
 #include"fields_2D.h"
 
@@ -405,6 +405,74 @@ void dx(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
 	for(j=0; j<M; j++)
 	{
 	    arrout[ind(i, j)] = -(2*N+1-i)*kx*I*arrin[ind(i, j)];
+	}
+
+    }
+}
+
+void d2x(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
+{
+    int N = cnsts.N;
+    int M = cnsts.M;
+    double kx = cnsts.kx;
+    int i, j;
+
+
+    // For positive fourier modes
+    for(i=0; i<N+1; i++)
+    {
+	//printf("%d\n",i);
+	//For all Chebyshev modes
+	for(j=0; j<M; j++)
+	{
+	    arrout[ind(i, j)] = -pow(i*kx, 2)*arrin[ind(i, j)];
+	    //printf("%e+%ej ", creal(arrin[ind(i,j)]), cimag(arrin[ind(i,j)]) );
+	    //printf("%e+%ej\n", creal(arrout[ind(i,j)]), cimag(arrout[ind(i,j)]) );
+	}
+
+    }
+
+    // For conjugate fourier modes
+    for(i=N+1; i<2*N+1; i++)
+    {
+	//For all Chebyshev modes
+	for(j=0; j<M; j++)
+	{
+	    arrout[ind(i, j)] = -pow((2*N+1-i)*kx, 2)*arrin[ind(i, j)];
+	}
+
+    }
+}
+
+void d4x(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
+{
+    int N = cnsts.N;
+    int M = cnsts.M;
+    double kx = cnsts.kx;
+    int i, j;
+
+
+    // For positive fourier modes
+    for(i=0; i<N+1; i++)
+    {
+	//printf("%d\n",i);
+	//For all Chebyshev modes
+	for(j=0; j<M; j++)
+	{
+	    arrout[ind(i, j)] = pow(i*kx, 4)*arrin[ind(i, j)];
+	    //printf("%e+%ej ", creal(arrin[ind(i,j)]), cimag(arrin[ind(i,j)]) );
+	    //printf("%e+%ej\n", creal(arrout[ind(i,j)]), cimag(arrout[ind(i,j)]) );
+	}
+
+    }
+
+    // For conjugate fourier modes
+    for(i=N+1; i<2*N+1; i++)
+    {
+	//For all Chebyshev modes
+	for(j=0; j<M; j++)
+	{
+	    arrout[ind(i, j)] = pow((2*N+1-i)*kx,4)*arrin[ind(i, j)];
 	}
 
     }

@@ -1,6 +1,7 @@
 CC=gcc
 DEBUGFLAGS = -pg -g -ggdb 
-CFLAGS = $(DEBUGFLAGS) -Wall -fpic -Iinclude $(TOBYCPATHS) 
+CFLAGS = -Wall -fpic -Iinclude $(TOBYCPATHS) 
+#CFLAGS = $(DEBUGFLAGS) -Wall -fpic -Iinclude $(TOBYCPATHS) 
 #-L/opt/local/lib -I/opt/local/include 
 
 DNS_2D_Newt : obj/fields_2D.o obj/DNS_2D_Newt.o
@@ -39,6 +40,6 @@ all : obj/fields_2D.o obj/DNS_2D_Newt.o obj/test_fields.o
 
 .PHONY : clean
 clean :
-	rm -f ./obj/*.o DNS_2D_Newt test_fields 
+	rm -f ./obj/*.o DNS_2D_Newt test_fields test_fields_1 test_fields_2
 	rm -f ./operators/*.h5
 	rm -f ./initial.h5

@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Tue 24 Feb 15:35:13 2015
+#   Last modified: Sat 28 Feb 16:58:08 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -302,10 +302,10 @@ del j
 PSI = zeros((2*N+1)*M,dtype='complex')
 
 # this is Poiseuille flow 
-PSI[N*M]   += 2.0/3.0
-PSI[N*M+1] += 3.0/4.0
-PSI[N*M+2] += 0.0
-PSI[N*M+3] += -1.0/12.0
+#PSI[N*M]   += 2.0/3.0
+#PSI[N*M+1] += 3.0/4.0
+#PSI[N*M+2] += 0.0
+#PSI[N*M+3] += -1.0/12.0
 
 # some junk to put in as a test.
 #PSI[(N-2)*M+ 0]   += 1
@@ -317,13 +317,13 @@ PSI[N*M+3] += -1.0/12.0
 #PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
 
 # Read in stream function from file
-#(PSI, Nu) = pickle.load(open(inFileName,'r'))
-#PSI = decide_resolution(PSI, NOld, MOld, CNSTS)
+(PSI, Nu) = pickle.load(open(inFileName,'r'))
+PSI = decide_resolution(PSI, NOld, MOld, CNSTS)
 #PSI[:] = rand((2*N+1)*M) + 1.j*rand((2*N+1)*M)
 #PSI[N*M:(N+1)*M] = rand(M)
-#PSI[:] = 1j
-#for i in range(2*N+1):
-#    PSI[i*M:(i+1)*M] = r_[0:M][::-1]
+
+#for i in range(2*N+1-2):
+#    PSI[(i+1)*M:(i+2)*M] = r_[0:M][::-1] /(1.*M)
 
 
 # Form the operators
@@ -504,11 +504,13 @@ lplc = load_hdf5_state("./output/lplpsi.h5").reshape(2*N+1, M).T
 lplc = fftshift(lplc, axes=1)
 lplc = lplc.T.flatten()
 
-LPLPSI = dot(dot(MDY,MDY) + dot(MDX,MDX), PSI)
+# THE ORDER OF OPERATIONS HERE MATTERS!
+#LPLPSI = dot(dot(MDY,MDY) + dot(MDX,MDX), PSI)
+LPLPSI = dot(dot(MDY,MDY), PSI) + dot(dot(MDX,MDX), PSI)
 
 print 'laplacian psi ?', allclose(LPLPSI, lplc)
+print 'difference', linalg.norm(LPLPSI-lplc)
 if not allclose(LPLPSI, lplc):
-    print 'difference', linalg.norm(LPLPSI-lplc)
     #print 'LPLPSI1', LPLPSI[M: 2*M]
     #print 'LPLPSI1c', lplc[M: 2*M]
     print 'difference', (LPLPSI-lplc)[N*M+38::M]
@@ -590,7 +592,10 @@ biharmc = load_hdf5_state("./output/biharmpsi.h5").reshape(2*N+1, M).T
 biharmc = fftshift(biharmc, axes=1)
 biharmc = biharmc.T.flatten()
 
-BIHARMPSI = dot(dot(MDY,MDY) + dot(MDX,MDX), LPLPSI)
+# ORDER OF OPERATIONS MATTERS!!!!!
+# BIHARMPSI = dot(dot(MDY,MDY) + dot(MDX,MDX), LPLPSI)
+#BIHARMPSI = dot(dot(MDY,MDY), LPLPSI) + dot(dot(MDX,MDX), LPLPSI)
+BIHARMPSI = D4XPSI + D4YPSI + 2*D2XD2YPSI 
 
 print 'biharm psi ?', allclose(BIHARMPSI, biharmc)
 print 'difference', linalg.norm(BIHARMPSI-biharmc)
@@ -735,37 +740,18 @@ for i in range(0,N+1):
     #print RHSVec[(N+i)*M+maxarg_]
     #print RHSvecc[maxarg_]
 
-    if i ==0:
+    #if i ==0:
         #print 'c', RHSvecc
         #print 'mat', RHSVec[N*M:(N+1)*M]
         #print RHSvecc - RHSVec[N*M:(N+1)*M]
-        print 'RHSVecC - RHSvec components'
-        print RHSvecc - Uc[N*M:(N+1)*M] - 0.5*dt*oneOverRe*d3yc[N*M:(N+1)*M] \
-                -2*dt*oneOverRe
-        print RHSvecc - U[N*M:(N+1)*M] - 0.5*dt*oneOverRe*D3YPSI[N*M:(N+1)*M] \
-                -2*dt*oneOverRe
-        print 'RHSVec - RHSvec components'
-        print RHSVec[N*M:(N+1)*M] - U[N*M:(N+1)*M] - 0.5*dt*oneOverRe*D3YPSI[N*M:(N+1)*M] \
-                -2*dt*oneOverRe
-        print 'RHSVecC - U - 2dt/Re'
-        print RHSvecc - Uc[N*M:(N+1)*M] -2*dt*oneOverRe
-        print linalg.norm(RHSvecc - Uc[N*M:(N+1)*M] -2*dt*oneOverRe )
-                       #-0.5*dt*d3yc[N*M:(N+1)*M])
-        print 'RHSVecC - 0.5*dt*d3yc'
-        print (RHSvecc - 0.5*dt*d3yc[N*M:(N+1)*M])
-        print linalg.norm(RHSvecc - 0.5*dt*d3yc[N*M:(N+1)*M])
-
-#*D3YPSI[N*M:(N+1)*M]
-        #Uought = zeros(M, dtype='complex')
-        #Uought[0] = 0.5
-        #Uought[2] = -0.5
-        #print Uc[N*M:(N+1)*M] - Uought
-        #D3YPSIought = zeros(M, dtype='complex')
-        #D3YPSIought[0] = -2.0
-        #D3YPSIought[2] = 0
-        #print "%40.30g" % real(d3yc[N*M:(N+1)*M]-D3YPSIought)[0] #- D3YPSIought
-        
-        exit(1)
+        #print 'RHSVecC - RHSvec components'
+        #print RHSvecc - Uc[N*M:(N+1)*M] - 0.5*dt*oneOverRe*d3yc[N*M:(N+1)*M] \
+        #        -2*dt*oneOverRe
+        #print RHSvecc - U[N*M:(N+1)*M] - 0.5*dt*oneOverRe*D3YPSI[N*M:(N+1)*M] \
+        #        -2*dt*oneOverRe
+        #print 'RHSVec - RHSvec components'
+        #print RHSVec[N*M:(N+1)*M] - U[N*M:(N+1)*M] - 0.5*dt*oneOverRe*D3YPSI[N*M:(N+1)*M] \
+        #       -2*dt*oneOverRe
 
 psi2c = load_hdf5_state("./output/psi2.h5").reshape(2*N+1, M).T 
 

@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Tue 24 Feb 16:37:21 2015
+// Last modified: Fri 27 Feb 17:21:44 2015
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -31,6 +31,10 @@ typedef struct flow_params flow_params;
 typedef struct complex_hdf complex_hdf;
 
 void dx(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts);
+
+void d2x(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts);
+
+void d4x(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts);
 
 void dy(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts);
 
