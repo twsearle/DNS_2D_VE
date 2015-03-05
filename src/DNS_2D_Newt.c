@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Sat 28 Feb 17:02:58 2015
+// Last modified: Wed  4 Mar 16:32:00 2015
 
 /* Program Description:
  *
@@ -72,7 +72,6 @@ int main(int argc, char **argv)
     double KE0 = 1.0;
     double KE1 = 0.0;
     double KE2 = 0.0;
-    double normU = 0.0;
 
     opterr = 0;
     int shortArg;
@@ -199,7 +198,7 @@ int main(int argc, char **argv)
     fftw_complex *scratchin, *scratchout;
     fftw_complex *psi, *u, *v, *udxlplpsi, *vdylplpsi, *biharmpsi, *lplpsi;
     fftw_complex *dyyypsi, *dypsi, *vdyypsi;
-    fftw_complex *d4ypsi, *d4xpsi, *d2xd2ypsi;
+    fftw_complex *d2ypsi, *d4ypsi, *d4xpsi, *d2xd2ypsi;
     fftw_complex *psibkp;
     double *scratchp1, *scratchp2;
 
@@ -222,25 +221,26 @@ int main(int argc, char **argv)
     tmpop = (fftw_complex*) fftw_malloc(M*M * sizeof(fftw_complex));
     opsList = (fftw_complex*) fftw_malloc((N+1)*M*M * sizeof(fftw_complex));
 
-    scratch = (fftw_complex*) fftw_malloc((M)*(2*N+1) * sizeof(fftw_complex));
-    scratch2 = (fftw_complex*) fftw_malloc((M)*(2*N+1) * sizeof(fftw_complex));
-    scratch3 = (fftw_complex*) fftw_malloc((M)*(2*N+1) * sizeof(fftw_complex));
-    scratch4 = (fftw_complex*) fftw_malloc((M)*(2*N+1) * sizeof(fftw_complex));
+    scratch = (fftw_complex*) fftw_malloc(M*(N+1) * sizeof(fftw_complex));
+    scratch2 = (fftw_complex*) fftw_malloc(M*(N+1) * sizeof(fftw_complex));
+    scratch3 = (fftw_complex*) fftw_malloc(M*(N+1) * sizeof(fftw_complex));
+    scratch4 = (fftw_complex*) fftw_malloc(M*(N+1) * sizeof(fftw_complex));
 
-    psi = (fftw_complex*) fftw_malloc((M)*(2*N+1) * sizeof(fftw_complex));
-    psibkp = (fftw_complex*) fftw_malloc((M)*(2*N+1) * sizeof(fftw_complex));
-    u = (fftw_complex*) fftw_malloc((M)*(2*N+1) * sizeof(fftw_complex));
-    v = (fftw_complex*) fftw_malloc((M)*(2*N+1) * sizeof(fftw_complex));
-    udxlplpsi = (fftw_complex*) fftw_malloc((M)*(2*N+1) * sizeof(fftw_complex));
-    vdylplpsi = (fftw_complex*) fftw_malloc((M)*(2*N+1) * sizeof(fftw_complex));
-    lplpsi = (fftw_complex*) fftw_malloc((M)*(2*N+1) * sizeof(fftw_complex));
-    biharmpsi = (fftw_complex*) fftw_malloc((M)*(2*N+1) * sizeof(fftw_complex));
-    dyyypsi = (fftw_complex*) fftw_malloc((M)*(2*N+1) * sizeof(fftw_complex));
-    d4ypsi = (fftw_complex*) fftw_malloc((M)*(2*N+1) * sizeof(fftw_complex));
-    d4xpsi = (fftw_complex*) fftw_malloc((M)*(2*N+1) * sizeof(fftw_complex));
-    d2xd2ypsi = (fftw_complex*) fftw_malloc((M)*(2*N+1) * sizeof(fftw_complex));
-    dypsi = (fftw_complex*) fftw_malloc((M)*(2*N+1) * sizeof(fftw_complex));
-    vdyypsi = (fftw_complex*) fftw_malloc((M)*(2*N+1) * sizeof(fftw_complex));
+    psi = (fftw_complex*) fftw_malloc(M*(N+1) * sizeof(fftw_complex));
+    psibkp = (fftw_complex*) fftw_malloc(M*(N+1) * sizeof(fftw_complex));
+    u = (fftw_complex*) fftw_malloc(M*(N+1) * sizeof(fftw_complex));
+    v = (fftw_complex*) fftw_malloc(M*(N+1) * sizeof(fftw_complex));
+    udxlplpsi = (fftw_complex*) fftw_malloc(M*(N+1) * sizeof(fftw_complex));
+    vdylplpsi = (fftw_complex*) fftw_malloc(M*(N+1) * sizeof(fftw_complex));
+    lplpsi = (fftw_complex*) fftw_malloc(M*(N+1) * sizeof(fftw_complex));
+    biharmpsi = (fftw_complex*) fftw_malloc(M*(N+1) * sizeof(fftw_complex));
+    d2ypsi = (fftw_complex*) fftw_malloc(M*(N+1) * sizeof(fftw_complex));
+    dyyypsi = (fftw_complex*) fftw_malloc(M*(N+1) * sizeof(fftw_complex));
+    d4ypsi = (fftw_complex*) fftw_malloc(M*(N+1) * sizeof(fftw_complex));
+    d4xpsi = (fftw_complex*) fftw_malloc(M*(N+1) * sizeof(fftw_complex));
+    d2xd2ypsi = (fftw_complex*) fftw_malloc(M*(N+1) * sizeof(fftw_complex));
+    dypsi = (fftw_complex*) fftw_malloc(M*(N+1) * sizeof(fftw_complex));
+    vdyypsi = (fftw_complex*) fftw_malloc(M*(N+1) * sizeof(fftw_complex));
 
     scratchin = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
     scratchout = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
@@ -261,7 +261,6 @@ int main(int argc, char **argv)
 
     // load the initial field from scipy
     load_hdf5_state("initial.h5", psi, params);
-    load_hdf5_state("initial.h5", psibkp, params);
 
     // load the operators from scipy 
     for (i=0; i<N+1; i++) 
@@ -274,14 +273,11 @@ int main(int argc, char **argv)
 	for (j=0; j<M*M; j++)
 	{
 	    opsList[i*M*M + j] = tmpop[j];
-	    //printf(" (%f + %fj) ", creal(opsList[i][j]), cimag(opsList[i][j]) );
 	}
 
-	// fpi = fopen(fn, "r");
-	// load_operator(fpi, opsList[i], params);
-	// fclose(fpi);
     }
 
+    #ifdef MYDEBUG
     for (i=0; i<N+1; i++) 
     {
 	char fn[30];
@@ -294,27 +290,11 @@ int main(int argc, char **argv)
 
 	save_hdf5_arr(fn, &tmpop[0], shapeOp[0]);
     }
+    #endif
     
     // perform the time iteration
     printf("\n------\nperforming the time iteration\n------\n");
     printf("\nTime:\t\tKE0:\n");
-
-    time = timeStep*dt;
-    dy(psi, u, params);
-
-    fft_convolve_r(u, u, u, scratchp1, scratchp2, scratchin, scratchout,
-	    &phys_plan, &spec_plan, params);
-
-    KE0 = (15./ 8.) * calc_KE0(u, params);
-    KE1 = calc_KE1(u, params) * (15.0/ 8.0);
-    KE2 = calc_KE2(u, params) * (15.0/ 8.0);
-
-    printf("%e\t%e\t%e\t%e\n", time, KE0, KE1, KE2);
-
-    fprintf(tracefp, "%e\t%e\t%e\t%e\n", time, KE0, KE1, KE2);
-
-    fflush(tracefp);
-
 
     for (timeStep=0; timeStep<numTimeSteps; timeStep++)
     {
@@ -326,16 +306,10 @@ int main(int argc, char **argv)
 	// u
 	dy(psi, u, params);
 
-	if(timeStep==0)
-	{
-	    save_hdf5_state("./output/psi.h5", &psi[0], params);
-	    save_hdf5_state("./output/u.h5",  &u[0], params);
-	}
-
 
       // v
       dx(psi, v, params);
-      for(i=0; i<2*N+1; i++)
+      for(i=0; i<N+1; i++)
       {
           for(j=0; j<M; j++)
           {
@@ -343,26 +317,12 @@ int main(int argc, char **argv)
           }
       }
 
-      if(timeStep==0)
-      {
-          save_hdf5_state("./output/v.h5", &v[0], params);
-	    sum=0;
-	    for (i=0; i<2*N+1; i++)
-	    {
-		for (j=0; j<M; j++)
-		{
-		    sum += (psibkp[ind(i,j)] - psi[ind(i,j)])*conj((psibkp[ind(i,j)] - psi[ind(i,j)]));
-		}
-	    }
-	    sum = sqrt(creal(sum));
-	    printf("%e + %e j\n", creal(sum), cimag(sum));
-      }
 
 	// lplpsi dyy(psi) + dxx(psi)
 
 	d2x(psi, scratch, params);
 	dy(u, lplpsi, params);
-	for(i=0; i<2*N+1; i++)
+	for(i=0; i<N+1; i++)
 	{
 	    for(j=0; j<M; j++)
 	    {
@@ -370,58 +330,32 @@ int main(int argc, char **argv)
 	    }
 	}
 
-	if(timeStep==0)
-	{
-	    save_hdf5_state("./output/lplpsi.h5", &lplpsi[0], params);
-	}
-
 	// biharmpsi (dyy + dxx)lplpsi
 	
-	if(timeStep==0)
-	{
-	    dy(u, scratch, params);
-	    save_hdf5_state("./output/d2ypsi.h5", &scratch[0], params);
-	}
+	dy(u, d2ypsi, params);
 
-	dy(scratch, dyyypsi, params);
 
-	if(timeStep==0)
-	{
-	    save_hdf5_state("./output/d3ypsi.h5", &dyyypsi[0], params);
-	}
+	dy(d2ypsi, dyyypsi, params);
 
 	dy(dyyypsi, d4ypsi, params);
 
-	if(timeStep==0)
-	{
-	    save_hdf5_state("./output/d4ypsi.h5", &d4ypsi[0], params);
-	}
 
 	d2x(psi, scratch, params);
 
+	#ifdef MYDEBUG
 	if(timeStep==0)
 	{
 	    save_hdf5_state("./output/d2xpsi.h5", &scratch[0], params);
 	}
+	#endif
 
 	dy(scratch, scratch2, params);
 	dy(scratch2, d2xd2ypsi, params);
 
-	if(timeStep==0)
-	{
-	    save_hdf5_state("./output/d2xd2ypsi.h5", &d2xd2ypsi[0], params);
-	}
 
 	d4x(psi, d4xpsi, params);
 
-	if(timeStep==0)
-	{
-	    save_hdf5_state("./output/d4xpsi.h5", &d4xpsi[0], params);
-	}
-
-
-
-	for(i=0; i<2*N+1; i++)
+	for(i=0; i<N+1; i++)
 	{
 	    for(j=0; j<M; j++)
 	    {
@@ -432,51 +366,44 @@ int main(int argc, char **argv)
 	    }
 	}
 	
-	if(timeStep==0)
-	{
-	    save_hdf5_state("./output/biharmpsi.h5", &biharmpsi[0], params);
-	}
 
 	// udxlplpsi 
 	dx(lplpsi, udxlplpsi, params);
-	if(timeStep==0)
-	{
-	    save_hdf5_state("./output/dxlplpsi.h5", &udxlplpsi[0], params);
-	}
+
 
 	fft_convolve_r(udxlplpsi, u, udxlplpsi, scratchp1, scratchp2, scratchin,
 		scratchout, &phys_plan, &spec_plan, params);
 
-	if(timeStep==0)
-	{
-	    save_hdf5_state("./output/udxlplpsi.h5", &udxlplpsi[0], params);
-	}
-
 	// vdylplpsi 
 	dy(lplpsi, vdylplpsi, params);
-	if(timeStep==0)
-	{
-	    save_hdf5_state("./output/dylplpsi.h5", &vdylplpsi[0], params);
-	}
+
 
 	fft_convolve_r(vdylplpsi, v, vdylplpsi, scratchp1, scratchp2, scratchin,
 		scratchout, &phys_plan, &spec_plan, params);
-
-	if(timeStep==0)
-	{
-	    save_hdf5_state("./output/vdylplpsi.h5", &vdylplpsi[0], params);
-	}
 	
 	//vdyypsi = vdyu
-	dy(u, vdyypsi, params);
+	dy(u, d2ypsi, params);
 
-	fft_convolve_r(vdyypsi, v, vdyypsi, scratchp1, scratchp2, scratchin,
+	fft_convolve_r(d2ypsi, v, vdyypsi, scratchp1, scratchp2, scratchin,
 		scratchout, &phys_plan, &spec_plan, params);
 
+	#ifdef MYDEBUG
 	if(timeStep==0)
 	{
+	    sum=0;
+	    for (i=0; i<N+1; i++)
+	    {
+		for (j=0; j<M; j++)
+		{
+		    sum += (psibkp[ind(i,j)] - psi[ind(i,j)])*conj((psibkp[ind(i,j)] - psi[ind(i,j)]));
+		}
+	    }
+	    sum = sqrt(creal(sum));
+	    printf("%e + %e j\n", creal(sum), cimag(sum));
+
 	    save_hdf5_state("./output/vdyypsi.h5", &vdyypsi[0], params);
 	}
+        #endif
 
 	// RHSVec = dt*0.5*oneOverRe*BIHARMPSI 
 	// 	+ LPLPSI 
@@ -488,10 +415,10 @@ int main(int argc, char **argv)
 	    for (j=0; j<M; j++)
 	    {
 
-		RHSvec[j] = 0.5*dt*oneOverRe*biharmpsi[ind(i,j)] 
-			    + lplpsi[ind(i,j)]
-			    - dt*udxlplpsi[ind(i,j)]
-			    - dt*vdylplpsi[ind(i,j)];
+		RHSvec[j] = 0.5*dt*oneOverRe*biharmpsi[ind(i,j)];
+		RHSvec[j] += + lplpsi[ind(i,j)];
+		RHSvec[j] += - dt*udxlplpsi[ind(i,j)];
+		RHSvec[j] += - dt*vdylplpsi[ind(i,j)];
 			    
 
 	    }
@@ -501,6 +428,7 @@ int main(int argc, char **argv)
 	    RHSvec[M-2] = 0;
 	    RHSvec[M-1] = 0;
 
+	    #ifdef MYDEBUG
 	    if(timeStep==0)
 	    {
 		char fn[30];
@@ -508,23 +436,17 @@ int main(int argc, char **argv)
 		printf("writing %s\n", fn);
 		save_hdf5_arr(fn, &RHSvec[0], M);
 	    }
-
-
+            #endif
 
 	    // perform dot product to calculate new streamfunction.
-	    for (j=0; j<M; j++)
+	    for (j=M-1; j>=0; j=j-1)
 	    {
 		psi[ind(i,j)] = 0;
-		psi[ind(2*N+1-i,j)] = 0;
 
-	        for (l=0; l<M; l++)
+		for (l=M-1; l>=0; l=l-1)
 	        {
 	            psi[ind(i,j)] += opsList[(i*M + j)*M + l] * RHSvec[l];
 	        }
-
-		psi[ind(2*N+1-i,j)] = conj(psi[ind(i,j)]);
-		//printf("%f + %fj\n", creal(psi[ind(i,j)]), cimag(psi[ind(i,j)]));
-		//printf("%f + %fj\n", creal(psi[ind(2*N+1-i,j)]), cimag(psi[ind(2*N+1-i,j)]) );
 	    }
 
 	}
@@ -540,8 +462,8 @@ int main(int argc, char **argv)
 	for (j=0; j<M; j++)
 	{
 	    //RHSvec[j] = u[ind(0,j)];
-	    RHSvec[j] = u[ind(0,j)] + dt*0.5*oneOverRe*dyyypsi[ind(0,j)]
-			- dt*vdyypsi[ind(0,j)];
+	    RHSvec[j] = dt*0.5*oneOverRe*dyyypsi[ind(0,j)] - dt*vdyypsi[ind(0,j)];
+	    RHSvec[j] += u[ind(0,j)]; 
 	}
 	RHSvec[0] += 2*dt*oneOverRe;
 
@@ -556,73 +478,93 @@ int main(int argc, char **argv)
 	RHSvec[M-2] = 0; 
 	RHSvec[M-1] = 0; 
 
+	#ifdef MYDEBUG
 	if(timeStep==0)
 	{
 	    char fn[30];
 	    sprintf(fn, "./output/RHSVec%d.h5", 0);
 	    save_hdf5_arr(fn, &RHSvec[0], shape2[0]);
 	}
+        #endif
 	
 
 	// step the zeroth mode
 	
+	//for (j=M-1; j>=0; j=j-1)
 	for (j=0; j<M; j++)
 	{
 	    psi[ind(0,j)] = 0;
+	    //for (l=M-1; l>=0; l=l-1)
 	    for (l=0; l<M; l++)
 	    {
 		psi[ind(0,j)] += opsList[j*M + l] * RHSvec[l];
 
-		// if ((j==0) || (j==1) || (j==2) || (j==3))
-		// {
-		// if ((l==0)||(l==2))
-		// {
-		// printf("%d,%d: %f %f %f\n", j,l, creal(psi[ind(0,j)]),
-		// 	creal(opsList[j*M+l]), creal(RHSvec[l]));
-		// }
-		// }
-
 	    }
 	}
 
-	//printf("psi[0] %f + %fj\n", creal(psi[0]), cimag(psi[0]));
-	//printf("psi[1] %f + %fj\n", creal(psi[1]), cimag(psi[1]));
-	//printf("psi[2] %f + %fj\n", creal(psi[2]), cimag(psi[2]));
-	//printf("psi[3] %f + %fj\n", creal(psi[3]), cimag(psi[3]));
+	#ifdef MYDEBUG
+	if(timeStep==0)
+	{
+	    save_hdf5_state("./output/psi.h5", &psi[0], params);
+	    save_hdf5_state("./output/u.h5",  &u[0], params);
+	    save_hdf5_state("./output/v.h5", &v[0], params);
+	    save_hdf5_state("./output/lplpsi.h5", &lplpsi[0], params);
+	    save_hdf5_state("./output/d2ypsi.h5", &d2ypsi[0], params);
+	    save_hdf5_state("./output/d3ypsi.h5", &dyyypsi[0], params);
+	    save_hdf5_state("./output/d4ypsi.h5", &d4ypsi[0], params);
+	    save_hdf5_state("./output/d2xd2ypsi.h5", &d2xd2ypsi[0], params);
+	    save_hdf5_state("./output/d4xpsi.h5", &d4xpsi[0], params);
+	    save_hdf5_state("./output/biharmpsi.h5", &biharmpsi[0], params);
+	    save_hdf5_state("./output/dxlplpsi.h5", &udxlplpsi[0], params);
+	    save_hdf5_state("./output/udxlplpsi.h5", &udxlplpsi[0], params);
+	    save_hdf5_state("./output/dylplpsi.h5", &vdylplpsi[0], params);
+	    save_hdf5_state("./output/vdylplpsi.h5", &vdylplpsi[0], params);
+	}
 
-	if(timeStep==1)
+	#endif
+
+
+
+	#ifdef MYDEBUG
+	if(timeStep==0)
 	{
 	    save_hdf5_state("./output/psi2.h5", &psi[0], params);
 	}
+        #endif
 
 	// output some information at every frame
 	if ((timeStep % stepsPerFrame) == 0 )
 	{
 	    time = timeStep*dt;
 
-	    normU = 0;
+	    double normU1 = 0;
+	    double normU2 = 0;
+	    double normU0 = 0;
 
 	    for (j=M-1; j>=0; j=j-1)
 	    {
-		normU += creal(u[ind(1,j)]*u[ind(2*N,j)]); 
+		normU0 += creal(u[ind(0,j)]*u[ind(0,j)]); 
+		normU1 += creal(u[ind(1,j)]*conj(u[ind(1,j)])); 
+		normU2 += creal(u[ind(2,j)]*conj(u[ind(2,j)])); 
 	    }
-	    normU = sqrt(normU);
+	    normU0 = sqrt(normU0);
+	    normU1 = sqrt(normU1);
+	    normU2 = sqrt(normU2);
 
-	    fprintf(traceU, "%e\t%e\t\n", time, normU);
+	    fprintf(traceU, "%e\t%e\t%e\t%e\t\n", time, normU0, normU1, normU2);
 
 	    fft_convolve_r(u, u, u, scratchp1, scratchp2, scratchin, scratchout,
 		    &phys_plan, &spec_plan, params);
+	    fft_convolve_r(v, v, v, scratchp1, scratchp2, scratchin, scratchout,
+		    &phys_plan, &spec_plan, params);
+	    
 
-	    KE0 = calc_KE0(u, params) * (15.0/ 8.0);
-	    KE1 = calc_KE1(u, params) * (15.0/ 8.0);
-	    KE2 = calc_KE2(u, params) * (15.0/ 8.0);
+	    KE0 = calc_KE0(u, v, params) * (15.0/ 8.0);
+	    KE1 = calc_KE1(u, v, params) * (15.0/ 8.0);
+	    KE2 = calc_KE2(u, v, params) * (15.0/ 8.0);
 
 	    printf("%e\t%e\t%e\t%e\n", time, KE0, KE1, KE2);
 
-
-	    //char fn[30];
-	    //sprintf(fn, "./output/t%e.h5", time);
-	    //save_hdf5_state(fn, &psi[0], params);
 	    
 	    save_hdf5_snapshot(&hdf5fp, &filetype_id, &datatype_id,
 		    psi, time, params);
@@ -669,6 +611,7 @@ int main(int argc, char **argv)
     fftw_free(scratchout);
     fftw_free(scratchp1);
     fftw_free(scratchp2);
+    fftw_free(d2ypsi);
     fftw_free(dyyypsi);
     fftw_free(d4ypsi);
     fftw_free(d4xpsi);

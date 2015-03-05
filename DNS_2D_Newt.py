@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Sun  1 Mar 20:40:00 2015
+#   Last modified: Wed  4 Mar 19:42:27 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -235,27 +235,28 @@ del j
 PSI = zeros((2*N+1)*M,dtype='complex')
 
 # This is Poiseuille flow 
-#PSI[N*M]   += 2.0/3.0
-#PSI[N*M+1] += 3.0/4.0
-#PSI[N*M+2] += 0.0
-#PSI[N*M+3] += -1.0/12.0
+PSI[N*M]   += 2.0/3.0
+PSI[N*M+1] += 3.0/4.0
+PSI[N*M+2] += 0.0
+PSI[N*M+3] += -1.0/12.0
 
-#PSI[(N-1)*M + 3] += 1e-10
-#PSI[(N-2)*M + 3] += 1e-10
-#PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
+perAmp = 1e-12 
+PSI[(N-1)*M:(N-1)*M + M/2] += perAmp*(rand(M/2) + 1.j*rand(M/2)) 
+PSI[(N-2)*M:(N-2)*M + M/2] += perAmp*(rand(M/2) + 1.j*rand(M/2)) 
+PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
+PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
 
-#print 'performing linear stability of Poiseuille flow test'
+print 'performing linear stability of Poiseuille flow test'
 
 # Read in stream function from file
-(PSI, Nu) = pickle.load(open(inFileName,'r'))
+#(PSI, Nu) = pickle.load(open(inFileName,'r'))
 
 #PSI[N*M]   += 2.0/3.0
 #PSI[N*M+1] += 3.0/4.0
 #PSI[N*M+3] += -1.0/12.0
-#PSI[N*M:N*M+4]   += 0.01*rand(4) + 0j
-#PSI[N*M+2] += 0.0
-#
-#PSI[(N-1)*M + 2] += 1e-2 - 1e-2j
+
+#PSI[N*M+1: (N+1)*M - M/2 :2] += perAmp*rand(M/4) 
+
 #PSI[(N-1)*M + 4] += 1e-2 - 1e-2j
 #PSI[(N-1)*M + 6] += 1e-3 - 1e-3j
 #PSI[(N-1)*M + 8] += 1e-4 - 1e-4j
@@ -265,11 +266,8 @@ PSI = zeros((2*N+1)*M,dtype='complex')
 #PSI[(N-2)*M + 5] += 1e-4 - 1e-4j
 #
 
-#PSI[(N-1)*M:N*M-M/2:2] += 1e-2*rand(M/4) - 1e-2j*rand(M/4)
-#PSI[(N-2)*M+1: (N-1)*M - M/2 + 1:2] += 1e-4*rand(M/4) - 1e-4j*rand(M/4)
-
-#PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
-#PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
+#PSI[(N-1)*M:N*M-M/2 -1:2] += perAmp*rand(M/4) - perAmp*1.j*rand(M/4)
+#PSI[(N-2)*M+1: (N-1)*M - M/2 :2] += 0.1*perAmp*rand(M/4) - 0.1*perAmp*1.j*rand(M/4)
 
 #PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
 #PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])

@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Sat 28 Feb 16:58:08 2015
+#   Last modified: Tue  3 Mar 13:39:59 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -468,7 +468,7 @@ U = dot(MDY, PSI)
 USQ = dot(tsm.prod_mat(U), U)
 
 INTY = mk_cheb_int()
-print 'KE0: ', (15.0/16.0)*dot(INTY, USQ[N*M:(N+1)*M])
+print 'KE0 (U^2 only): ', (15.0/16.0)*dot(INTY, USQ[N*M:(N+1)*M])
 
 # read in and make it 2D to get rid of the junk Cheby modes.
 # Then take transpose and flatten to return to 2*N+1 chunks of M length.
@@ -611,9 +611,9 @@ dxlplc = dxlplc.T.flatten()
 DXLPLPSI = dot(MDX, LPLPSI)
 
 print "dxlplpsi ", allclose(DXLPLPSI, dxlplc)
+print 'difference', linalg.norm(DXLPLPSI-dxlplc)
 
 if not allclose(DXLPLPSI, dxlplc):
-    print 'difference', linalg.norm(DXLPLPSI-dxlplc)
 
     print "mode 0", linalg.norm(DXLPLPSI[N*M:(N+1)*M]-dxlplc[N*M:(N+1)*M])
     for n in range(1,N+1):
@@ -632,8 +632,8 @@ udxlplc = udxlplc.T.flatten()
 UDXLPLPSI = dot(prod_mat(U), dot(MDX, LPLPSI))
 
 print 'udxlolpsi ?', allclose(UDXLPLPSI, udxlplc)
+print 'difference', linalg.norm(UDXLPLPSI-udxlplc)
 if not allclose(UDXLPLPSI, udxlplc):
-    print 'difference', linalg.norm(UDXLPLPSI-udxlplc)
     print 'relative difference', linalg.norm(UDXLPLPSI-udxlplc)/linalg.norm(udxlplc)
 
     print "max difference", amax(UDXLPLPSI-udxlplc)
@@ -651,8 +651,7 @@ dylplc = dylplc.T.flatten()
 DYLPLPSI = dot(MDY, LPLPSI)
 
 print "dylplpsi ", allclose(DYLPLPSI, dylplc)
-if not allclose(DYLPLPSI, dylplc):
-    print 'difference', linalg.norm(DYLPLPSI-dylplc)
+print 'difference', linalg.norm(DYLPLPSI-dylplc)
 
 vdylplc = load_hdf5_state("./output/vdylplpsi.h5").reshape(2*N+1, M).T 
 vdylplc = fftshift(vdylplc, axes=1)
@@ -661,8 +660,8 @@ vdylplc = vdylplc.T.flatten()
 VDYLPLPSI = dot(prod_mat(V), dot(MDY, LPLPSI))
 
 print 'vdylplpsi ?', allclose(VDYLPLPSI, vdylplc)
+print 'difference', linalg.norm(VDYLPLPSI-vdylplc)
 if not allclose(VDYLPLPSI, vdylplc):
-    print 'difference', linalg.norm(VDYLPLPSI-vdylplc)
     print 'relative difference', linalg.norm(VDYLPLPSI-vdylplc)/linalg.norm(vdylplc)
     #print 'VDYLPLPSI1', VDYLPLPSI[M: 2*M]
     #print 'VDYLPLPSI1c', vdylplc[M: 2*M]
@@ -677,23 +676,17 @@ VDYU = dot(prod_mat(V), dot(MDY, dot(MDY, PSI)))
 print 'vdyypsi ?', allclose(VDYU, vdyyc)
 print 'difference', linalg.norm(VDYU-vdyyc)
 if not allclose(VDYU, vdyyc):
-    print 'difference', linalg.norm(VDYU-vdyyc)
     #print 'VDYU1', VDYU[M: 2*M]
     #print 'VDYU1c', vdyyc[M: 2*M]
-    print 'difference', (VDYU-vdyyc)[N*M+38::M]
+    print ' high mode difference', (VDYU-vdyyc)[N*M+38::M]
 
 op0c = load_hdf5_state("./output/op0.h5")#.reshape(M, M).T 
 
-print 'operator 0', allclose(op0c, PsiOpInvList[0].flatten())
-
-if not allclose(op0c, PsiOpInvList[0].flatten()):
-    print 'difference', linalg.norm(op0c-PsiOpInvList[0].flatten())
-    print op0c[:6]
-    print PsiOpInvList[N].flatten()[:6]
+print 'operator 0', linalg.norm(op0c-PsiOpInvList[0].flatten())
 
 for i in range(1,N+1):
     opc = load_hdf5_state("./output/op{0}.h5".format(i))
-    print 'operator ',i, allclose(opc, PsiOpInvList[i].flatten())
+    print 'operator ',i, linalg.norm(opc - PsiOpInvList[i].flatten())
 
 
 DYYYPSI = dot(MDY, dot(MDY, dot(MDY, PSI)))
@@ -703,14 +696,24 @@ RHSVec = dt*0.5*oneOverRe*BIHARMPSI \
         - dt*UDXLPLPSI \
         - dt*VDYLPLPSI 
 
+#RHSVec = dt*0.5*oneOverRe*biharmc \
+#        + lplc \
+#        - dt*udxlplc \
+#        - dt*vdylplc 
+
 
 # Zeroth mode
 RHSVec[N*M:(N+1)*M] = 0
 RHSVec[N*M:(N+1)*M] = dt*0.5*oneOverRe*DYYYPSI[N*M:(N+1)*M] \
-        + U[N*M:(N+1)*M] #\
-        #- dt*VDYU[N*M:(N+1)*M]
+        + U[N*M:(N+1)*M] \
+        - dt*VDYU[N*M:(N+1)*M]
 RHSVec[N*M] += dt*2*oneOverRe
 
+#RHSVec[N*M:(N+1)*M] = 0
+#RHSVec[N*M:(N+1)*M] = dt*0.5*oneOverRe*d3yc[N*M:(N+1)*M] \
+#        + Uc[N*M:(N+1)*M] \
+#        - dt*vdyyc[N*M:(N+1)*M]
+#RHSVec[N*M] += dt*2*oneOverRe
 
 # Apply BC's
 
@@ -741,24 +744,35 @@ for i in range(0,N+1):
     #print RHSvecc[maxarg_]
 
     #if i ==0:
-        #print 'c', RHSvecc
-        #print 'mat', RHSVec[N*M:(N+1)*M]
-        #print RHSvecc - RHSVec[N*M:(N+1)*M]
-        #print 'RHSVecC - RHSvec components'
-        #print RHSvecc - Uc[N*M:(N+1)*M] - 0.5*dt*oneOverRe*d3yc[N*M:(N+1)*M] \
-        #        -2*dt*oneOverRe
-        #print RHSvecc - U[N*M:(N+1)*M] - 0.5*dt*oneOverRe*D3YPSI[N*M:(N+1)*M] \
-        #        -2*dt*oneOverRe
-        #print 'RHSVec - RHSvec components'
-        #print RHSVec[N*M:(N+1)*M] - U[N*M:(N+1)*M] - 0.5*dt*oneOverRe*D3YPSI[N*M:(N+1)*M] \
-        #       -2*dt*oneOverRe
+    #    print 'c', RHSvecc
+    #    print 'mat', RHSVec[N*M:(N+1)*M]
+    #    print RHSvecc - RHSVec[N*M:(N+1)*M]
+    #    print 'RHSVecC - RHSvec components'
+    #    print RHSvecc - Uc[N*M:(N+1)*M] - 0.5*dt*oneOverRe*d3yc[N*M:(N+1)*M] \
+    #            -2*dt*oneOverRe
+    #    print RHSvecc - U[N*M:(N+1)*M] - 0.5*dt*oneOverRe*D3YPSI[N*M:(N+1)*M] \
+    #            -2*dt*oneOverRe
+    #    print 'RHSVec - RHSvec components'
+    #    print RHSVec[N*M:(N+1)*M] - U[N*M:(N+1)*M] - 0.5*dt*oneOverRe*D3YPSI[N*M:(N+1)*M] \
+    #           -2*dt*oneOverRe
 
 psi2c = load_hdf5_state("./output/psi2.h5").reshape(2*N+1, M).T 
 
-PSI[N*M:(N+1)*M] = dot(PsiOpInvList[0], RHSVec[N*M:(N+1)*M])
+#PSI[N*M:(N+1)*M] = dot(PsiOpInvList[0], RHSVec[N*M:(N+1)*M])
+for i in range(M):
+    PSI[(N)*M + i] = 0
+    #for j in range(M-1,-1,-1):
+    for j in range(M):
+        PSI[(N)*M + i] += PsiOpInvList[0][i,j] * RHSVec[(N)*M + j]
 
+#for n in range(1,N+1):
+#    PSI[(N+n)*M:(N+n+1)*M] = dot(PsiOpInvList[n], RHSVec[(N+n)*M:(N+n+1)*M])
+#    del n  
 for n in range(1,N+1):
-    PSI[(N+n)*M:(N+n+1)*M] = dot(PsiOpInvList[n], RHSVec[(N+n)*M:(N+n+1)*M])
+    for i in range(M):
+        PSI[(N+n)*M + i] = 0
+        for j in range(M):
+            PSI[(N+n)*M + i] += PsiOpInvList[n][i,j] * RHSVec[(N+n)*M + j]
     del n  
 
 for n in range(0,N):

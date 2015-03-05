@@ -1,5 +1,5 @@
 CC=gcc
-DEBUGFLAGS = -pg -g -ggdb 
+DEBUGFLAGS = -pg -g -ggdb -DMYDEBUG
 CFLAGS = -Wall -fpic -Iinclude $(TOBYCPATHS) 
 #CFLAGS = $(DEBUGFLAGS) -Wall -fpic -Iinclude $(TOBYCPATHS) 
 #-L/opt/local/lib -I/opt/local/include 
@@ -38,7 +38,13 @@ all : obj/fields_2D.o obj/DNS_2D_Newt.o obj/test_fields.o
 #	$(CC) -o test_fields_2 obj/test_fields_2.o obj/fields_2D.o $(CFLAGS) -lhdf5 -lhdf5_hl -lfftw3 -lm
 	$(CC) -o DNS_2D_Newt obj/DNS_2D_Newt.o obj/fields_2D.o $(CFLAGS) -lhdf5 -lhdf5_hl -lfftw3 -lm
 
-.PHONY : clean
+debug : 
+	$(CC) -c src/fields_2D.c -o obj/fields_2D.o $(DEBUGFLAGS) $(CFLAGS) 
+	$(CC) -c src/DNS_2D_Newt.c -o obj/DNS_2D_Newt.o $(DEBUGFLAGS) $(CFLAGS)
+	$(CC) -o DNS_2D_Newt obj/DNS_2D_Newt.o obj/fields_2D.o $(DEBUGFLAGS) $(CFLAGS) -lhdf5 -lhdf5_hl -lfftw3 -lm
+
+
+.PHONY : clean debug
 clean :
 	rm -f ./obj/*.o DNS_2D_Newt test_fields test_fields_1 test_fields_2
 	rm -f ./operators/*.h5

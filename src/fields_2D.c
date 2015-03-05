@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Sat 28 Feb 16:21:13 2015
+// Last modified: Mon  2 Mar 20:21:17 2015
 
 #include"fields_2D.h"
 
@@ -102,7 +102,7 @@ void save_hdf5_state(char *filename, fftw_complex *arr, flow_params cnsts)
 {
     int N = cnsts.N;
     int M = cnsts.M;
-    int i;
+    int i, j;
 
     hid_t  file_id, dataset_id, dataspace_id, datatype_id, filetype_id;
     herr_t status;
@@ -136,10 +136,22 @@ void save_hdf5_state(char *filename, fftw_complex *arr, flow_params cnsts)
     // set up the data for writing
     wdata = (complex_hdf *) malloc (arr_size[0] * sizeof (complex_hdf));
 
-    for (i=0; i<(2*N+1)*M; i++)
+    for (j=0; j<M; j++)
     {
-	wdata[i].r = creal(arr[i]);
-	wdata[i].i = cimag(arr[i]);
+	wdata[j].r = creal(arr[j]);
+	wdata[j].i = cimag(arr[j]);
+    }
+
+    for (i=1; i<N+1; i++)
+    {
+	for (j=0; j<M; j++)
+	{
+	    wdata[M*i + j].r = creal(arr[M*i + j]);
+	    wdata[M*i + j].i = cimag(arr[M*i + j]);
+
+	    wdata[M*(2*N+1-i) + j].r = creal(arr[M*i + j]);
+	    wdata[M*(2*N+1-i) + j].i = -cimag(arr[M*i + j]);
+	}
     }
     
     // write the file 
@@ -163,7 +175,7 @@ void save_hdf5_snapshot(hid_t *file_id, hid_t *filetype_id, hid_t *datatype_id,
 {
     int N = cnsts.N;
     int M = cnsts.M;
-    int i;
+    int i, j;
     char dataset_name[30];
 
     hid_t  dataset_id, dataspace_id;
@@ -186,10 +198,22 @@ void save_hdf5_snapshot(hid_t *file_id, hid_t *filetype_id, hid_t *datatype_id,
     // set up the data for writing
     wdata = (complex_hdf *) malloc (arr_size[0] * sizeof (complex_hdf));
 
-    for (i=0; i<(2*N+1)*M; i++)
+    for (j=0; j<M; j++)
     {
-	wdata[i].r = creal(arr[i]);
-	wdata[i].i = cimag(arr[i]);
+	wdata[j].r = creal(arr[j]);
+	wdata[j].i = cimag(arr[j]);
+    }
+
+    for (i=1; i<N+1; i++)
+    {
+	for (j=0; j<M; j++)
+	{
+	    wdata[M*i + j].r = creal(arr[M*i + j]);
+	    wdata[M*i + j].i = cimag(arr[M*i + j]);
+
+	    wdata[M*(2*N+1-i) + j].r = creal(arr[M*i + j]);
+	    wdata[M*(2*N+1-i) + j].i = -cimag(arr[M*i + j]);
+	}
     }
     
     // write the file 
@@ -240,7 +264,7 @@ void load_hdf5_state(char *filename, fftw_complex *arr, flow_params cnsts)
 		      H5P_DEFAULT, rdata); 
 
     // copy the result into the complex array
-    for (i=0; i<(2*N+1); i++)
+    for (i=0; i<(N+1); i++)
     {
 	for (j=0; j<M; j++) 
 	{
@@ -392,19 +416,6 @@ void dx(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
 	for(j=0; j<M; j++)
 	{
 	    arrout[ind(i, j)] = i*kx*I*arrin[ind(i, j)];
-	    //printf("%e+%ej ", creal(arrin[ind(i,j)]), cimag(arrin[ind(i,j)]) );
-	    //printf("%e+%ej\n", creal(arrout[ind(i,j)]), cimag(arrout[ind(i,j)]) );
-	}
-
-    }
-
-    // For conjugate fourier modes
-    for(i=N+1; i<2*N+1; i++)
-    {
-	//For all Chebyshev modes
-	for(j=0; j<M; j++)
-	{
-	    arrout[ind(i, j)] = -(2*N+1-i)*kx*I*arrin[ind(i, j)];
 	}
 
     }
@@ -421,24 +432,10 @@ void d2x(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
     // For positive fourier modes
     for(i=0; i<N+1; i++)
     {
-	//printf("%d\n",i);
 	//For all Chebyshev modes
 	for(j=0; j<M; j++)
 	{
 	    arrout[ind(i, j)] = -pow(i*kx, 2)*arrin[ind(i, j)];
-	    //printf("%e+%ej ", creal(arrin[ind(i,j)]), cimag(arrin[ind(i,j)]) );
-	    //printf("%e+%ej\n", creal(arrout[ind(i,j)]), cimag(arrout[ind(i,j)]) );
-	}
-
-    }
-
-    // For conjugate fourier modes
-    for(i=N+1; i<2*N+1; i++)
-    {
-	//For all Chebyshev modes
-	for(j=0; j<M; j++)
-	{
-	    arrout[ind(i, j)] = -pow((2*N+1-i)*kx, 2)*arrin[ind(i, j)];
 	}
 
     }
@@ -455,24 +452,10 @@ void d4x(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
     // For positive fourier modes
     for(i=0; i<N+1; i++)
     {
-	//printf("%d\n",i);
 	//For all Chebyshev modes
 	for(j=0; j<M; j++)
 	{
 	    arrout[ind(i, j)] = pow(i*kx, 4)*arrin[ind(i, j)];
-	    //printf("%e+%ej ", creal(arrin[ind(i,j)]), cimag(arrin[ind(i,j)]) );
-	    //printf("%e+%ej\n", creal(arrout[ind(i,j)]), cimag(arrout[ind(i,j)]) );
-	}
-
-    }
-
-    // For conjugate fourier modes
-    for(i=N+1; i<2*N+1; i++)
-    {
-	//For all Chebyshev modes
-	for(j=0; j<M; j++)
-	{
-	    arrout[ind(i, j)] = pow((2*N+1-i)*kx,4)*arrin[ind(i, j)];
 	}
 
     }
@@ -485,7 +468,7 @@ void dy(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
     int i, j;
 
     // For all Fourier modes
-    for(i=0; i<2*N+1; i++)
+    for(i=0; i<N+1; i++)
     {
 	// Last 2 modes
 	arrout[ind(i, M-1)] = 0;
@@ -653,8 +636,8 @@ void to_physical_r(complex *arrin, double *arrout,
             for (j=0; j<M; j++)
             {
         	scratchin[indfft(i,j)] = arrin[ind(i,j)];
-        	scratchin[indfft(2*Nf+1-i, j)] = arrin[ind(2*N+1-i,j)];
-            }
+        	scratchin[indfft(2*Nf+1-i, j)] =  conj(arrin[ind(i,j)]);
+           }
         }
 
         // zero off the rest of the fourier modes
@@ -677,12 +660,18 @@ void to_physical_r(complex *arrin, double *arrout,
     }
     else
     {
-        for (i=0; i<2*N+1; i++)
+        for (j=0; j<M; j++)
+        {
+            scratchin[indfft(0,j)] = arrin[ind(0,j)];
+        }
+
+        for (i=1; i<N+1; i++)
         {
             for (j=0; j<M; j++)
             {
         	scratchin[indfft(i,j)] = arrin[ind(i,j)];
-            }
+        	scratchin[indfft(2*Nf+1-i, j)] =  conj(arrin[ind(i,j)]);
+           }
         }
     }
 
@@ -998,26 +987,11 @@ void to_spectral_r(double *arrin, complex *arrout,
 		arrout[ind(i,j)] = (1.0/(Mf-1.0))*scratchout[indfft(i,j)];
 	    }
 	}
-
-	// copy negative modes into output
-	for (i=1; i<N+1; i++)
-	{
-	    // out2D[0, :] = (0.5/(M-1.0))*out2D[0, :]
-	    arrout[ind(2*N+1-i,0)] = (0.5/(Mf-1.0)) * scratchout[indfft(2*Nf+1-i,0)]; 
-
-	    // when dealiasing this will be still x 1.0 not 0.5, because it isn't
-	    // the last element in the transformed array
-	    for (j=1; j<M; j++)
-	    {
-		// out2D[1:M-1, :] = (1.0/(M-1.0))*out2D[1:M-1, :]
-		arrout[ind(2*N+1-i,j)] = (1.0/(Mf-1.0))*scratchout[indfft(2*Nf+1-i,j)];
-	    }
-	}
     }
 
     else
     {
-	for (i=0; i<2*N+1; i++)
+	for (i=0; i<N+1; i++)
 	{
 	    // out2D[0, :] = (0.5/(M-1.0))*out2D[0, :]
 	    arrout[ind(i,0)] = (0.5/(M-1.0)) * scratchout[indfft(i,0)]; 
@@ -1217,7 +1191,7 @@ void fft_convolve_r(complex *arr1, complex *arr2, complex *arrout,
     to_spectral_r(scratchp1, arrout, scratchin, scratchout, spec_plan, cnsts);
 }
 
-double calc_KE0(fftw_complex *arrin, flow_params cnsts)
+double calc_KE0(fftw_complex *usq, fftw_complex *vsq, flow_params cnsts)
 {
     double integral0th = 0;
     double KE0 = 0;
@@ -1226,7 +1200,8 @@ double calc_KE0(fftw_complex *arrin, flow_params cnsts)
 
     for (m=0; m<M; m+=2)
     {
-	integral0th += (2. / (1.-m*m)) * creal(arrin[ind(0,m)]);
+	integral0th += (2. / (1.-m*m)) * creal(usq[ind(0,m)]);
+	integral0th += (2. / (1.-m*m)) * creal(vsq[ind(0,m)]);
     }
 
     KE0 = 0.5 * integral0th;
@@ -1234,19 +1209,20 @@ double calc_KE0(fftw_complex *arrin, flow_params cnsts)
     return KE0;
 }
 
-double calc_KE1(fftw_complex *arrin, flow_params cnsts)
+double calc_KE1(fftw_complex *usq, fftw_complex *vsq, flow_params cnsts)
 {
     fftw_complex integral0th = 0;
     double KE1 = 0;
 
     int m=0;
     int M=cnsts.M;
-    int N=cnsts.N;
 
     for (m=0; m<M; m+=2)
     {
-	integral0th += (2. / (1.-m*m)) * arrin[ind(1,m)];
-	integral0th += (2. / (1.-m*m)) * arrin[ind(2*N,m)];
+	integral0th += (2. / (1.-m*m)) * usq[ind(1,m)];
+	integral0th += (2. / (1.-m*m)) * conj(usq[ind(1,m)]);
+	integral0th += (2. / (1.-m*m)) * vsq[ind(1,m)];
+	integral0th += (2. / (1.-m*m)) * conj(vsq[ind(1,m)]);
     }
 
     KE1 = 0.5 * creal(integral0th);
@@ -1254,19 +1230,20 @@ double calc_KE1(fftw_complex *arrin, flow_params cnsts)
     return KE1;
 }
 
-double calc_KE2(fftw_complex *arrin, flow_params cnsts)
+double calc_KE2(fftw_complex *usq, fftw_complex *vsq, flow_params cnsts)
 {
     fftw_complex integral = 0;
     double KE2 = 0;
 
     int m=0;
     int M=cnsts.M;
-    int N=cnsts.N;
 
     for (m=0; m<M; m+=2)
     {
-	integral += (2. / (1.-m*m)) * arrin[ind(2,m)];
-	integral += (2. / (1.-m*m)) * arrin[ind(2*N-1,m)];
+	integral += (2. / (1.-m*m)) * usq[ind(2,m)];
+	integral += (2. / (1.-m*m)) * conj(usq[ind(2,m)]);
+	integral += (2. / (1.-m*m)) * vsq[ind(2,m)];
+	integral += (2. / (1.-m*m)) * conj(vsq[ind(2,m)]);
     }
 
     KE2 = 0.5 * creal(integral);
