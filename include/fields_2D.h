@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon  2 Mar 20:20:42 2015
+// Last modified: Fri  6 Mar 09:33:06 2015
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -100,6 +100,8 @@ double calc_KE0(fftw_complex *usq, fftw_complex *vsq, flow_params cnsts);
 double calc_KE1(fftw_complex *usq, fftw_complex *vsq, flow_params cnsts);
 
 double calc_KE2(fftw_complex *usq, fftw_complex *vsq, flow_params cnsts);
+
+double calc_KE(fftw_complex *usq, fftw_complex *vsq, flow_params cnsts);
 
 struct flow_params {
     int N;

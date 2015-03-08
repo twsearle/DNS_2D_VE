@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Wed  4 Mar 19:42:27 2015
+#   Last modified: Sun  8 Mar 20:23:34 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -73,7 +73,7 @@ fp.close()
 
 if dealiasing:
     Nf = (3*N)/2 + 1
-    Mf = (3*M)/2
+    Mf = 2*M
 else:
     Nf = N
     Mf = M
@@ -234,22 +234,24 @@ del j
 #### The initial stream-function
 PSI = zeros((2*N+1)*M,dtype='complex')
 
-# This is Poiseuille flow 
-PSI[N*M]   += 2.0/3.0
-PSI[N*M+1] += 3.0/4.0
-PSI[N*M+2] += 0.0
-PSI[N*M+3] += -1.0/12.0
+# Read in stream function from file
+(PSI, Nu) = pickle.load(open(inFileName,'r'))
 
-perAmp = 1e-12 
+# This is Poiseuille flow 
+#PSI[N*M]   += 2.0/3.0
+#PSI[N*M+1] += 3.0/4.0
+#PSI[N*M+2] += 0.0
+#PSI[N*M+3] += -1.0/12.0
+
+perAmp = 1e-8
+PSI[N*M:N*M + M/2] += perAmp*(rand(M/2))
 PSI[(N-1)*M:(N-1)*M + M/2] += perAmp*(rand(M/2) + 1.j*rand(M/2)) 
 PSI[(N-2)*M:(N-2)*M + M/2] += perAmp*(rand(M/2) + 1.j*rand(M/2)) 
 PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
 PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
 
-print 'performing linear stability of Poiseuille flow test'
+#print 'performing linear stability of Poiseuille flow test'
 
-# Read in stream function from file
-#(PSI, Nu) = pickle.load(open(inFileName,'r'))
 
 #PSI[N*M]   += 2.0/3.0
 #PSI[N*M+1] += 3.0/4.0

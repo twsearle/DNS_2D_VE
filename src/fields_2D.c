@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon  2 Mar 20:21:17 2015
+// Last modified: Fri  6 Mar 10:24:20 2015
 
 #include"fields_2D.h"
 
@@ -1225,7 +1225,7 @@ double calc_KE1(fftw_complex *usq, fftw_complex *vsq, flow_params cnsts)
 	integral0th += (2. / (1.-m*m)) * conj(vsq[ind(1,m)]);
     }
 
-    KE1 = 0.5 * creal(integral0th);
+    KE1 = creal(integral0th);
     
     return KE1;
 }
@@ -1246,7 +1246,40 @@ double calc_KE2(fftw_complex *usq, fftw_complex *vsq, flow_params cnsts)
 	integral += (2. / (1.-m*m)) * conj(vsq[ind(2,m)]);
     }
 
-    KE2 = 0.5 * creal(integral);
+    KE2 = creal(integral);
     
     return KE2;
+}
+
+double calc_KE(fftw_complex *usq, fftw_complex *vsq, flow_params cnsts)
+{
+    fftw_complex integral = 0;
+    double KE = 0;
+
+    int m=0;
+    int n=0;
+    int M=cnsts.M;
+    int N=cnsts.N;
+
+    for (n=0; n<N+1; n++)
+    {
+	integral = 0;
+
+	for (m=0; m<M; m+=2)
+	{
+	    integral += (2. / (1.-m*m)) * usq[ind(n,m)];
+	    integral += (2. / (1.-m*m)) * conj(usq[ind(n,m)]);
+	    integral += (2. / (1.-m*m)) * vsq[ind(n,m)];
+	    integral += (2. / (1.-m*m)) * conj(vsq[ind(n,m)]);
+	}
+
+	if (n == 0)
+	{
+	    KE += 0.25*creal(integral);
+	} else {
+	    KE += creal(integral);
+	}
+    }
+    
+    return KE;
 }
