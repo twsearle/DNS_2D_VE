@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Sun  8 Mar 20:23:34 2015
+#   Last modified: Mon  9 Mar 14:05:24 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -235,13 +235,13 @@ del j
 PSI = zeros((2*N+1)*M,dtype='complex')
 
 # Read in stream function from file
-(PSI, Nu) = pickle.load(open(inFileName,'r'))
+#(PSI, Nu) = pickle.load(open(inFileName,'r'))
 
 # This is Poiseuille flow 
-#PSI[N*M]   += 2.0/3.0
-#PSI[N*M+1] += 3.0/4.0
-#PSI[N*M+2] += 0.0
-#PSI[N*M+3] += -1.0/12.0
+PSI[N*M]   += 2.0/3.0
+PSI[N*M+1] += 3.0/4.0
+PSI[N*M+2] += 0.0
+PSI[N*M+3] += -1.0/12.0
 
 perAmp = 1e-8
 PSI[N*M:N*M + M/2] += perAmp*(rand(M/2))
@@ -319,20 +319,6 @@ for i in range(1, N+1):
     PsiOpInvList.append(PSIOP)
 
 del PSIOP
-
-# zeroth mode
-Psi0thOp = zeros((M,M), dtype='complex')
-Psi0thOp = SMDY - 0.5*dt*oneOverRe*SMDYYY + 0j
-
-# Apply BCs
-
-# dypsi0(+-1) = 0
-Psi0thOp[M-3, :] = DERIVTOP
-Psi0thOp[M-2, :] = DERIVBOT
-# psi0(-1) =  0
-Psi0thOp[M-1, :] = BBOT
-
-PsiOpInvList.append(linalg.inv(Psi0thOp))
 
 PsiOpInvList = array(PsiOpInvList)
 

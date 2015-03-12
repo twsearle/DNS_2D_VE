@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Sun  8 Mar 22:35:42 2015
+// Last modified: Wed 11 Mar 18:52:31 2015
 
 /* Program Description:
  *
@@ -292,6 +292,7 @@ int main(int argc, char **argv)
 
 	save_hdf5_arr(fn, &tmpop[0], M*M);
     }
+    save_hdf5_state("./output/psi.h5", &psi[0], params);
     #endif
     
     // perform the time iteration
@@ -302,7 +303,7 @@ int main(int argc, char **argv)
     {
 
 	step_sf_SI_Crank_Nicolson(
-	    psi, dt, oneOverRe, params, scratch, scratch2, u, v, lplpsi,
+	    psi, dt, timeStep, oneOverRe, params, scratch, scratch2, u, v, lplpsi,
 	    biharmpsi, d2ypsi, dyyypsi, d4ypsi, d2xd2ypsi, d4xpsi, udxlplpsi,
 	    vdylplpsi, vdyypsi, RHSvec, opsList, &phys_plan, &spec_plan,
 	    scratchin, scratchout, scratchp1, scratchp2);

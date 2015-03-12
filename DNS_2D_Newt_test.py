@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Tue  3 Mar 13:39:59 2015
+#   Last modified: Wed 11 Mar 18:47:24 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -319,6 +319,14 @@ PSI = zeros((2*N+1)*M,dtype='complex')
 # Read in stream function from file
 (PSI, Nu) = pickle.load(open(inFileName,'r'))
 PSI = decide_resolution(PSI, NOld, MOld, CNSTS)
+
+for n in range(1,N+1):
+    PSI[(N-n)*M: (N-n+1)*M] = conj(PSI[(N+n)*M: (N+n+1)*M])
+
+#for n in range(1,N+1):
+#    PSI[(N+n)*M: (N+n+1)*M] = r_[0:M:1]
+#    PSI[(N-n)*M: (N-n+1)*M] = r_[0:M:1]
+
 #PSI[:] = rand((2*N+1)*M) + 1.j*rand((2*N+1)*M)
 #PSI[N*M:(N+1)*M] = rand(M)
 
@@ -403,6 +411,7 @@ print "writing initial state to initial.h5"
 f = h5py.File("initial.h5", "w")
 dset = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
 dset[...] = PSI.T.flatten()
+print shape(dset)
 f.close()
 
 #### TIME ITERATE 
@@ -452,10 +461,17 @@ subprocess.call(cargs)
 
 print "check variables are properly calculated in c code"
 
+print shape(load_hdf5_state("./output/psi.h5"))
+print shape(PSI)
 psic = load_hdf5_state("./output/psi.h5").reshape(2*N+1, M).T 
 
 print 'initial streamfunction?', allclose(PSI,psic)
 print 'difference', linalg.norm(psic-PSI)
+if linalg.norm(psic-PSI) > 0.0:
+    print ( PSI)[0,:]
+    print (psic)[0,:]
+    print "FAIL"
+    exit(1)
 #print 'zeroth mode c-python', psic[:M]- PSI[:M]
 
 # switch PSI back to normal ordering for F modes

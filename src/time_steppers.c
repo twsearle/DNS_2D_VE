@@ -7,14 +7,14 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Sun  8 Mar 22:37:35 2015
+// Last modified: Wed 11 Mar 18:55:32 2015
 
 #include"fields_2D.h"
 
 // Functions
 
 void step_sf_SI_Crank_Nicolson(
-	complex *psi, double dt, double oneOverRe, flow_params params, complex
+	complex *psi, double dt, int timeStep, double oneOverRe, flow_params params, complex
 	*scratch, complex *scratch2, complex *u, complex *v, complex *lplpsi,
 	complex *biharmpsi, complex *d2ypsi, complex *dyyypsi, complex *d4ypsi,
 	complex *d2xd2ypsi, complex *d4xpsi, complex *udxlplpsi, complex
@@ -97,6 +97,12 @@ void step_sf_SI_Crank_Nicolson(
 
     // udxlplpsi 
     dx(lplpsi, udxlplpsi, params);
+    #ifdef MYDEBUG
+    if(timeStep==0)
+    {
+	save_hdf5_state("./output/dxlplpsi.h5", &udxlplpsi[0], params);
+    }
+    #endif
 
 
     fft_convolve_r(udxlplpsi, u, udxlplpsi, scratchp1, scratchp2, scratchin,
@@ -104,6 +110,13 @@ void step_sf_SI_Crank_Nicolson(
 
     // vdylplpsi 
     dy(lplpsi, vdylplpsi, params);
+
+    #ifdef MYDEBUG
+    if(timeStep==0)
+    {
+	save_hdf5_state("./output/dylplpsi.h5", &vdylplpsi[0], params);
+    }
+    #endif
 
 
     fft_convolve_r(vdylplpsi, v, vdylplpsi, scratchp1, scratchp2, scratchin,
@@ -126,6 +139,23 @@ void step_sf_SI_Crank_Nicolson(
     // 	+ LPLPSI 
     // 	- dt*UDXLPLPSI 
     // 	- dt*VDYLPLPSI 
+#ifdef MYDEBUG
+    if(timeStep==0)
+    {
+	printf("should see some output?\n");
+	save_hdf5_state("./output/u.h5",  &u[0], params);
+	save_hdf5_state("./output/v.h5", &v[0], params);
+	save_hdf5_state("./output/lplpsi.h5", &lplpsi[0], params);
+	save_hdf5_state("./output/d2ypsi.h5", &d2ypsi[0], params);
+	save_hdf5_state("./output/d3ypsi.h5", &dyyypsi[0], params);
+	save_hdf5_state("./output/d4ypsi.h5", &d4ypsi[0], params);
+	save_hdf5_state("./output/d2xd2ypsi.h5", &d2xd2ypsi[0], params);
+	save_hdf5_state("./output/d4xpsi.h5", &d4xpsi[0], params);
+	save_hdf5_state("./output/biharmpsi.h5", &biharmpsi[0], params);
+	save_hdf5_state("./output/udxlplpsi.h5", &udxlplpsi[0], params);
+	save_hdf5_state("./output/vdylplpsi.h5", &vdylplpsi[0], params);
+    }
+#endif
 
     for (i=1; i<N+1; i++)
     {
@@ -219,26 +249,6 @@ void step_sf_SI_Crank_Nicolson(
 	}
     }
 
-#ifdef MYDEBUG
-    if(timeStep==0)
-    {
-	save_hdf5_state("./output/psi.h5", &psi[0], params);
-	save_hdf5_state("./output/u.h5",  &u[0], params);
-	save_hdf5_state("./output/v.h5", &v[0], params);
-	save_hdf5_state("./output/lplpsi.h5", &lplpsi[0], params);
-	save_hdf5_state("./output/d2ypsi.h5", &d2ypsi[0], params);
-	save_hdf5_state("./output/d3ypsi.h5", &dyyypsi[0], params);
-	save_hdf5_state("./output/d4ypsi.h5", &d4ypsi[0], params);
-	save_hdf5_state("./output/d2xd2ypsi.h5", &d2xd2ypsi[0], params);
-	save_hdf5_state("./output/d4xpsi.h5", &d4xpsi[0], params);
-	save_hdf5_state("./output/biharmpsi.h5", &biharmpsi[0], params);
-	save_hdf5_state("./output/dxlplpsi.h5", &udxlplpsi[0], params);
-	save_hdf5_state("./output/udxlplpsi.h5", &udxlplpsi[0], params);
-	save_hdf5_state("./output/dylplpsi.h5", &vdylplpsi[0], params);
-	save_hdf5_state("./output/vdylplpsi.h5", &vdylplpsi[0], params);
-    }
-
-#endif
 
 }
 

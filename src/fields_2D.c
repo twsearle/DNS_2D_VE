@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri  6 Mar 10:24:20 2015
+// Last modified: Wed 11 Mar 18:26:33 2015
 
 #include"fields_2D.h"
 
@@ -153,6 +153,8 @@ void save_hdf5_state(char *filename, fftw_complex *arr, flow_params cnsts)
 	    wdata[M*(2*N+1-i) + j].i = -cimag(arr[M*i + j]);
 	}
     }
+    printf("HHHHHHHEEEEEEEEERRRRRRRRREEEEE");
+    printf("%d\n",M*(2*N+1));
     
     // write the file 
     status = H5Dwrite(dataset_id, datatype_id, H5S_ALL, H5S_ALL, 
@@ -264,7 +266,7 @@ void load_hdf5_state(char *filename, fftw_complex *arr, flow_params cnsts)
 		      H5P_DEFAULT, rdata); 
 
     // copy the result into the complex array
-    for (i=0; i<(N+1); i++)
+    for (i=0; i<N+1; i++)
     {
 	for (j=0; j<M; j++) 
 	{
