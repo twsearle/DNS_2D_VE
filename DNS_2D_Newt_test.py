@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Tue  3 Mar 13:39:59 2015
+#   Last modified: Wed 11 Mar 19:28:49 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -70,7 +70,7 @@ dealiasing = True
 
 if dealiasing:
     Nf = (3*N)/2 + 1
-    Mf = (3*M)/2
+    Mf = 2*M
 else:
     Nf = N
     Mf = M
@@ -83,8 +83,8 @@ fp.close()
 numTimeSteps = int(totTime / dt)
 assert not (totTime % dt), "non-integer number of time steps!"
 
-NOld = 5
-MOld = 40 
+NOld = N
+MOld =M
 kwargs = {'N': N, 'M': M, 'Re': Re,'Wi': Wi, 'beta': beta, 'kx': kx,'time':
           totTime, 'dt':dt, 'dealiasing':dealiasing }
 baseFileName  = "-N{N}-M{M}-kx{kx}-Re{Re}-b{beta}-Wi{Wi}-dt{dt}.pickle".format(**kwargs)
@@ -318,13 +318,14 @@ PSI = zeros((2*N+1)*M,dtype='complex')
 
 # Read in stream function from file
 (PSI, Nu) = pickle.load(open(inFileName,'r'))
-PSI = decide_resolution(PSI, NOld, MOld, CNSTS)
+SI = decide_resolution(PSI, NOld, MOld, CNSTS)
+for n in range(1,N+1):
+    PSI[(N-n)*M: (N-n+1)*M] = conj(PSI[(N+n)*M: (N+n+1)*M])
 #PSI[:] = rand((2*N+1)*M) + 1.j*rand((2*N+1)*M)
 #PSI[N*M:(N+1)*M] = rand(M)
 
 #for i in range(2*N+1-2):
 #    PSI[(i+1)*M:(i+2)*M] = r_[0:M][::-1] /(1.*M)
-
 
 # Form the operators
 PsiOpInvList = []
@@ -396,8 +397,6 @@ PSI = PSI.reshape(2*N+1, M).T
 # put PSI into FFT ordering.
 PSI = ifftshift(PSI, axes=1)
 
-# savetxt("initial.dat", PSI.T, fmt='%.18e')
-
 print "writing initial state to initial.h5"
 
 f = h5py.File("initial.h5", "w")
@@ -456,6 +455,10 @@ psic = load_hdf5_state("./output/psi.h5").reshape(2*N+1, M).T
 
 print 'initial streamfunction?', allclose(PSI,psic)
 print 'difference', linalg.norm(psic-PSI)
+if linalg.norm(psic-PSI) > 0.0:
+    print psic - PSI
+    print 'FAIL'
+    exit(1)
 #print 'zeroth mode c-python', psic[:M]- PSI[:M]
 
 # switch PSI back to normal ordering for F modes

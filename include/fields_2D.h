@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri  6 Mar 09:33:06 2015
+// Last modified: Wed 11 Mar 20:00:40 2015
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -85,9 +85,14 @@ void save_hdf5_arr(char *filename, fftw_complex *arr, int size);
 void save_hdf5_snapshot(hid_t *file_id, hid_t *filetype_id, hid_t *datatype_id,
 	fftw_complex *arr, double time, flow_params cnsts);
 
+void save_hdf5_snapshot_visco(hid_t *file_id, hid_t *filetype_id, hid_t *datatype_id,
+	complex *psi, complex *cxx, complex *cyy, complex *cxy, double time, flow_params cnsts);
+
 void save_state(FILE *fp, fftw_complex *arr, flow_params cnsts);
 
 void load_hdf5_state(char *filename, fftw_complex *arr, flow_params cnsts);
+
+void load_hdf5_state_visco(char *filename, complex *psi, complex *cxx, complex *cyy, complex *cxy, flow_params cnsts);
 
 void load_state(FILE *fp, fftw_complex *arr, flow_params cnsts);
 

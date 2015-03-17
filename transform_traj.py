@@ -2,6 +2,7 @@ from scipy import *
 from scipy import linalg
 from scipy import fftpack
 from numpy.fft import fftshift, ifftshift
+import argparse
 
 from pyevtk.hl import gridToVTK 
 import cPickle as pickle
@@ -32,13 +33,20 @@ dealiasing = config.getboolean('Time Iteration', 'Dealiasing')
 
 fp.close()
 
+argparser = argparse.ArgumentParser()
+argparser.add_argument("-Newt", 
+                help = 'Examine pure newtonian ECS',
+                       action="store_true")
+
+args = argparser.parse_args()
+
 numTimeSteps = int(totTime / dt)
 
 kwargs = {'N': N, 'M': M, 'Nf': Nf, 'Mf':Mf, 
           'Re': Re,'Wi': Wi, 'beta': beta, 'kx': kx,'time':
           totTime, 'dt':dt, 'dealiasing':dealiasing }
 
-inFileName = "./output/traj_psi.h5".format()
+inFileName = "./output/traj.h5".format()
 
 CNSTS = kwargs
 
@@ -50,6 +58,18 @@ def load_hdf5_snapshot(fp, time):
     inarr = array(f[dataset_id])
 
     return inarr
+
+def load_hdf5_snapshot_visco(fp, time):
+
+    dataset_id = "/t{0:f}".format(time)
+    print dataset_id
+
+    psi = array(f[dataset_id+"/psi"])
+    cxx = array(f[dataset_id+"/cxx"])
+    cyy = array(f[dataset_id+"/cyy"])
+    cxy = array(f[dataset_id+"/cxy"])
+
+    return psi, cxx, cyy, cxy
 
 def to_physical_2(in2D, CNSTS):
     """
@@ -134,43 +154,90 @@ fpvd.write('''<?xml version="1.0"?>
 
 f = h5py.File(inFileName, "r")
 
+# Dimensions 
 
-for frameNum in range(numFrames):
-    time = (totTime / numFrames) * frameNum
-    arr = load_hdf5_snapshot(f, time)
+nx, ny, nz = 2*Nf, Mf-1, 1 
+ncells = nx * ny * nz 
 
-    arr = arr.reshape((2*N+1, M)).T
+# Coordinates 
+lx = 2*pi / kx
+ly = 2.0
+dx = lx / (nx)
+x = arange(0, lx + dx, dx, dtype='float64') 
+y = cos(pi*arange(Mf)/(Mf-1))
+z = array([0.0, 1.0])
 
-    tmp = to_physical_2(arr, CNSTS).T
+if args.Newt:
 
-    psiReal = zeros((2*Nf+1, Mf, 2))
+    for frameNum in range(numFrames):
+        time = (totTime / numFrames) * frameNum
+        arr = load_hdf5_snapshot(f, time)
 
-    psiReal[:,:,0] = real(tmp)
-    psiReal[:,:,1] = real(tmp)
+        arr = arr.reshape((N+1, M)).T
+        arr = hstack((arr, conj(arr[:, N:0:-1])))
 
-    # Dimensions 
+        tmp = to_physical_2(arr, CNSTS).T
 
-    nx, ny, nz = 2*Nf, Mf-1, 1 
+        psiReal = zeros((2*Nf+1, Mf, 2))
 
-    ncells = nx * ny * nz 
+        psiReal[:,:,0] = real(tmp)
+        psiReal[:,:,1] = real(tmp)
 
-    # Coordinates 
-    lx = 2*pi / kx
-    ly = 2.0
+        filename = "vtktraj/t{0}.vtr".format(time)
 
-    dx = lx / (nx)
+        gridToVTK(filename[:-4], x, y, z, pointData = {"psi" : psiReal}) 
 
-    x = arange(0, lx + dx, dx, dtype='float64') 
-    y = cos(pi*arange(Mf)/(Mf-1))
-    z = array([0.0, 1.0])
+         
+        fpvd.write('<DataSet timestep="{0}" group="" part="0"\n'.format(time))
+        fpvd.write('file="{0}"/>'.format(filename))
 
-    filename = "vtktraj/t{0}.vtr".format(time)
+else:
 
-    gridToVTK(filename[:-4], x, y, z, pointData = {"psi" : psiReal}) 
+    for frameNum in range(numFrames):
+        time = (totTime / numFrames) * frameNum
+        psi, cxx, cyy, cxy = load_hdf5_snapshot_visco(f, time)
 
-     
-    fpvd.write('<DataSet timestep="{0}" group="" part="0"\n'.format(time))
-    fpvd.write('file="{0}"/>'.format(filename))
+        psi = psi.reshape((N+1, M)).T
+        psi = hstack((psi, conj(psi[:, N:0:-1])))
+
+        tmp = to_physical_2(psi, CNSTS).T
+        psiReal = zeros((2*Nf+1, Mf, 2))
+        psiReal[:,:,0] = real(tmp)
+        psiReal[:,:,1] = real(tmp)
+
+        cxx = cxx.reshape((N+1, M)).T
+        cxx = hstack((cxx, conj(cxx[:, N:0:-1])))
+
+        tmp = to_physical_2(cxx, CNSTS).T
+        cxxReal = zeros((2*Nf+1, Mf, 2))
+        cxxReal[:,:,0] = real(tmp)
+        cxxReal[:,:,1] = real(tmp)
+
+        cyy = cyy.reshape((N+1, M)).T
+        cyy = hstack((cyy, conj(cyy[:, N:0:-1])))
+
+        tmp = to_physical_2(cyy, CNSTS).T
+        cyyReal = zeros((2*Nf+1, Mf, 2))
+        cyyReal[:,:,0] = real(tmp)
+        cyyReal[:,:,1] = real(tmp)
+
+        cxy = cxy.reshape((N+1, M)).T
+        cxy = hstack((cxy, conj(cxy[:, N:0:-1])))
+
+        tmp = to_physical_2(cxy, CNSTS).T
+        cxyReal = zeros((2*Nf+1, Mf, 2))
+        cxyReal[:,:,0] = real(tmp)
+        cxyReal[:,:,1] = real(tmp)
+
+        filename = "vtktraj/t{0}.vtr".format(time)
+
+        gridToVTK(filename[:-4], x, y, z, pointData = {"psi": psiReal, "cxx": cxxReal,
+                                                       "cyy": cyyReal, "cxy": cxyReal}) 
+
+         
+        fpvd.write('<DataSet timestep="{0}" group="" part="0"\n'.format(time))
+        fpvd.write('file="{0}"/>'.format(filename))
+
 
 fpvd.write('''
   </Collection>
