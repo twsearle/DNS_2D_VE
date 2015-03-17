@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Mon  9 Mar 14:05:24 2015
+#   Last modified: Thu 12 Mar 17:27:37 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -240,15 +240,15 @@ PSI = zeros((2*N+1)*M,dtype='complex')
 # This is Poiseuille flow 
 PSI[N*M]   += 2.0/3.0
 PSI[N*M+1] += 3.0/4.0
-PSI[N*M+2] += 0.0
-PSI[N*M+3] += -1.0/12.0
-
-perAmp = 1e-8
-PSI[N*M:N*M + M/2] += perAmp*(rand(M/2))
-PSI[(N-1)*M:(N-1)*M + M/2] += perAmp*(rand(M/2) + 1.j*rand(M/2)) 
-PSI[(N-2)*M:(N-2)*M + M/2] += perAmp*(rand(M/2) + 1.j*rand(M/2)) 
-PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
-PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
+#PSI[N*M+2] += 0.0
+#PSI[N*M+3] += -1.0/12.0
+#
+#perAmp = 1e-8
+#PSI[N*M:N*M + M/2] += perAmp*(rand(M/2))
+#PSI[(N-1)*M:(N-1)*M + M/2] += perAmp*(rand(M/2) + 1.j*rand(M/2)) 
+#PSI[(N-2)*M:(N-2)*M + M/2] += perAmp*(rand(M/2) + 1.j*rand(M/2)) 
+#PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
+#PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
 
 #print 'performing linear stability of Poiseuille flow test'
 
