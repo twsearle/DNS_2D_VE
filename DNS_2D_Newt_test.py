@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Wed 18 Mar 19:22:16 2015
+#   Last modified: Wed 18 Mar 19:35:43 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -673,7 +673,7 @@ UDXLPLPSI = dot(prod_mat(U), dot(MDX, LPLPSI))
 print 'udxlolpsi ?', allclose(UDXLPLPSI, udxlplc)
 print 'difference', linalg.norm(UDXLPLPSI-udxlplc)
 if not allclose(UDXLPLPSI, udxlplc):
-    print 'relative difference', linalg.norm(UDXLPLPSI-udxlplc)/linalg.norm(udxlplc)
+    print 'relative difference', linalg.norm(UDXLPLPSI-udxlplc)
 
     print "max difference", amax(UDXLPLPSI-udxlplc)
     print "max difference arg", argmax(UDXLPLPSI-udxlplc)
@@ -701,7 +701,7 @@ VDYLPLPSI = dot(prod_mat(V), dot(MDY, LPLPSI))
 print 'vdylplpsi ?', allclose(VDYLPLPSI, vdylplc)
 print 'difference', linalg.norm(VDYLPLPSI-vdylplc)
 if not allclose(VDYLPLPSI, vdylplc):
-    print 'relative difference', linalg.norm(VDYLPLPSI-vdylplc)/linalg.norm(vdylplc)
+    print 'relative difference', linalg.norm(VDYLPLPSI-vdylplc)
     #print 'VDYLPLPSI1', VDYLPLPSI[M: 2*M]
     #print 'VDYLPLPSI1c', vdylplc[M: 2*M]
     print 'difference', (VDYLPLPSI-vdylplc)[N*M+38::M]
