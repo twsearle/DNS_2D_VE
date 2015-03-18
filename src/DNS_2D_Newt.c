@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 18 Mar 19:24:20 2015
+// Last modified: Wed 18 Mar 19:33:39 2015
 
 /* Program Description:
  *
@@ -303,7 +303,7 @@ int main(int argc, char **argv)
 
 	save_hdf5_arr(fn, &tmpop[0], M*M);
 
-	sprintf(fn, "./output/hop%d.h5", i);
+	sprintf(fn, "./output/hOp%d.h5", i);
 	printf("writing: %s\n", fn);
 	for (j=0; j<M*M; j++)
 	{
