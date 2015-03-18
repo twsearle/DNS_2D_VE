@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 18 Mar 17:24:54 2015
+// Last modified: Wed 18 Mar 19:24:20 2015
 
 /* Program Description:
  *
@@ -344,6 +344,11 @@ int main(int argc, char **argv)
 	    biharmpsi, d2ypsi, dyyypsi, d4ypsi, d2xd2ypsi, d4xpsi, udxlplpsi,
 	    vdylplpsi, vdyypsi, RHSvec, opsList, &phys_plan, &spec_plan,
 	    scratchin, scratchout, scratchp1, scratchp2);
+
+	if (timeStep==0)
+	{
+	    save_hdf5_state("./output/psi2.h5", &psi[0], params);
+	}
 
 	// output some information at every frame
 	if ((timeStep % stepsPerFrame) == 0 )

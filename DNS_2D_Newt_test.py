@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Wed 18 Mar 16:12:59 2015
+#   Last modified: Wed 18 Mar 19:22:16 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -512,12 +512,14 @@ Uc = Uc.T.flatten()
 
 print 'U ?', allclose(U, Uc)
 print 'difference', linalg.norm(U-Uc)
-print 'U0', U[N*M: (N+1)*M]
-print 'U0c', Uc[N*M: (N+1)*M]
+if linalg.norm(U-Uc) > 1e-12:
+    print 'U0', U[N*M: (N+1)*M]
+    print 'U0c', Uc[N*M: (N+1)*M]
+    print 'FAIL'
+    exit(1)
 
 # v
 V = -dot(MDX, PSI)
-
 
 Vc = load_hdf5_state("./output/v.h5").reshape(2*N+1, M).T 
 pickle.dump(Vc, open('testVc.pickle','w'))
@@ -568,8 +570,11 @@ D3YPSI = dot(MDY, dot(MDY, dot(MDY,PSI) ) )
 
 print 'd3y psi ?', allclose(D3YPSI, d3yc)
 print 'difference', linalg.norm(D3YPSI-d3yc)
-print 'd3y0', D3YPSI[N*M:(N+1)*M]
-print 'd3yc0', d3yc[N*M:(N+1)*M]
+if linalg.norm(D3YPSI-d3yc) > 1e-12:
+    #print 'd3y0', D3YPSI[N*M:(N+1)*M]
+    #print 'd3yc0', d3yc[N*M:(N+1)*M]
+    print 'FAIL'
+    exit(1)
 
 d4yc = load_hdf5_state("./output/d4ypsi.h5").reshape(2*N+1, M).T 
 d4yc = fftshift(d4yc, axes=1)
@@ -652,7 +657,7 @@ if not allclose(DXLPLPSI, dxlplc):
     print "mode 0", linalg.norm(DXLPLPSI[N*M:(N+1)*M]-dxlplc[N*M:(N+1)*M])
     for n in range(1,N+1):
         print "mode", n, linalg.norm(DXLPLPSI[(N+n)*M:(N+n+1)*M]-dxlplc[(N+n)*M:(N+n+1)*M])
-        print "mode", -n,linalg.norm(DXLPLPSI[(N-n)*M:(N+2-n)*M]-dxlplc[(N-n)*M:(N+1-n)*M])
+        print "mode", -n,linalg.norm(DXLPLPSI[(N-n)*M:(N+1-n)*M]-dxlplc[(N-n)*M:(N+1-n)*M])
 
     print "mode 0", linalg.norm(dxlplc[N*M:(N+1)*M])
     for n in range(1,N+1):
