@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Wed 18 Mar 19:35:43 2015
+#   Last modified: Wed 18 Mar 19:37:05 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -734,11 +734,11 @@ for i in range(1,N+1):
     if linalg.norm(opc - PsiOpInvList[i].flatten()) > 0.0 :
         exit(1)
 
-hop0c = load_hdf5_state("./output/hop0.h5")#.reshape(M, M).T 
+hop0c = load_hdf5_state("./output/hOp0.h5")#.reshape(M, M).T 
 print 'half operator 0', linalg.norm(hop0c-PsiOpInvListHalf[0].flatten())
 
 for i in range(1,N+1):
-    hopc = load_hdf5_state("./output/hop{0}.h5".format(i))
+    hopc = load_hdf5_state("./output/hOp{0}.h5".format(i))
     print 'half operator ',i, linalg.norm(hopc - PsiOpInvListHalf[i].flatten())
     if linalg.norm(hopc - PsiOpInvListHalf[i].flatten()) > 0.0 :
         exit(1)
