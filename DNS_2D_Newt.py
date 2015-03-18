@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Wed 18 Mar 22:55:58 2015
+#   Last modified: Wed 18 Mar 23:03:34 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -294,7 +294,7 @@ PSI[N*M+3] += -1.0/12.0
 perAmp = 1e-2
 #PSI[N*M:N*M + M/2:2] += 1e-2 * perAmp*(rand(M/4))
 PSI[(N-1)*M:(N-1)*M + M/2:2] += perAmp*(rand(M/4) + 1.j*rand(M/4)) 
-PSI[(N-2)*M + 1:(N-2)*M + M/2:2] += perAmp*(rand(M/4) + 1.j*rand(M/4)) 
+PSI[(N-2)*M + 1:(N-2)*M + M/2:2] += 0.1*perAmp*(rand(M/4) + 1.j*rand(M/4)) 
 PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
 PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
 
