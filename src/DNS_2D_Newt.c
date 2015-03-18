@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 18 Mar 19:33:39 2015
+// Last modified: Wed 18 Mar 19:39:39 2015
 
 /* Program Description:
  *
@@ -279,7 +279,7 @@ int main(int argc, char **argv)
 	    opsList[i*M*M + j] = tmpop[j];
 	}
 
-	sprintf(fn, "./operators/hop%d.h5", i);
+	sprintf(fn, "./operators/hOp%d.h5", i);
 	printf("opening: %s\n", fn);
 	load_hdf5_operator(fn, tmpop, params);
 
