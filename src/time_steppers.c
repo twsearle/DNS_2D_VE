@@ -7,14 +7,14 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 11 Mar 18:55:32 2015
+// Last modified: Wed 18 Mar 16:18:45 2015
 
 #include"fields_2D.h"
 
 // Functions
 
 void step_sf_SI_Crank_Nicolson(
-	complex *psi, double dt, int timeStep, double oneOverRe, flow_params params, complex
+	complex *psi, complex *psi2, double dt, int timeStep, double oneOverRe, flow_params params, complex
 	*scratch, complex *scratch2, complex *u, complex *v, complex *lplpsi,
 	complex *biharmpsi, complex *d2ypsi, complex *dyyypsi, complex *d4ypsi,
 	complex *d2xd2ypsi, complex *d4xpsi, complex *udxlplpsi, complex
@@ -27,16 +27,17 @@ void step_sf_SI_Crank_Nicolson(
     int N = params.N;
     int M = params.M;
 
-    // calculate RHS 
-    // First of all calculate some useful variables then product terms,
-    // then calculate RHS for each mode, then solve for the new
-    // streamfunction at each time.
+    // First of all calculate the nonlinear terms on psi2, then calculate
+    // linear terms on psi then calculate RHS for each mode, then solve for the
+    // new streamfunction, psi, at this timestep.
 
+    // -----------Nonlinear Terms --------------
+    //
     // u
-    dy(psi, u, params);
+    dy(psi2, u, params);
 
     // v
-    dx(psi, v, params);
+    dx(psi2, v, params);
     for(i=0; i<N+1; i++)
     {
 	for(j=0; j<M; j++)
@@ -48,49 +49,13 @@ void step_sf_SI_Crank_Nicolson(
 
     // lplpsi dyy(psi) + dxx(psi)
 
-    d2x(psi, scratch, params);
+    d2x(psi2, scratch, params);
     dy(u, lplpsi, params);
     for(i=0; i<N+1; i++)
     {
 	for(j=0; j<M; j++)
 	{
 	    lplpsi[ind(i,j)] = lplpsi[ind(i,j)] + scratch[ind(i,j)];
-	}
-    }
-
-    // biharmpsi (dyy + dxx)lplpsi
-
-    dy(u, d2ypsi, params);
-
-
-    dy(d2ypsi, dyyypsi, params);
-
-    dy(dyyypsi, d4ypsi, params);
-
-
-    d2x(psi, scratch, params);
-
-#ifdef MYDEBUG
-    if(timeStep==0)
-    {
-	save_hdf5_state("./output/d2xpsi.h5", &scratch[0], params);
-    }
-#endif
-
-    dy(scratch, scratch2, params);
-    dy(scratch2, d2xd2ypsi, params);
-
-
-    d4x(psi, d4xpsi, params);
-
-    for(i=0; i<N+1; i++)
-    {
-	for(j=0; j<M; j++)
-	{
-	    // biharmpsi[ind(i,j)] = biharmpsi[ind(i,j)] + scratch2[ind(i,j)];
-
-	    biharmpsi[ind(i,j)] = d4xpsi[ind(i,j)] + 2.*d2xd2ypsi[ind(i,j)];
-	    biharmpsi[ind(i,j)] = biharmpsi[ind(i,j)] + d4ypsi[ind(i,j)];
 	}
     }
 
@@ -135,10 +100,59 @@ void step_sf_SI_Crank_Nicolson(
     }
 #endif
 
+    // ----------- linear Terms --------------
+    
+    // lplpsi dyy(psi) + dxx(psi)
+
+    d2x(psi, scratch, params);
+    dy(psi, u, params);
+    dy(u, lplpsi, params);
+
+    for(i=0; i<N+1; i++)
+    {
+	for(j=0; j<M; j++)
+	{
+	    lplpsi[ind(i,j)] = lplpsi[ind(i,j)] + scratch[ind(i,j)];
+	}
+    }
+
+    // biharmpsi (dyy + dxx)lplpsi
+
+    dy(u, d2ypsi, params);
+    dy(d2ypsi, dyyypsi, params);
+    dy(dyyypsi, d4ypsi, params);
+
+    d2x(psi, scratch, params);
+
+#ifdef MYDEBUG
+    if(timeStep==0)
+    {
+	save_hdf5_state("./output/d2xpsi.h5", &scratch[0], params);
+    }
+#endif
+
+    dy(scratch, scratch2, params);
+    dy(scratch2, d2xd2ypsi, params);
+
+
+    d4x(psi, d4xpsi, params);
+
+    for(i=0; i<N+1; i++)
+    {
+	for(j=0; j<M; j++)
+	{
+	    // biharmpsi[ind(i,j)] = biharmpsi[ind(i,j)] + scratch2[ind(i,j)];
+
+	    biharmpsi[ind(i,j)] = d4xpsi[ind(i,j)] + 2.*d2xd2ypsi[ind(i,j)];
+	    biharmpsi[ind(i,j)] = biharmpsi[ind(i,j)] + d4ypsi[ind(i,j)];
+	}
+    }
+
     // RHSVec = dt*0.5*oneOverRe*BIHARMPSI 
     // 	+ LPLPSI 
     // 	- dt*UDXLPLPSI 
     // 	- dt*VDYLPLPSI 
+    
 #ifdef MYDEBUG
     if(timeStep==0)
     {
@@ -249,13 +263,4 @@ void step_sf_SI_Crank_Nicolson(
 	}
     }
 
-
-}
-
-void step_stresses_RK4()
-{
-}
-
-void step_stresses_ABM()
-{
 }

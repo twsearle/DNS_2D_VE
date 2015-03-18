@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 11 Mar 18:52:31 2015
+// Last modified: Wed 18 Mar 17:24:54 2015
 
 /* Program Description:
  *
@@ -198,7 +198,7 @@ int main(int argc, char **argv)
 
     // field arrays are declared as pointers and then I malloc.
     complex *scratch, *scratch2, *scratch3, *scratch4, *tmpop;
-    complex *psi, *u, *v, *udxlplpsi, *vdylplpsi, *biharmpsi, *lplpsi;
+    complex *psi, *psi2, *u, *v, *udxlplpsi, *vdylplpsi, *biharmpsi, *lplpsi;
     complex *dyyypsi, *dypsi, *vdyypsi;
     complex *d2ypsi, *d4ypsi, *d4xpsi, *d2xd2ypsi;
 
@@ -209,7 +209,7 @@ int main(int argc, char **argv)
     double time = 0;
     double oneOverRe = 1./params.Re;
     
-    fftw_complex *opsList;
+    fftw_complex *opsList, *hopsList;
 
     fftw_plan phys_plan, spec_plan;
 
@@ -223,6 +223,7 @@ int main(int argc, char **argv)
     // dynamically malloc array of complex numbers.
     tmpop = (complex*) fftw_malloc(M*M * sizeof(complex));
     opsList = (complex*) fftw_malloc((N+1)*M*M * sizeof(complex));
+    hopsList = (complex*) fftw_malloc((N+1)*M*M * sizeof(complex));
 
     scratch = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     scratch2 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
@@ -230,6 +231,7 @@ int main(int argc, char **argv)
     scratch4 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
 
     psi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    psi2 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     u = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     v = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     udxlplpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
@@ -277,6 +279,15 @@ int main(int argc, char **argv)
 	    opsList[i*M*M + j] = tmpop[j];
 	}
 
+	sprintf(fn, "./operators/hop%d.h5", i);
+	printf("opening: %s\n", fn);
+	load_hdf5_operator(fn, tmpop, params);
+
+	for (j=0; j<M*M; j++)
+	{
+	    hopsList[i*M*M + j] = tmpop[j];
+	}
+
     }
 
     #ifdef MYDEBUG
@@ -291,6 +302,15 @@ int main(int argc, char **argv)
 	}
 
 	save_hdf5_arr(fn, &tmpop[0], M*M);
+
+	sprintf(fn, "./output/hop%d.h5", i);
+	printf("writing: %s\n", fn);
+	for (j=0; j<M*M; j++)
+	{
+	    tmpop[j] = hopsList[i*M*M + j];
+	}
+
+	save_hdf5_arr(fn, &tmpop[0], M*M);
     }
     save_hdf5_state("./output/psi.h5", &psi[0], params);
     #endif
@@ -302,18 +322,28 @@ int main(int argc, char **argv)
     for (timeStep=0; timeStep<numTimeSteps; timeStep++)
     {
 
+	// predictor step to calculate nonlinear terms
+	
+	for (i=0; i<N+1; i++)
+	{
+	    for(j=0; j<M; j++)
+	    {
+		psi2[ind(i,j)] = psi[ind(i,j)];
+	    }
+	}
+
 	step_sf_SI_Crank_Nicolson(
-	    psi, dt, timeStep, oneOverRe, params, scratch, scratch2, u, v, lplpsi,
+	    psi2, psi, dt/2., timeStep, oneOverRe, params, scratch, scratch2, u, v, lplpsi,
+	    biharmpsi, d2ypsi, dyyypsi, d4ypsi, d2xd2ypsi, d4xpsi, udxlplpsi,
+	    vdylplpsi, vdyypsi, RHSvec, hopsList, &phys_plan, &spec_plan,
+	    scratchin, scratchout, scratchp1, scratchp2);
+
+	// 'corrector' step to calculate full step based on nonlinear terms from predictor step
+	step_sf_SI_Crank_Nicolson(
+	    psi, psi2, dt, timeStep, oneOverRe, params, scratch, scratch2, u, v, lplpsi,
 	    biharmpsi, d2ypsi, dyyypsi, d4ypsi, d2xd2ypsi, d4xpsi, udxlplpsi,
 	    vdylplpsi, vdyypsi, RHSvec, opsList, &phys_plan, &spec_plan,
 	    scratchin, scratchout, scratchp1, scratchp2);
-
-	#ifdef MYDEBUG
-	if(timeStep==0)
-	{
-	    save_hdf5_state("./output/psi2.h5", &psi[0], params);
-	}
-        #endif
 
 	// output some information at every frame
 	if ((timeStep % stepsPerFrame) == 0 )
@@ -396,11 +426,13 @@ int main(int argc, char **argv)
 
     fftw_free(tmpop);
     fftw_free(opsList);
+    fftw_free(hopsList);
     fftw_free(scratch);
     fftw_free(scratch2);
     fftw_free(scratch3);
     fftw_free(scratch4);
     fftw_free(psi);
+    fftw_free(psi2);
     fftw_free(u);
     fftw_free(v);
     fftw_free(udxlplpsi);

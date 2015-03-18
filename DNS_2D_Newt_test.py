@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Wed 11 Mar 18:47:24 2015
+#   Last modified: Wed 18 Mar 16:12:59 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -243,6 +243,54 @@ def decide_resolution(vec, NOld, MOld, CNSTS):
 
     return ovec
 
+def form_operators(dt):
+    opinvlist = []
+
+    # zeroth mode
+    Psi0thOp = zeros((M,M), dtype='complex')
+    Psi0thOp = SMDY - 0.5*dt*oneOverRe*SMDYYY + 0j
+
+    # Apply BCs
+
+    # dypsi0(+-1) = 0
+    Psi0thOp[M-3, :] = DERIVTOP
+    Psi0thOp[M-2, :] = DERIVBOT
+    # psi0(-1) =  0
+    Psi0thOp[M-1, :] = BBOT
+
+    opinvlist.append(linalg.inv(Psi0thOp))
+
+    for i in range(1, N+1):
+        n = i
+
+        OP = zeros((2*M, 2*M), dtype='complex')
+        SLAPLAC = -n*n*kx*kx*SII + SMDYY
+
+        OP[0:M, 0:M] = 0
+        OP[0:M, M:2*M] = SII - 0.5*oneOverRe*dt*SLAPLAC
+
+        OP[M:2*M, 0:M] = SLAPLAC
+        OP[M:2*M, M:2*M] = -SII
+
+        # Apply BCs
+        # dypsi(+-1) = 0
+        OP[M-2, :] = concatenate((DERIVTOP, zeros(M, dtype='complex')))
+        OP[M-1, :] = concatenate((DERIVBOT, zeros(M, dtype='complex')))
+        
+        # dxpsi(+-1) = 0
+        OP[2*M-2, :] = concatenate((BTOP, zeros(M, dtype='complex')))
+        OP[2*M-1, :] = concatenate((BBOT, zeros(M, dtype='complex')))
+
+        # store the inverse of the relevent part of the matrix
+        OP = linalg.inv(OP)
+        OP = OP[0:M, 0:M]
+
+        opinvlist.append(OP)
+
+    del OP
+
+    opinvlist = array(opinvlist)
+    return opinvlist
 
 # -----------------------------------------------------------------------------
 # MAIN
@@ -335,52 +383,8 @@ for n in range(1,N+1):
 
 
 # Form the operators
-PsiOpInvList = []
-
-# zeroth mode
-Psi0thOp = zeros((M,M), dtype='complex')
-Psi0thOp = SMDY - 0.5*dt*oneOverRe*SMDYYY + 0j
-
-# Apply BCs
-
-# dypsi0(+-1) = 0
-Psi0thOp[M-3, :] = DERIVTOP
-Psi0thOp[M-2, :] = DERIVBOT
-# psi0(-1) =  0
-Psi0thOp[M-1, :] = BBOT
-
-PsiOpInvList.append(linalg.inv(Psi0thOp))
-
-for i in range(1, N+1):
-    n = i
-
-    PSIOP = zeros((2*M, 2*M), dtype='complex')
-    SLAPLAC = -n*n*kx*kx*SII + SMDYY
-
-    PSIOP[0:M, 0:M] = 0
-    PSIOP[0:M, M:2*M] = SII - 0.5*oneOverRe*dt*SLAPLAC
-
-    PSIOP[M:2*M, 0:M] = SLAPLAC
-    PSIOP[M:2*M, M:2*M] = -SII
-
-    # Apply BCs
-    # dypsi(+-1) = 0
-    PSIOP[M-2, :] = concatenate((DERIVTOP, zeros(M, dtype='complex')))
-    PSIOP[M-1, :] = concatenate((DERIVBOT, zeros(M, dtype='complex')))
-    
-    # dxpsi(+-1) = 0
-    PSIOP[2*M-2, :] = concatenate((BTOP, zeros(M, dtype='complex')))
-    PSIOP[2*M-1, :] = concatenate((BBOT, zeros(M, dtype='complex')))
-
-    # store the inverse of the relevent part of the matrix
-    PSIOP = linalg.inv(PSIOP)
-    PSIOP = PSIOP[0:M, 0:M]
-
-    PsiOpInvList.append(PSIOP)
-
-del PSIOP
-
-PsiOpInvList = array(PsiOpInvList)
+PsiOpInvListHalf = form_operators(dt/2.0)
+PsiOpInvList = form_operators(dt)
 
 #### SAVE THE OPERATORS AND INITIAL STATE FOR THE C CODE
 
@@ -389,10 +393,24 @@ for i in range(N+1):
     n = i
     print n
     opFn = "./operators/op{0}.h5".format(n)
-    print opFn
+    print "writing ", opFn
     f = h5py.File(opFn, "w")
     dset = f.create_dataset("op", (M*M,), dtype='complex')
     dset[...] = PsiOpInvList[i].flatten()
+    f.close()
+
+    #savetxt("./operators/op{0}.dat".format(abs(n)),PsiOpInvList[n])
+del i
+
+for i in range(N+1):
+    # operator order in list is 0->N
+    n = i
+    print n
+    opFn = "./operators/hOp{0}.h5".format(n)
+    print "writing ", opFn
+    f = h5py.File(opFn, "w")
+    dset = f.create_dataset("op", (M*M,), dtype='complex')
+    dset[...] = PsiOpInvListHalf[i].flatten()
 
     f.close()
 
@@ -696,6 +714,11 @@ if not allclose(VDYU, vdyyc):
     #print 'VDYU1c', vdyyc[M: 2*M]
     print ' high mode difference', (VDYU-vdyyc)[N*M+38::M]
 
+print """
+--------------
+Operator check
+--------------
+"""
 op0c = load_hdf5_state("./output/op0.h5")#.reshape(M, M).T 
 
 print 'operator 0', linalg.norm(op0c-PsiOpInvList[0].flatten())
@@ -703,7 +726,17 @@ print 'operator 0', linalg.norm(op0c-PsiOpInvList[0].flatten())
 for i in range(1,N+1):
     opc = load_hdf5_state("./output/op{0}.h5".format(i))
     print 'operator ',i, linalg.norm(opc - PsiOpInvList[i].flatten())
+    if linalg.norm(opc - PsiOpInvList[i].flatten()) > 0.0 :
+        exit(1)
 
+hop0c = load_hdf5_state("./output/hop0.h5")#.reshape(M, M).T 
+print 'half operator 0', linalg.norm(hop0c-PsiOpInvListHalf[0].flatten())
+
+for i in range(1,N+1):
+    hopc = load_hdf5_state("./output/hop{0}.h5".format(i))
+    print 'half operator ',i, linalg.norm(hopc - PsiOpInvListHalf[i].flatten())
+    if linalg.norm(hopc - PsiOpInvListHalf[i].flatten()) > 0.0 :
+        exit(1)
 
 DYYYPSI = dot(MDY, dot(MDY, dot(MDY, PSI)))
 
