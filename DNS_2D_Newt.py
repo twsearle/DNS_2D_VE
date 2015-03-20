@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Wed 18 Mar 23:03:34 2015
+#   Last modified: Thu 19 Mar 16:46:54 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -52,6 +52,8 @@ import ConfigParser
 import subprocess
 import h5py
 
+import fields_2D as f2d
+
 # SETTINGS---------------------------------------------------------------------
 
 config = ConfigParser.RawConfigParser()
@@ -84,7 +86,7 @@ assert Wi != 0.0, "cannot have Wi = 0!"
 
 NOld = N 
 MOld = M
-kwargs = {'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf, 'Re': Re, 'Wi': Wi, 'beta': beta,
+kwargs = {'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0, 'Re': Re, 'Wi': Wi, 'beta': beta,
           'kx': kx,'time': totTime, 'dt':dt, 'dealiasing':dealiasing}
 baseFileName  = "-N{N}-M{M}-kx{kx}-Re{Re}.pickle".format(**kwargs)
 outFileName  = "pf{0}".format(baseFileName)
@@ -282,10 +284,14 @@ del j
 #### The initial stream-function
 PSI = zeros((2*N+1)*M,dtype='complex')
 
+# --------------- TWS -----------------
+
 # Read in stream function from file
 #(PSI, Nu) = pickle.load(open(inFileName,'r'))
 
-# This is Poiseuille flow 
+
+# --------------- POISEUILLE -----------------
+
 PSI[N*M]   += 2.0/3.0
 PSI[N*M+1] += 3.0/4.0
 #PSI[N*M+2] += 0.0
@@ -299,7 +305,6 @@ PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
 PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
 
 #print 'performing linear stability of Poiseuille flow test'
-
 
 #PSI[N*M]   += 2.0/3.0
 #PSI[N*M+1] += 3.0/4.0
@@ -321,6 +326,55 @@ PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
 
 PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
 PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
+
+# --------------- SHEAR LAYER -----------------
+
+y_points = cos(pi*arange(Mf)/(Mf-1))
+delta = 0.1
+
+# Set initial streamfunction
+PSI = zeros((Mf, 2*Nf+1), dtype='d')
+
+for i in range(Mf):
+    y =y_points[i]
+    for j in range(2*Nf+1):
+        PSI[i,j] = delta * (1./tanh(1./delta)) * log(cosh(y/delta))
+
+del y, i, j
+
+PSI = f2d.to_spectral(PSI, CNSTS)
+
+#test = f2d.dy(PSI, CNSTS) 
+#test = f2d.to_physical(test, CNSTS)
+#savetxt('U.dat', vstack((y_points,test[:,0])).T)
+#PSI = f2d.to_physical(PSI, CNSTS)
+#savetxt('PSI.dat', vstack((y_points,PSI[:,0])).T)
+#exit(1)
+
+PSI = fftshift(PSI, axes=1)
+PSI = PSI.T.flatten()
+
+# set forcing
+forcing = zeros((Mf, 2*Nf+1), dtype='d')
+test = zeros((Mf, 2*Nf+1), dtype='d')
+
+for i in range(Mf):
+    y =y_points[i]
+    for j in range(2*Nf+1):
+        forcing[i,j] = ( 2.0/tanh(1.0/delta)) * (1.0/cosh(y/delta)**2) * tanh(y/delta)
+        forcing[i,j] *= 1.0/(Re * delta**2) 
+
+del y, i, j
+
+forcing = f2d.to_spectral(forcing, CNSTS)
+
+f = h5py.File("forcing.h5", "w")
+dset = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
+dset[...] = forcing.T.flatten()
+f.close()
+
+# set BC
+CNSTS['U0'] = 1.0
 
 # Form the operators
 PsiOpInvList = form_operators(dt)
@@ -378,34 +432,38 @@ stepsPerFrame = numTimeSteps/numFrames
 # pass the flow variables and the time iteration settings to the C code
 if dealiasing:
     cargs = ["./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M",
-             "{0:d}".format(CNSTS["M"]), "-L", "2.0", "-k", "{0:e}".format(CNSTS["kx"]),
-             "-R", "{0:e}".format(CNSTS["Re"]), "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]), "-s",
-             "{0:d}".format(stepsPerFrame), "-T", "{0:d}".format(numTimeSteps),
-            "-d"]
+             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
+             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
+             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
+             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),
+             "-s", "{0:d}".format(stepsPerFrame), "-T",
+             "{0:d}".format(numTimeSteps), "-d"]
     print "./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M", \
-          "{0:d}".format(CNSTS["M"]), "-L", "2.0", "-k", \
-            "{0:e}".format(CNSTS["kx"]),"-R", \
-            "{0:e}".format(CNSTS["Re"]), "-W", "{0:e}".format(CNSTS["Wi"]),\
-            "-b", "{0:e}".format(CNSTS["beta"]), "-t", \
-            "{0:e}".format(CNSTS["dt"]), "-s",\
-          "{0:d}".format(stepsPerFrame), "-T", "{0:d}".format(numTimeSteps),"-d"
+             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
+             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
+             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
+             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),\
+             "-s", "{0:d}".format(stepsPerFrame), "-T",\
+             "{0:d}".format(numTimeSteps), "-d"
 
 else:
     cargs = ["./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M",
-             "{0:d}".format(CNSTS["M"]), "-L", "2.0", "-k", "{0:e}".format(CNSTS["kx"]),
-             "-R", "{0:e}".format(CNSTS["Re"]), "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]), "-s",
-             "{0:d}".format(stepsPerFrame), "-T", "{0:d}".format(numTimeSteps)]
+             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
+             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
+             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
+             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),
+             "-s", "{0:d}".format(stepsPerFrame), "-T",
+             "{0:d}".format(numTimeSteps)]
     print "./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M", \
-          "{0:d}".format(CNSTS["M"]), "-L", "2.0", "-k", \
-            "{0:e}".format(CNSTS["kx"]),"-R", \
-            "{0:e}".format(CNSTS["Re"]), "-W", "{0:e}".format(CNSTS["Wi"]),\
-            "-b", "{0:e}".format(CNSTS["beta"]), "-t", \
-            "{0:e}".format(CNSTS["dt"]), "-s",\
-          "{0:d}".format(stepsPerFrame), "-T", "{0:d}".format(numTimeSteps)
+             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
+             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
+             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
+             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),\
+             "-s", "{0:d}".format(stepsPerFrame), "-T",\
+             "{0:d}".format(numTimeSteps)
 
 subprocess.call(cargs)
 
 # Read in data from the C code
 print 'done'
+

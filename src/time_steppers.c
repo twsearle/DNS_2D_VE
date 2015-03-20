@@ -7,20 +7,21 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 18 Mar 16:18:45 2015
+// Last modified: Thu 19 Mar 14:43:24 2015
 
 #include"fields_2D.h"
 
 // Functions
 
 void step_sf_SI_Crank_Nicolson(
-	complex *psi, complex *psi2, double dt, int timeStep, double oneOverRe, flow_params params, complex
-	*scratch, complex *scratch2, complex *u, complex *v, complex *lplpsi,
-	complex *biharmpsi, complex *d2ypsi, complex *dyyypsi, complex *d4ypsi,
+	complex *psi, complex *psi2, double dt, int timeStep, complex
+	*forcing, double oneOverRe, flow_params params, complex *scratch,
+	complex *scratch2, complex *u, complex *v, complex *lplpsi, complex
+	*biharmpsi, complex *d2ypsi, complex *dyyypsi, complex *d4ypsi,
 	complex *d2xd2ypsi, complex *d4xpsi, complex *udxlplpsi, complex
 	*vdylplpsi, complex *vdyypsi, complex *RHSvec, complex *opsList,
-	fftw_plan *phys_plan, fftw_plan *spec_plan, complex *scratchin, complex
-	*scratchout, double *scratchp1, double *scratchp2 
+	fftw_plan *phys_plan, fftw_plan *spec_plan, complex *scratchin,
+	complex *scratchout, double *scratchp1, double *scratchp2 
 	)
 {
     int i, j, l;
@@ -180,7 +181,7 @@ void step_sf_SI_Crank_Nicolson(
 	    RHSvec[j] += + lplpsi[ind(i,j)];
 	    RHSvec[j] += - dt*udxlplpsi[ind(i,j)];
 	    RHSvec[j] += - dt*vdylplpsi[ind(i,j)];
-
+	    RHSvec[j] += dt*forcing[ind(i,j)]; 
 
 	}
 
@@ -225,8 +226,9 @@ void step_sf_SI_Crank_Nicolson(
 	//RHSvec[j] = u[ind(0,j)];
 	RHSvec[j] = dt*0.5*oneOverRe*dyyypsi[ind(0,j)] - dt*vdyypsi[ind(0,j)];
 	RHSvec[j] += u[ind(0,j)]; 
+	RHSvec[j] += dt*forcing[ind(0,j)]; 
     }
-    RHSvec[0] += 2*dt*oneOverRe;
+    //RHSvec[0] += 2*dt*oneOverRe;
 
     // apply BCs
     // # dyPsi0(+-1) = 0
@@ -235,8 +237,8 @@ void step_sf_SI_Crank_Nicolson(
     // # Psi0(-1) = 0
     // RHSVec[N*M + M-1] = 0
 
-    RHSvec[M-3] = 0; 
-    RHSvec[M-2] = 0; 
+    RHSvec[M-3] = params.U0; 
+    RHSvec[M-2] = -params.U0; 
     RHSvec[M-1] = 0; 
 
 #ifdef MYDEBUG

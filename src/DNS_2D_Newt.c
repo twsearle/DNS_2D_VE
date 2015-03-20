@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 18 Mar 19:39:39 2015
+// Last modified: Thu 19 Mar 16:23:05 2015
 
 /* Program Description:
  *
@@ -81,7 +81,7 @@ int main(int argc, char **argv)
     //default parameters
     params.N = 5;
     params.M = 40;
-    params.Ly = 2.;
+    params.U0 = 0;
     params.kx = 1.31;
     params.Re = 400;
     params.Wi = 1e-05;
@@ -90,7 +90,7 @@ int main(int argc, char **argv)
 
     // Read in parameters from cline args.
 
-    while ((shortArg = getopt (argc, argv, "dN:M:L:k:R:W:b:t:s:T:")) != -1)
+    while ((shortArg = getopt (argc, argv, "dN:M:U:k:R:W:b:t:s:T:")) != -1)
 	switch (shortArg)
 	  {
 	  case 'N':
@@ -99,8 +99,8 @@ int main(int argc, char **argv)
 	  case 'M':
 	    params.M = atoi(optarg);
 	    break;
-	  case 'L':
-	    params.Ly = atof(optarg);
+	  case 'U':
+	    params.U0 = atof(optarg);
 	    break;
 	  case 'k':
 	    params.kx = atof(optarg);
@@ -153,7 +153,7 @@ int main(int argc, char **argv)
     printf("PARAMETERS: ");
     printf("\nN                   \t %d ", params.N);
     printf("\nM                   \t %d ", params.M);
-    printf("\nLy                  \t %f ", params.Ly);
+    printf("\nU0                  \t %f ", params.U0);
     printf("\nkx                  \t %e ", params.kx);
     printf("\nRe                  \t %e ", params.Re);
     printf("\nWi                  \t %e ", params.Wi);
@@ -199,7 +199,7 @@ int main(int argc, char **argv)
     // field arrays are declared as pointers and then I malloc.
     complex *scratch, *scratch2, *scratch3, *scratch4, *tmpop;
     complex *psi, *psi2, *u, *v, *udxlplpsi, *vdylplpsi, *biharmpsi, *lplpsi;
-    complex *dyyypsi, *dypsi, *vdyypsi;
+    complex *dyyypsi, *dypsi, *vdyypsi, *forcing;
     complex *d2ypsi, *d4ypsi, *d4xpsi, *d2xd2ypsi;
 
     fftw_complex *scratchin, *scratchout;
@@ -231,6 +231,7 @@ int main(int argc, char **argv)
     scratch4 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
 
     psi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    forcing = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     psi2 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     u = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     v = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
@@ -265,6 +266,7 @@ int main(int argc, char **argv)
 
     // load the initial field from scipy
     load_hdf5_state("initial.h5", psi, params);
+    load_hdf5_state("forcing.h5", forcing, params);
 
     // load the operators from scipy 
     for (i=0; i<N+1; i++) 
@@ -313,6 +315,7 @@ int main(int argc, char **argv)
 	save_hdf5_arr(fn, &tmpop[0], M*M);
     }
     save_hdf5_state("./output/psi.h5", &psi[0], params);
+    save_hdf5_state("./output/forcing.h5", &forcing[0], params);
     #endif
     
     // perform the time iteration
@@ -333,14 +336,14 @@ int main(int argc, char **argv)
 	}
 
 	step_sf_SI_Crank_Nicolson(
-	    psi2, psi, dt/2., timeStep, oneOverRe, params, scratch, scratch2, u, v, lplpsi,
+	    psi2, psi, dt/2., timeStep, forcing, oneOverRe, params, scratch, scratch2, u, v, lplpsi,
 	    biharmpsi, d2ypsi, dyyypsi, d4ypsi, d2xd2ypsi, d4xpsi, udxlplpsi,
 	    vdylplpsi, vdyypsi, RHSvec, hopsList, &phys_plan, &spec_plan,
 	    scratchin, scratchout, scratchp1, scratchp2);
 
 	// 'corrector' step to calculate full step based on nonlinear terms from predictor step
 	step_sf_SI_Crank_Nicolson(
-	    psi, psi2, dt, timeStep, oneOverRe, params, scratch, scratch2, u, v, lplpsi,
+	    psi, psi2, dt, timeStep, forcing, oneOverRe, params, scratch, scratch2, u, v, lplpsi,
 	    biharmpsi, d2ypsi, dyyypsi, d4ypsi, d2xd2ypsi, d4xpsi, udxlplpsi,
 	    vdylplpsi, vdyypsi, RHSvec, opsList, &phys_plan, &spec_plan,
 	    scratchin, scratchout, scratchp1, scratchp2);
@@ -437,6 +440,7 @@ int main(int argc, char **argv)
     fftw_free(scratch3);
     fftw_free(scratch4);
     fftw_free(psi);
+    fftw_free(forcing);
     fftw_free(psi2);
     fftw_free(u);
     fftw_free(v);

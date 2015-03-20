@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri  6 Mar 09:33:06 2015
+// Last modified: Thu 19 Mar 14:45:13 2015
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -110,7 +110,7 @@ struct flow_params {
     int Nf;
     int Mf;
     double kx;
-    double Ly;
+    double U0;
     double Re;
     double Wi;
     double beta;

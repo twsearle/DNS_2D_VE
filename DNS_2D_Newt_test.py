@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Wed 18 Mar 19:37:05 2015
+#   Last modified: Thu 19 Mar 16:26:58 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -70,7 +70,7 @@ dealiasing = True
 
 if dealiasing:
     Nf = (3*N)/2 + 1
-    Mf = (3*M)/2
+    Mf = 2*M
 else:
     Nf = N
     Mf = M
@@ -85,7 +85,7 @@ assert not (totTime % dt), "non-integer number of time steps!"
 
 NOld = 5
 MOld = 40 
-kwargs = {'N': N, 'M': M, 'Re': Re,'Wi': Wi, 'beta': beta, 'kx': kx,'time':
+kwargs = {'N': N, 'M': M, 'U0': 0, 'Re': Re,'Wi': Wi, 'beta': beta, 'kx': kx,'time':
           totTime, 'dt':dt, 'dealiasing':dealiasing }
 baseFileName  = "-N{N}-M{M}-kx{kx}-Re{Re}-b{beta}-Wi{Wi}-dt{dt}.pickle".format(**kwargs)
 outFileName  = "pf{0}".format(baseFileName)
@@ -240,6 +240,10 @@ def decide_resolution(vec, NOld, MOld, CNSTS):
 
     elif N <= NOld and M <= MOld:
         ovec = decrease_resolution(vec, NOld, MOld, CNSTS)
+
+    else: 
+        print 'error in deciding resolution'
+        exit(1)
 
     return ovec
 
@@ -446,32 +450,36 @@ MDX = mk_diff_x()
 # pass the flow variables and the time iteration settings to the C code
 if dealiasing:
     cargs = ["./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M",
-             "{0:d}".format(CNSTS["M"]), "-L", "2.0", "-k", "{0:e}".format(CNSTS["kx"]),
-             "-R", "{0:e}".format(CNSTS["Re"]), "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]), "-s",
-             "{0:d}".format(stepsPerFrame), "-T", "{0:d}".format(numTimeSteps),
-            "-d"]
+             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
+             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
+             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
+             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),
+             "-s", "{0:d}".format(stepsPerFrame), "-T",
+             "{0:d}".format(numTimeSteps), "-d"]
+
     print "./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M", \
-          "{0:d}".format(CNSTS["M"]), "-L", "2.0", "-k", \
-            "{0:e}".format(CNSTS["kx"]),"-R", \
-            "{0:e}".format(CNSTS["Re"]), "-W", "{0:e}".format(CNSTS["Wi"]),\
-            "-b", "{0:e}".format(CNSTS["beta"]), "-t", \
-            "{0:e}".format(CNSTS["dt"]), "-s",\
-          "{0:d}".format(stepsPerFrame), "-T", "{0:d}".format(numTimeSteps),"-d"
+             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
+             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
+             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
+             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),\
+             "-s", "{0:d}".format(stepsPerFrame), "-T",\
+             "{0:d}".format(numTimeSteps), "-d"
 
 else:
     cargs = ["./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M",
-             "{0:d}".format(CNSTS["M"]), "-L", "2.0", "-k", "{0:e}".format(CNSTS["kx"]),
-             "-R", "{0:e}".format(CNSTS["Re"]), "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]), "-s",
-             "{0:d}".format(stepsPerFrame), "-T", "{0:d}".format(numTimeSteps)]
+             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
+             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
+             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
+             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),
+             "-s", "{0:d}".format(stepsPerFrame), "-T",
+             "{0:d}".format(numTimeSteps)]
     print "./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M", \
-          "{0:d}".format(CNSTS["M"]), "-L", "2.0", "-k", \
-            "{0:e}".format(CNSTS["kx"]),"-R", \
-            "{0:e}".format(CNSTS["Re"]), "-W", "{0:e}".format(CNSTS["Wi"]),\
-            "-b", "{0:e}".format(CNSTS["beta"]), "-t", \
-            "{0:e}".format(CNSTS["dt"]), "-s",\
-          "{0:d}".format(stepsPerFrame), "-T", "{0:d}".format(numTimeSteps)
+             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
+             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
+             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
+             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),\
+             "-s", "{0:d}".format(stepsPerFrame), "-T",\
+             "{0:d}".format(numTimeSteps)
 
 subprocess.call(cargs)
 
