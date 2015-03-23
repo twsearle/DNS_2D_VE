@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Thu 19 Mar 16:46:54 2015
+#   Last modified: Sun 22 Mar 01:04:31 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -43,6 +43,7 @@ Outline:
 # MODULES
 from scipy import *
 from scipy import linalg
+from numpy.linalg import cond 
 from numpy.fft import fftshift, ifftshift
 from numpy.random import rand
 
@@ -197,6 +198,9 @@ def form_operators(dt):
     # psi0(-1) =  0
     Psi0thOp[M-1, :] = BBOT
 
+    print "condition numbers for dt = {0} operators".format(dt)
+    print "mode 0, condition number {0:e}".format(cond(Psi0thOp))
+
     PsiOpInvList.append(linalg.inv(Psi0thOp))
 
     for i in range(1, N+1):
@@ -219,6 +223,10 @@ def form_operators(dt):
         # dxpsi(+-1) = 0
         PSIOP[2*M-2, :] = concatenate((BTOP, zeros(M, dtype='complex')))
         PSIOP[2*M-1, :] = concatenate((BBOT, zeros(M, dtype='complex')))
+
+        # Calculate condition number before taking the inverse
+        conditionNum = cond(PSIOP)
+        print "mode {0}, condition number {1:e}".format(n, conditionNum)
 
         # store the inverse of the relevent part of the matrix
         PSIOP = linalg.inv(PSIOP)
@@ -297,7 +305,7 @@ PSI[N*M+1] += 3.0/4.0
 #PSI[N*M+2] += 0.0
 PSI[N*M+3] += -1.0/12.0
 #
-perAmp = 1e-2
+perAmp = 1e-3
 #PSI[N*M:N*M + M/2:2] += 1e-2 * perAmp*(rand(M/4))
 PSI[(N-1)*M:(N-1)*M + M/2:2] += perAmp*(rand(M/4) + 1.j*rand(M/4)) 
 PSI[(N-2)*M + 1:(N-2)*M + M/2:2] += 0.1*perAmp*(rand(M/4) + 1.j*rand(M/4)) 
@@ -327,54 +335,57 @@ PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
 PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
 PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
 
+forcing = zeros((M,2*N+1), dtype='complex')
+forcing[0,0] = 2.0/Re
+
 # --------------- SHEAR LAYER -----------------
-
-y_points = cos(pi*arange(Mf)/(Mf-1))
-delta = 0.1
-
-# Set initial streamfunction
-PSI = zeros((Mf, 2*Nf+1), dtype='d')
-
-for i in range(Mf):
-    y =y_points[i]
-    for j in range(2*Nf+1):
-        PSI[i,j] = delta * (1./tanh(1./delta)) * log(cosh(y/delta))
-
-del y, i, j
-
-PSI = f2d.to_spectral(PSI, CNSTS)
-
-#test = f2d.dy(PSI, CNSTS) 
-#test = f2d.to_physical(test, CNSTS)
-#savetxt('U.dat', vstack((y_points,test[:,0])).T)
-#PSI = f2d.to_physical(PSI, CNSTS)
-#savetxt('PSI.dat', vstack((y_points,PSI[:,0])).T)
-#exit(1)
-
-PSI = fftshift(PSI, axes=1)
-PSI = PSI.T.flatten()
-
-# set forcing
-forcing = zeros((Mf, 2*Nf+1), dtype='d')
-test = zeros((Mf, 2*Nf+1), dtype='d')
-
-for i in range(Mf):
-    y =y_points[i]
-    for j in range(2*Nf+1):
-        forcing[i,j] = ( 2.0/tanh(1.0/delta)) * (1.0/cosh(y/delta)**2) * tanh(y/delta)
-        forcing[i,j] *= 1.0/(Re * delta**2) 
-
-del y, i, j
-
-forcing = f2d.to_spectral(forcing, CNSTS)
-
-f = h5py.File("forcing.h5", "w")
-dset = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
-dset[...] = forcing.T.flatten()
-f.close()
-
-# set BC
-CNSTS['U0'] = 1.0
+#
+#y_points = cos(pi*arange(Mf)/(Mf-1))
+#delta = 0.1
+#
+## Set initial streamfunction
+#PSI = zeros((Mf, 2*Nf+1), dtype='d')
+#
+#for i in range(Mf):
+#    y =y_points[i]
+#    for j in range(2*Nf+1):
+#        PSI[i,j] = delta * (1./tanh(1./delta)) * log(cosh(y/delta))
+#
+#del y, i, j
+#
+#PSI = f2d.to_spectral(PSI, CNSTS)
+#
+##test = f2d.dy(PSI, CNSTS) 
+##test = f2d.to_physical(test, CNSTS)
+##savetxt('U.dat', vstack((y_points,test[:,0])).T)
+##PSI = f2d.to_physical(PSI, CNSTS)
+##savetxt('PSI.dat', vstack((y_points,PSI[:,0])).T)
+##exit(1)
+#
+#PSI = fftshift(PSI, axes=1)
+#PSI = PSI.T.flatten()
+#
+## set forcing
+#forcing = zeros((Mf, 2*Nf+1), dtype='d')
+#test = zeros((Mf, 2*Nf+1), dtype='d')
+#
+#for i in range(Mf):
+#    y =y_points[i]
+#    for j in range(2*Nf+1):
+#        forcing[i,j] = ( 2.0/tanh(1.0/delta)) * (1.0/cosh(y/delta)**2) * tanh(y/delta)
+#        forcing[i,j] *= 1.0/(Re * delta**2) 
+#
+#del y, i, j
+#
+#forcing = f2d.to_spectral(forcing, CNSTS)
+#
+#f = h5py.File("forcing.h5", "w")
+#dset = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
+#dset[...] = forcing.T.flatten()
+#f.close()
+#
+## set BC
+#CNSTS['U0'] = 1.0
 
 # Form the operators
 PsiOpInvList = form_operators(dt)
