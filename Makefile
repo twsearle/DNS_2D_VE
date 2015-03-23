@@ -52,8 +52,8 @@ debug : obj/fields_2D.o obj/time_steppers.o obj/DNS_2D_Newt.o obj/DNS_2D_Visco.o
 	$(CC) -c src/time_steppers.c -o obj/time_steppers.o $(DEBUGFLAGS) $(CFLAGS) 
 	$(CC) -c src/fields_2D.c -o obj/fields_2D.o $(DEBUGFLAGS) $(CFLAGS) 
 	$(CC) -c src/DNS_2D_Newt.c -o obj/DNS_2D_Newt.o $(DEBUGFLAGS) $(CFLAGS)
-	$(CC) -c src/DNS_2D_Visco.c -o obj/DNS_2D_Visco.o $(DEBUGFLAGS) $(CFLAGS)
 	$(CC) -o DNS_2D_Newt obj/DNS_2D_Newt.o obj/time_steppers.o obj/fields_2D.o $(DEBUGFLAGS) $(CFLAGS) -lhdf5 -lhdf5_hl -lfftw3 -lm
+	$(CC) -c src/DNS_2D_Visco.c -o obj/DNS_2D_Visco.o $(DEBUGFLAGS) $(CFLAGS)
 	$(CC) -o DNS_2D_Visco obj/DNS_2D_Visco.o obj/time_steppers.o obj/fields_2D.o $(DEBUGFLAGS) $(CFLAGS) -lhdf5 -lhdf5_hl -lfftw3 -lm
 
 

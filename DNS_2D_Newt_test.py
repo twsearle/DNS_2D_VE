@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Wed 11 Mar 19:28:49 2015
+#   Last modified: Fri 20 Mar 11:31:15 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -83,9 +83,9 @@ fp.close()
 numTimeSteps = int(totTime / dt)
 assert not (totTime % dt), "non-integer number of time steps!"
 
-NOld = N
-MOld =M
-kwargs = {'N': N, 'M': M, 'Re': Re,'Wi': Wi, 'beta': beta, 'kx': kx,'time':
+NOld = 5
+MOld = 40 
+kwargs = {'N': N, 'M': M, 'U0': 0, 'Re': Re,'Wi': Wi, 'beta': beta, 'kx': kx,'time':
           totTime, 'dt':dt, 'dealiasing':dealiasing }
 baseFileName  = "-N{N}-M{M}-kx{kx}-Re{Re}-b{beta}-Wi{Wi}-dt{dt}.pickle".format(**kwargs)
 outFileName  = "pf{0}".format(baseFileName)
@@ -241,8 +241,60 @@ def decide_resolution(vec, NOld, MOld, CNSTS):
     elif N <= NOld and M <= MOld:
         ovec = decrease_resolution(vec, NOld, MOld, CNSTS)
 
+    else: 
+        print 'error in deciding resolution'
+        exit(1)
+
     return ovec
 
+def form_operators(dt):
+    opinvlist = []
+
+    # zeroth mode
+    Psi0thOp = zeros((M,M), dtype='complex')
+    Psi0thOp = SMDY - 0.5*dt*oneOverRe*SMDYYY + 0j
+
+    # Apply BCs
+
+    # dypsi0(+-1) = 0
+    Psi0thOp[M-3, :] = DERIVTOP
+    Psi0thOp[M-2, :] = DERIVBOT
+    # psi0(-1) =  0
+    Psi0thOp[M-1, :] = BBOT
+
+    opinvlist.append(linalg.inv(Psi0thOp))
+
+    for i in range(1, N+1):
+        n = i
+
+        OP = zeros((2*M, 2*M), dtype='complex')
+        SLAPLAC = -n*n*kx*kx*SII + SMDYY
+
+        OP[0:M, 0:M] = 0
+        OP[0:M, M:2*M] = SII - 0.5*oneOverRe*dt*SLAPLAC
+
+        OP[M:2*M, 0:M] = SLAPLAC
+        OP[M:2*M, M:2*M] = -SII
+
+        # Apply BCs
+        # dypsi(+-1) = 0
+        OP[M-2, :] = concatenate((DERIVTOP, zeros(M, dtype='complex')))
+        OP[M-1, :] = concatenate((DERIVBOT, zeros(M, dtype='complex')))
+        
+        # dxpsi(+-1) = 0
+        OP[2*M-2, :] = concatenate((BTOP, zeros(M, dtype='complex')))
+        OP[2*M-1, :] = concatenate((BBOT, zeros(M, dtype='complex')))
+
+        # store the inverse of the relevent part of the matrix
+        OP = linalg.inv(OP)
+        OP = OP[0:M, 0:M]
+
+        opinvlist.append(OP)
+
+    del OP
+
+    opinvlist = array(opinvlist)
+    return opinvlist
 
 # -----------------------------------------------------------------------------
 # MAIN
@@ -318,62 +370,25 @@ PSI = zeros((2*N+1)*M,dtype='complex')
 
 # Read in stream function from file
 (PSI, Nu) = pickle.load(open(inFileName,'r'))
-SI = decide_resolution(PSI, NOld, MOld, CNSTS)
+PSI = decide_resolution(PSI, NOld, MOld, CNSTS)
+
 for n in range(1,N+1):
     PSI[(N-n)*M: (N-n+1)*M] = conj(PSI[(N+n)*M: (N+n+1)*M])
+
+#for n in range(1,N+1):
+#    PSI[(N+n)*M: (N+n+1)*M] = r_[0:M:1]
+#    PSI[(N-n)*M: (N-n+1)*M] = r_[0:M:1]
+
 #PSI[:] = rand((2*N+1)*M) + 1.j*rand((2*N+1)*M)
 #PSI[N*M:(N+1)*M] = rand(M)
 
 #for i in range(2*N+1-2):
 #    PSI[(i+1)*M:(i+2)*M] = r_[0:M][::-1] /(1.*M)
 
+
 # Form the operators
-PsiOpInvList = []
-
-# zeroth mode
-Psi0thOp = zeros((M,M), dtype='complex')
-Psi0thOp = SMDY - 0.5*dt*oneOverRe*SMDYYY + 0j
-
-# Apply BCs
-
-# dypsi0(+-1) = 0
-Psi0thOp[M-3, :] = DERIVTOP
-Psi0thOp[M-2, :] = DERIVBOT
-# psi0(-1) =  0
-Psi0thOp[M-1, :] = BBOT
-
-PsiOpInvList.append(linalg.inv(Psi0thOp))
-
-for i in range(1, N+1):
-    n = i
-
-    PSIOP = zeros((2*M, 2*M), dtype='complex')
-    SLAPLAC = -n*n*kx*kx*SII + SMDYY
-
-    PSIOP[0:M, 0:M] = 0
-    PSIOP[0:M, M:2*M] = SII - 0.5*oneOverRe*dt*SLAPLAC
-
-    PSIOP[M:2*M, 0:M] = SLAPLAC
-    PSIOP[M:2*M, M:2*M] = -SII
-
-    # Apply BCs
-    # dypsi(+-1) = 0
-    PSIOP[M-2, :] = concatenate((DERIVTOP, zeros(M, dtype='complex')))
-    PSIOP[M-1, :] = concatenate((DERIVBOT, zeros(M, dtype='complex')))
-    
-    # dxpsi(+-1) = 0
-    PSIOP[2*M-2, :] = concatenate((BTOP, zeros(M, dtype='complex')))
-    PSIOP[2*M-1, :] = concatenate((BBOT, zeros(M, dtype='complex')))
-
-    # store the inverse of the relevent part of the matrix
-    PSIOP = linalg.inv(PSIOP)
-    PSIOP = PSIOP[0:M, 0:M]
-
-    PsiOpInvList.append(PSIOP)
-
-del PSIOP
-
-PsiOpInvList = array(PsiOpInvList)
+PsiOpInvListHalf = form_operators(dt/2.0)
+PsiOpInvList = form_operators(dt)
 
 #### SAVE THE OPERATORS AND INITIAL STATE FOR THE C CODE
 
@@ -382,10 +397,24 @@ for i in range(N+1):
     n = i
     print n
     opFn = "./operators/op{0}.h5".format(n)
-    print opFn
+    print "writing ", opFn
     f = h5py.File(opFn, "w")
     dset = f.create_dataset("op", (M*M,), dtype='complex')
     dset[...] = PsiOpInvList[i].flatten()
+    f.close()
+
+    #savetxt("./operators/op{0}.dat".format(abs(n)),PsiOpInvList[n])
+del i
+
+for i in range(N+1):
+    # operator order in list is 0->N
+    n = i
+    print n
+    opFn = "./operators/hOp{0}.h5".format(n)
+    print "writing ", opFn
+    f = h5py.File(opFn, "w")
+    dset = f.create_dataset("op", (M*M,), dtype='complex')
+    dset[...] = PsiOpInvListHalf[i].flatten()
 
     f.close()
 
@@ -396,6 +425,8 @@ del i
 PSI = PSI.reshape(2*N+1, M).T
 # put PSI into FFT ordering.
 PSI = ifftshift(PSI, axes=1)
+
+# savetxt("initial.dat", PSI.T, fmt='%.18e')
 
 print "writing initial state to initial.h5"
 
@@ -418,32 +449,36 @@ MDX = mk_diff_x()
 # pass the flow variables and the time iteration settings to the C code
 if dealiasing:
     cargs = ["./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M",
-             "{0:d}".format(CNSTS["M"]), "-L", "2.0", "-k", "{0:e}".format(CNSTS["kx"]),
-             "-R", "{0:e}".format(CNSTS["Re"]), "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]), "-s",
-             "{0:d}".format(stepsPerFrame), "-T", "{0:d}".format(numTimeSteps),
-            "-d"]
+             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
+             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
+             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
+             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),
+             "-s", "{0:d}".format(stepsPerFrame), "-T",
+             "{0:d}".format(numTimeSteps), "-d"]
+
     print "./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M", \
-          "{0:d}".format(CNSTS["M"]), "-L", "2.0", "-k", \
-            "{0:e}".format(CNSTS["kx"]),"-R", \
-            "{0:e}".format(CNSTS["Re"]), "-W", "{0:e}".format(CNSTS["Wi"]),\
-            "-b", "{0:e}".format(CNSTS["beta"]), "-t", \
-            "{0:e}".format(CNSTS["dt"]), "-s",\
-          "{0:d}".format(stepsPerFrame), "-T", "{0:d}".format(numTimeSteps),"-d"
+             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
+             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
+             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
+             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),\
+             "-s", "{0:d}".format(stepsPerFrame), "-T",\
+             "{0:d}".format(numTimeSteps), "-d"
 
 else:
     cargs = ["./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M",
-             "{0:d}".format(CNSTS["M"]), "-L", "2.0", "-k", "{0:e}".format(CNSTS["kx"]),
-             "-R", "{0:e}".format(CNSTS["Re"]), "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]), "-s",
-             "{0:d}".format(stepsPerFrame), "-T", "{0:d}".format(numTimeSteps)]
+             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
+             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
+             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
+             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),
+             "-s", "{0:d}".format(stepsPerFrame), "-T",
+             "{0:d}".format(numTimeSteps)]
     print "./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M", \
-          "{0:d}".format(CNSTS["M"]), "-L", "2.0", "-k", \
-            "{0:e}".format(CNSTS["kx"]),"-R", \
-            "{0:e}".format(CNSTS["Re"]), "-W", "{0:e}".format(CNSTS["Wi"]),\
-            "-b", "{0:e}".format(CNSTS["beta"]), "-t", \
-            "{0:e}".format(CNSTS["dt"]), "-s",\
-          "{0:d}".format(stepsPerFrame), "-T", "{0:d}".format(numTimeSteps)
+             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
+             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
+             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
+             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),\
+             "-s", "{0:d}".format(stepsPerFrame), "-T",\
+             "{0:d}".format(numTimeSteps)
 
 subprocess.call(cargs)
 
@@ -451,13 +486,16 @@ subprocess.call(cargs)
 
 print "check variables are properly calculated in c code"
 
+print shape(load_hdf5_state("./output/psi.h5"))
+print shape(PSI)
 psic = load_hdf5_state("./output/psi.h5").reshape(2*N+1, M).T 
 
 print 'initial streamfunction?', allclose(PSI,psic)
 print 'difference', linalg.norm(psic-PSI)
 if linalg.norm(psic-PSI) > 0.0:
-    print psic - PSI
-    print 'FAIL'
+    print ( PSI)[0,:]
+    print (psic)[0,:]
+    print "FAIL"
     exit(1)
 #print 'zeroth mode c-python', psic[:M]- PSI[:M]
 
@@ -481,12 +519,14 @@ Uc = Uc.T.flatten()
 
 print 'U ?', allclose(U, Uc)
 print 'difference', linalg.norm(U-Uc)
-print 'U0', U[N*M: (N+1)*M]
-print 'U0c', Uc[N*M: (N+1)*M]
+if linalg.norm(U-Uc) > 1e-12:
+    print 'U0', U[N*M: (N+1)*M]
+    print 'U0c', Uc[N*M: (N+1)*M]
+    print 'FAIL'
+    exit(1)
 
 # v
 V = -dot(MDX, PSI)
-
 
 Vc = load_hdf5_state("./output/v.h5").reshape(2*N+1, M).T 
 pickle.dump(Vc, open('testVc.pickle','w'))
@@ -537,8 +577,11 @@ D3YPSI = dot(MDY, dot(MDY, dot(MDY,PSI) ) )
 
 print 'd3y psi ?', allclose(D3YPSI, d3yc)
 print 'difference', linalg.norm(D3YPSI-d3yc)
-print 'd3y0', D3YPSI[N*M:(N+1)*M]
-print 'd3yc0', d3yc[N*M:(N+1)*M]
+if linalg.norm(D3YPSI-d3yc) > 1e-12:
+    #print 'd3y0', D3YPSI[N*M:(N+1)*M]
+    #print 'd3yc0', d3yc[N*M:(N+1)*M]
+    print 'FAIL'
+    exit(1)
 
 d4yc = load_hdf5_state("./output/d4ypsi.h5").reshape(2*N+1, M).T 
 d4yc = fftshift(d4yc, axes=1)
@@ -621,7 +664,7 @@ if not allclose(DXLPLPSI, dxlplc):
     print "mode 0", linalg.norm(DXLPLPSI[N*M:(N+1)*M]-dxlplc[N*M:(N+1)*M])
     for n in range(1,N+1):
         print "mode", n, linalg.norm(DXLPLPSI[(N+n)*M:(N+n+1)*M]-dxlplc[(N+n)*M:(N+n+1)*M])
-        print "mode", -n,linalg.norm(DXLPLPSI[(N-n)*M:(N+2-n)*M]-dxlplc[(N-n)*M:(N+1-n)*M])
+        print "mode", -n,linalg.norm(DXLPLPSI[(N-n)*M:(N+1-n)*M]-dxlplc[(N-n)*M:(N+1-n)*M])
 
     print "mode 0", linalg.norm(dxlplc[N*M:(N+1)*M])
     for n in range(1,N+1):
@@ -637,7 +680,7 @@ UDXLPLPSI = dot(prod_mat(U), dot(MDX, LPLPSI))
 print 'udxlolpsi ?', allclose(UDXLPLPSI, udxlplc)
 print 'difference', linalg.norm(UDXLPLPSI-udxlplc)
 if not allclose(UDXLPLPSI, udxlplc):
-    print 'relative difference', linalg.norm(UDXLPLPSI-udxlplc)/linalg.norm(udxlplc)
+    print 'relative difference', linalg.norm(UDXLPLPSI-udxlplc)
 
     print "max difference", amax(UDXLPLPSI-udxlplc)
     print "max difference arg", argmax(UDXLPLPSI-udxlplc)
@@ -665,7 +708,7 @@ VDYLPLPSI = dot(prod_mat(V), dot(MDY, LPLPSI))
 print 'vdylplpsi ?', allclose(VDYLPLPSI, vdylplc)
 print 'difference', linalg.norm(VDYLPLPSI-vdylplc)
 if not allclose(VDYLPLPSI, vdylplc):
-    print 'relative difference', linalg.norm(VDYLPLPSI-vdylplc)/linalg.norm(vdylplc)
+    print 'relative difference', linalg.norm(VDYLPLPSI-vdylplc)
     #print 'VDYLPLPSI1', VDYLPLPSI[M: 2*M]
     #print 'VDYLPLPSI1c', vdylplc[M: 2*M]
     print 'difference', (VDYLPLPSI-vdylplc)[N*M+38::M]
@@ -683,6 +726,11 @@ if not allclose(VDYU, vdyyc):
     #print 'VDYU1c', vdyyc[M: 2*M]
     print ' high mode difference', (VDYU-vdyyc)[N*M+38::M]
 
+print """
+--------------
+Operator check
+--------------
+"""
 op0c = load_hdf5_state("./output/op0.h5")#.reshape(M, M).T 
 
 print 'operator 0', linalg.norm(op0c-PsiOpInvList[0].flatten())
@@ -690,7 +738,17 @@ print 'operator 0', linalg.norm(op0c-PsiOpInvList[0].flatten())
 for i in range(1,N+1):
     opc = load_hdf5_state("./output/op{0}.h5".format(i))
     print 'operator ',i, linalg.norm(opc - PsiOpInvList[i].flatten())
+    if linalg.norm(opc - PsiOpInvList[i].flatten()) > 0.0 :
+        exit(1)
 
+hop0c = load_hdf5_state("./output/hOp0.h5")#.reshape(M, M).T 
+print 'half operator 0', linalg.norm(hop0c-PsiOpInvListHalf[0].flatten())
+
+for i in range(1,N+1):
+    hopc = load_hdf5_state("./output/hOp{0}.h5".format(i))
+    print 'half operator ',i, linalg.norm(hopc - PsiOpInvListHalf[i].flatten())
+    if linalg.norm(hopc - PsiOpInvListHalf[i].flatten()) > 0.0 :
+        exit(1)
 
 DYYYPSI = dot(MDY, dot(MDY, dot(MDY, PSI)))
 

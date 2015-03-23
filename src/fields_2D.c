@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 11 Mar 19:55:05 2015
+// Last modified: Mon 23 Mar 12:52:32 2015
 
 #include"fields_2D.h"
 
@@ -1399,95 +1399,66 @@ void fft_convolve_r(complex *arr1, complex *arr2, complex *arrout,
     to_spectral_r(scratchp1, arrout, scratchin, scratchout, spec_plan, cnsts);
 }
 
-double calc_KE0(fftw_complex *usq, fftw_complex *vsq, flow_params cnsts)
+double calc_KE_mode(fftw_complex *u, fftw_complex *v, int n, flow_params cnsts)
 {
-    double integral0th = 0;
-    double KE0 = 0;
-    int m=0;
-    int M=cnsts.M;
-
-    for (m=0; m<M; m+=2)
-    {
-	integral0th += (2. / (1.-m*m)) * creal(usq[ind(0,m)]);
-	integral0th += (2. / (1.-m*m)) * creal(vsq[ind(0,m)]);
-    }
-
-    KE0 = 0.5 * integral0th;
-    
-    return KE0;
-}
-
-double calc_KE1(fftw_complex *usq, fftw_complex *vsq, flow_params cnsts)
-{
-    fftw_complex integral0th = 0;
-    double KE1 = 0;
-
-    int m=0;
-    int M=cnsts.M;
-
-    for (m=0; m<M; m+=2)
-    {
-	integral0th += (2. / (1.-m*m)) * usq[ind(1,m)];
-	integral0th += (2. / (1.-m*m)) * conj(usq[ind(1,m)]);
-	integral0th += (2. / (1.-m*m)) * vsq[ind(1,m)];
-	integral0th += (2. / (1.-m*m)) * conj(vsq[ind(1,m)]);
-    }
-
-    KE1 = creal(integral0th);
-    
-    return KE1;
-}
-
-double calc_KE2(fftw_complex *usq, fftw_complex *vsq, flow_params cnsts)
-{
-    fftw_complex integral = 0;
-    double KE2 = 0;
-
-    int m=0;
-    int M=cnsts.M;
-
-    for (m=0; m<M; m+=2)
-    {
-	integral += (2. / (1.-m*m)) * usq[ind(2,m)];
-	integral += (2. / (1.-m*m)) * conj(usq[ind(2,m)]);
-	integral += (2. / (1.-m*m)) * vsq[ind(2,m)];
-	integral += (2. / (1.-m*m)) * conj(vsq[ind(2,m)]);
-    }
-
-    KE2 = creal(integral);
-    
-    return KE2;
-}
-
-double calc_KE(fftw_complex *usq, fftw_complex *vsq, flow_params cnsts)
-{
-    fftw_complex integral = 0;
     double KE = 0;
-
+    int i=0;
     int m=0;
-    int n=0;
+    int p=0;
+    complex usq=0;
+    complex vsq=0;
+    complex tmpu=0;
+    complex tmpv=0;
     int M=cnsts.M;
-    int N=cnsts.N;
 
-    for (n=0; n<N+1; n++)
-    {
-	integral = 0;
-
-	for (m=0; m<M; m+=2)
+	for (i=0; i<M; i+=2)
 	{
-	    integral += (2. / (1.-m*m)) * usq[ind(n,m)];
-	    integral += (2. / (1.-m*m)) * conj(usq[ind(n,m)]);
-	    integral += (2. / (1.-m*m)) * vsq[ind(n,m)];
-	    integral += (2. / (1.-m*m)) * conj(vsq[ind(n,m)]);
+	    usq = 0;
+	    vsq = 0;
+
+	    for (m=i-M+1; m<M; m++)
+	    {
+		p = abs(i-m);
+
+		tmpu = u[ind(n,p)];
+		tmpv = v[ind(n,p)];
+
+		if (p==0)
+		{
+		    tmpu *= 2.0;
+		    tmpv *= 2.0;
+		}
+
+		tmpu *= conj(u[ind(n,abs(m))]);
+		tmpv *= conj(v[ind(n,abs(m))]);
+
+		if (abs(m)==0)
+		{
+		    tmpu *= 2.0;
+		    tmpv *= 2.0;
+		}
+
+		if (i==0)
+		{
+		    usq += 0.25*tmpu;
+		    vsq += 0.25*tmpv;
+		} else
+		{
+		    usq += 0.5*tmpu;
+		    vsq += 0.5*tmpv;
+		}
+
+	    }
+
+	    KE += (2. / (1.-i*i)) * usq;
+	    KE += (2. / (1.-i*i)) * vsq;
+
 	}
 
 	if (n == 0)
 	{
-	    KE += 0.25*creal(integral);
+	    return 0.5*creal(KE);
 	} else {
-	    KE += creal(integral);
+	    return creal(KE);
 	}
-    }
-    
-    return KE;
 }

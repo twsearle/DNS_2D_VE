@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Fri 20 Mar 10:58:31 2015
+#   Last modified: Mon 23 Mar 12:38:23 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -43,6 +43,7 @@ Outline:
 # MODULES
 from scipy import *
 from scipy import linalg
+from numpy.linalg import cond 
 from numpy.fft import fftshift, ifftshift
 from numpy.random import rand
 
@@ -81,7 +82,7 @@ else:
     Mf = M
 
 numTimeSteps = int(totTime / dt)
-assert totTime % dt, "non-integer number of time steps!"
+assert (totTime / dt) - float(numTimeSteps) == 0, "Non-integer number of timesteps"
 assert Wi != 0.0, "cannot have Wi = 0!"
 
 NOld = N 
@@ -118,6 +119,19 @@ def mk_cheb_int():
     del m
     
     return integrator
+
+def cheb_prod_mat(velA):
+    """Function to return a matrix for left-multiplying two Chebychev vectors"""
+
+    D = zeros((M, M), dtype='complex')
+
+    for n in range(M):
+        for m in range(-M+1,M):     # Bottom of range is inclusive
+            itr = abs(n-m)
+            if (itr < M):
+                D[n, abs(m)] += 0.5*oneOverC[n]*CFunc[itr]*CFunc[abs(m)]*velA[itr]
+    del m, n, itr
+    return D
 
 def append_save_array(array, fp):
 
@@ -197,6 +211,9 @@ def form_operators(dt):
     # psi0(-1) =  0
     Psi0thOp[M-1, :] = BBOT
 
+    print "condition numbers for dt = {0} operators".format(dt)
+    print "mode 0, condition number {0:e}".format(cond(Psi0thOp))
+
     PsiOpInvList.append(linalg.inv(Psi0thOp))
 
     for i in range(1, N+1):
@@ -219,6 +236,10 @@ def form_operators(dt):
         # dxpsi(+-1) = 0
         PSIOP[2*M-2, :] = concatenate((BTOP, zeros(M, dtype='complex')))
         PSIOP[2*M-1, :] = concatenate((BBOT, zeros(M, dtype='complex')))
+
+        # Calculate condition number before taking the inverse
+        conditionNum = cond(PSIOP)
+        print "mode {0}, condition number {1:e}".format(n, conditionNum)
 
         # store the inverse of the relevent part of the matrix
         PSIOP = linalg.inv(PSIOP)
@@ -255,6 +276,8 @@ vecLen = (2*N+1)*M
 oneOverRe = 1. / Re
 assert oneOverRe != infty, "Can't set Reynold's to zero!"
 
+CFunc = ones(M)
+CFunc[0] = 2.0
 # Set the oneOverC function: 1/2 for m=0, 1 elsewhere:
 oneOverC = ones(M)
 oneOverC[0] = 1. / 2.
@@ -292,18 +315,21 @@ PSI = zeros((2*N+1)*M,dtype='complex')
 
 # --------------- POISEUILLE -----------------
 
-# This is Poiseuille flow 
-#PSI[N*M]   += 2.0/3.0
-#PSI[N*M+1] += 3.0/4.0
+PSI[N*M]   += 2.0/3.0
+PSI[N*M+1] += 3.0/4.0
 #PSI[N*M+2] += 0.0
-#PSI[N*M+3] += -1.0/12.0
+PSI[N*M+3] += -1.0/12.0
+#
+perAmp = 1e-2
 
-perAmp = 1e-8
-PSI[N*M:N*M + M/2] += perAmp*(rand(M/2))
-PSI[(N-1)*M:(N-1)*M + M/2] += perAmp*(rand(M/2) + 1.j*rand(M/2)) 
-PSI[(N-2)*M:(N-2)*M + M/2] += perAmp*(rand(M/2) + 1.j*rand(M/2)) 
-PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
-PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
+for n in range(1,N+1):
+    if (n % 2) == 0:
+        PSI[(N-n)*M + 1:(N-n)*M + M/2 :2] += (0.1**(n-1))*perAmp*(rand(M/4) + 1.j*rand(M/4))
+    else:
+        PSI[(N-n)*M:(N-n)*M + M/2 - 1 :2] += (0.1**(n-1))*perAmp*(rand(M/4) + 1.j*rand(M/4))
+
+    PSI[(N+n)*M:(N+n+1)*M] = conj(PSI[(N-n)*M:(N-n+1)*M])
+ 
 
 #print 'performing linear stability of Poiseuille flow test'
 
@@ -317,7 +343,7 @@ PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
 #PSI[(N-1)*M + 6] += 1e-3 - 1e-3j
 #PSI[(N-1)*M + 8] += 1e-4 - 1e-4j
 #PSI[(N-1)*M + 10] += 1e-4 - 1e-4j
-#
+##
 #PSI[(N-2)*M + 3] += 1e-4 - 1e-4j
 #PSI[(N-2)*M + 5] += 1e-4 - 1e-4j
 #
@@ -325,57 +351,96 @@ PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
 #PSI[(N-1)*M:N*M-M/2 -1:2] += perAmp*rand(M/4) - perAmp*1.j*rand(M/4)
 #PSI[(N-2)*M+1: (N-1)*M - M/2 :2] += 0.1*perAmp*rand(M/4) - 0.1*perAmp*1.j*rand(M/4)
 
+#PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
+#PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
 
-# Apply BCs
+forcing = zeros((M,2*N+1), dtype='complex')
+forcing[0,0] = 2.0/Re
+
+#KE = 0
+#SMDY =  mk_single_diffy()
+#u0 = dot(SMDY, PSI[N*M: (N+1)*M])
+#u0sq = zeros(M, dtype='complex')
+#for n in range(0,M,2):
+#    for m in range(n-M+1, M):
+#
+#        p = abs(n-m)
+#        if (p==0):
+#            tmp = 2.0*u0[p]
+#        else:
+#            tmp = u0[p]
+#
+#        if (abs(m)==0):
+#            tmp *= 2.0*conj(u0[abs(m)])
+#        else:
+#            tmp *= conj(u0[abs(m)])
+#
+#        if (n==0):
+#            u0sq[n] += 0.25*tmp
+#        else:
+#            u0sq[n] += 0.5*tmp
+#
+#    KE += (2. / (1.-n*n)) * u0sq[n];
+#    print KE
+#
+#u0sq2 = dot(cheb_prod_mat(u0), u0)
+#print u0sq2-u0sq
+#
+#print 'KE0', KE*(15./8.)*0.5
+
+
+
 
 # --------------- SHEAR LAYER -----------------
+#
+#y_points = cos(pi*arange(Mf)/(Mf-1))
+#delta = 0.1
+#
+## Set initial streamfunction
+#PSI = zeros((Mf, 2*Nf+1), dtype='d')
+#
+#for i in range(Mf):
+#    y =y_points[i]
+#    for j in range(2*Nf+1):
+#        PSI[i,j] = delta * (1./tanh(1./delta)) * log(cosh(y/delta))
+#
+#del y, i, j
+#
+#PSI = f2d.to_spectral(PSI, CNSTS)
+#
+##test = f2d.dy(PSI, CNSTS) 
+##test = f2d.to_physical(test, CNSTS)
+##savetxt('U.dat', vstack((y_points,test[:,0])).T)
+##PSI = f2d.to_physical(PSI, CNSTS)
+##savetxt('PSI.dat', vstack((y_points,PSI[:,0])).T)
+##exit(1)
+#
+#PSI = fftshift(PSI, axes=1)
+#PSI = PSI.T.flatten()
+#
+## set forcing
+#forcing = zeros((Mf, 2*Nf+1), dtype='d')
+#test = zeros((Mf, 2*Nf+1), dtype='d')
+#
+#for i in range(Mf):
+#    y =y_points[i]
+#    for j in range(2*Nf+1):
+#        forcing[i,j] = ( 2.0/tanh(1.0/delta)) * (1.0/cosh(y/delta)**2) * tanh(y/delta)
+#        forcing[i,j] *= 1.0/(Re * delta**2) 
+#
+#del y, i, j
+#forcing = f2d.to_spectral(forcing, CNSTS)
+#
+## set BC
+#CNSTS['U0'] = 1.0
 
-y_points = cos(pi*arange(Mf)/(Mf-1))
-delta = 0.1
+# ----------------------------------------------------------------------------
 
-# Set initial streamfunction
-PSI = zeros((Mf, 2*Nf+1), dtype='d')
-
-for i in range(Mf):
-    y =y_points[i]
-    for j in range(2*Nf+1):
-        PSI[i,j] = delta * (1./tanh(1./delta)) * log(cosh(y/delta))
-
-del y, i, j
-
-PSI = f2d.to_spectral(PSI, CNSTS)
-
-#test = f2d.dy(PSI, CNSTS) 
-#test = f2d.to_physical(test, CNSTS)
-#savetxt('U.dat', vstack((y_points,test[:,0])).T)
-#PSI = f2d.to_physical(PSI, CNSTS)
-#savetxt('PSI.dat', vstack((y_points,PSI[:,0])).T)
-#exit(1)
-
-PSI = fftshift(PSI, axes=1)
-PSI = PSI.T.flatten()
-
-# set forcing
-forcing = zeros((Mf, 2*Nf+1), dtype='d')
-test = zeros((Mf, 2*Nf+1), dtype='d')
-
-for i in range(Mf):
-    y =y_points[i]
-    for j in range(2*Nf+1):
-        forcing[i,j] = ( 2.0/tanh(1.0/delta)) * (1.0/cosh(y/delta)**2) * tanh(y/delta)
-        forcing[i,j] *= 1.0/(Re * delta**2) 
-
-del y, i, j
-
-forcing = f2d.to_spectral(forcing, CNSTS)
 
 f = h5py.File("forcing.h5", "w")
 dset = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
 dset[...] = forcing.T.flatten()
 f.close()
-
-# set BC
-CNSTS['U0'] = 1.0
 
 # Form the operators
 PsiOpInvList = form_operators(dt)
@@ -467,3 +532,4 @@ subprocess.call(cargs)
 
 # Read in data from the C code
 print 'done'
+
