@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Mon 23 Mar 12:31:26 2015
+#   Last modified: Mon 23 Mar 12:38:23 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -320,12 +320,16 @@ PSI[N*M+1] += 3.0/4.0
 #PSI[N*M+2] += 0.0
 PSI[N*M+3] += -1.0/12.0
 #
-#perAmp = 0*1e-3
-#PSI[N*M:N*M + M/2:2] += 1e-2 * perAmp*(rand(M/4))
-#PSI[(N-1)*M:(N-1)*M + M/2:2] += perAmp*(rand(M/4) + 1.j*rand(M/4)) 
-#PSI[(N-2)*M + 1:(N-2)*M + M/2:2] += 0.1*perAmp*(rand(M/4) + 1.j*rand(M/4)) 
-#PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
-#PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
+perAmp = 1e-2
+
+for n in range(1,N+1):
+    if (n % 2) == 0:
+        PSI[(N-n)*M + 1:(N-n)*M + M/2 :2] += (0.1**(n-1))*perAmp*(rand(M/4) + 1.j*rand(M/4))
+    else:
+        PSI[(N-n)*M:(N-n)*M + M/2 - 1 :2] += (0.1**(n-1))*perAmp*(rand(M/4) + 1.j*rand(M/4))
+
+    PSI[(N+n)*M:(N+n+1)*M] = conj(PSI[(N-n)*M:(N-n+1)*M])
+ 
 
 #print 'performing linear stability of Poiseuille flow test'
 
@@ -347,8 +351,8 @@ PSI[N*M+3] += -1.0/12.0
 #PSI[(N-1)*M:N*M-M/2 -1:2] += perAmp*rand(M/4) - perAmp*1.j*rand(M/4)
 #PSI[(N-2)*M+1: (N-1)*M - M/2 :2] += 0.1*perAmp*rand(M/4) - 0.1*perAmp*1.j*rand(M/4)
 
-PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
-PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
+#PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
+#PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
 
 forcing = zeros((M,2*N+1), dtype='complex')
 forcing[0,0] = 2.0/Re
