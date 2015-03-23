@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri 20 Mar 11:16:54 2015
+// Last modified: Mon 23 Mar 18:42:27 2015
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -21,16 +21,17 @@
 //prototypes
 
 void step_sf_SI_Crank_Nicolson_visco(
-	complex *psi, complex *cxx, complex *cyy, complex *cxy, double dt, int
-	timeStep, flow_params params, complex *scratch, complex *scratch2,
-	complex *u, complex *v, complex *lplpsi, complex *biharmpsi, complex
-	*d2ypsi, complex *dyyypsi, complex *d4ypsi, complex *d2xd2ypsi, complex
-	*d4xpsi, complex *udxlplpsi, complex *vdylplpsi, complex *vdyypsi,
-	complex *txx, complex *tyy, complex *txy, complex *d2ytxy, complex
-	*d2xtxy, complex *dxytyy_txx, complex *dytxy, complex *RHSvec, complex
-	*opsList, fftw_plan *phys_plan, fftw_plan *spec_plan, complex
-	*scratchin, complex *scratchout, double *scratchp1, double *scratchp2 
-	);
+	complex *psi, complex *psiNL, complex *cij, complex *cijNL, complex
+	*forcing, complex *forcing2, double dt, int timeStep, flow_params
+	params, complex *scratch, complex *scratch2, complex *u, complex *v,
+	complex *lplpsi, complex *biharmpsi, complex *d2ypsi, complex *dyyypsi,
+	complex *d4ypsi, complex *d2xd2ypsi, complex *d4xpsi, complex
+	*udxlplpsi, complex *vdylplpsi, complex *vdyypsi, complex *d2ycxy,
+	complex *d2xcxy, complex *dxycyy_cxx, complex *dycxy, complex
+	*d2ycxyNL, complex *d2xcxyNL, complex *dxycyy_cxxNL, complex *dycxyNL,
+	complex *RHSvec, complex *opsList, fftw_plan *phys_plan, fftw_plan
+	*spec_plan, complex *scratchin, complex *scratchout, double *scratchp1,
+	double *scratchp2 );
 
 void step_sf_SI_Crank_Nicolson(
 	complex *psi, complex *psi2, double dt, int timeStep, complex
@@ -41,6 +42,16 @@ void step_sf_SI_Crank_Nicolson(
 	*vdylplpsi, complex *vdyypsi, complex *RHSvec, complex *opsList,
 	fftw_plan *phys_plan, fftw_plan *spec_plan, complex *scratchin, complex
 	*scratchout, double *scratchp1, double *scratchp2 
+	);
+
+void step_conformation_Crank_Nicolson(
+	complex *psi, complex *cij, complex *cijNL, double dt, flow_params params,
+	complex *u, complex *v, complex *dxu, complex *dyu, complex *dxv,
+	complex *dyv, complex *cxxdxu, complex *cxydyu, complex *vgradcxx,
+	complex *cxydxv, complex *cyydyv, complex *vgradcyy, complex *cxxdxv,
+	complex *cyydyu, complex *vgradcxy, complex *scratch, complex
+	*scratch2, fftw_plan *phys_plan, fftw_plan *spec_plan, complex
+	*scratchin, complex *scratchout, double *scratchp1, double *scratchp2 
 	);
 
 void stress_time_derivative(
