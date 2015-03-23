@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu 19 Mar 16:23:05 2015
+// Last modified: Mon 23 Mar 12:34:28 2015
 
 /* Program Description:
  *
@@ -73,7 +73,8 @@ int main(int argc, char **argv)
     double KE0 = 1.0;
     double KE1 = 0.0;
     double KE2 = 0.0;
-    double KE = 0.0;
+    double KE_tot = 0.0;
+    double KE_xdepend = 0.0;
 
     opterr = 0;
     int shortArg;
@@ -322,7 +323,7 @@ int main(int argc, char **argv)
     printf("\n------\nperforming the time iteration\n------\n");
     printf("\nTime:\t\tKE0:\n");
 
-    for (timeStep=0; timeStep<numTimeSteps; timeStep++)
+    for (timeStep=0; timeStep<=numTimeSteps; timeStep++)
     {
 
 	// predictor step to calculate nonlinear terms
@@ -382,30 +383,30 @@ int main(int argc, char **argv)
 		normU1 += creal(u[ind(1,j)]*conj(u[ind(1,j)])); 
 		normU2 += creal(u[ind(2,j)]*conj(u[ind(2,j)])); 
 	    }
-	    normU0 = sqrt(normU0);//-(1./sqrt(2.));
-	    normU1 = sqrt(normU1);
-	    normU2 = sqrt(normU2);
+	    normU0 = normU0;//-(1./sqrt(2.));
+	    normU1 = normU1;
+	    normU2 = normU2;
 
 	    fprintf(traceU, "%e\t%e\t%e\t%e\t\n", time, normU0, normU1, normU2);
 
-	    fft_convolve_r(u, u, u, scratchp1, scratchp2, scratchin, scratchout,
-		    &phys_plan, &spec_plan, params);
-	    fft_convolve_r(v, v, v, scratchp1, scratchp2, scratchin, scratchout,
-		    &phys_plan, &spec_plan, params);
-	    
+	    KE0 = calc_KE_mode(u, v, 0, params) * (15.0/ 8.0);
+	    KE1 = calc_KE_mode(u, v, 1, params) * (15.0/ 8.0);
+	    KE2 = calc_KE_mode(u, v, 2, params) * (15.0/ 8.0);
+	    KE_xdepend = KE1 + KE2; 
+	    for (i=3; i<N+1; i++)
+	    {
+		KE_xdepend += calc_KE_mode(u, v, i, params) * (15.0/ 8.0);
+	    }
+    
+	    KE_tot = KE0 + KE_xdepend;
 
-	    KE0 = calc_KE0(u, v, params) * (15.0/ 8.0);
-	    KE1 = calc_KE1(u, v, params) * (15.0/ 8.0);
-	    KE2 = calc_KE2(u, v, params) * (15.0/ 8.0);
-	    KE = calc_KE(u, v, params) * (15.0/ 8.0);
-
-	    printf("%e\t%e\t%e\t%e\n", time, KE0, KE1, KE2);
+	    printf("%e\t%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1, KE2);
 
 	    
 	    save_hdf5_snapshot(&hdf5fp, &filetype_id, &datatype_id,
 		    psi, time, params);
 	    
-	    fprintf(tracefp, "%e\t%e\t%e\t%e\t%e\n", time, KE0, KE1, KE2, KE);
+	    fprintf(tracefp, "%e\t%e\t%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1, KE2, KE_xdepend);
 
 	    fflush(traceU);
 	    fflush(trace1mode);

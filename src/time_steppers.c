@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu 19 Mar 14:43:24 2015
+// Last modified: Mon 23 Mar 10:55:41 2015
 
 #include"fields_2D.h"
 
@@ -157,7 +157,6 @@ void step_sf_SI_Crank_Nicolson(
 #ifdef MYDEBUG
     if(timeStep==0)
     {
-	printf("should see some output?\n");
 	save_hdf5_state("./output/u.h5",  &u[0], params);
 	save_hdf5_state("./output/v.h5", &v[0], params);
 	save_hdf5_state("./output/lplpsi.h5", &lplpsi[0], params);
@@ -260,7 +259,7 @@ void step_sf_SI_Crank_Nicolson(
 	//for (l=M-1; l>=0; l=l-1)
 	for (l=0; l<M; l++)
 	{
-	    psi[ind(0,j)] += opsList[j*M + l] * RHSvec[l];
+	    psi[ind(0,j)] += creal(opsList[j*M + l] * RHSvec[l]);
 
 	}
     }

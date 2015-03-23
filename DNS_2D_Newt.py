@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Sun 22 Mar 01:04:31 2015
+#   Last modified: Mon 23 Mar 12:31:26 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -82,7 +82,7 @@ else:
     Mf = M
 
 numTimeSteps = int(totTime / dt)
-assert totTime % dt, "non-integer number of time steps!"
+assert (totTime / dt) - float(numTimeSteps) == 0, "Non-integer number of timesteps"
 assert Wi != 0.0, "cannot have Wi = 0!"
 
 NOld = N 
@@ -119,6 +119,19 @@ def mk_cheb_int():
     del m
     
     return integrator
+
+def cheb_prod_mat(velA):
+    """Function to return a matrix for left-multiplying two Chebychev vectors"""
+
+    D = zeros((M, M), dtype='complex')
+
+    for n in range(M):
+        for m in range(-M+1,M):     # Bottom of range is inclusive
+            itr = abs(n-m)
+            if (itr < M):
+                D[n, abs(m)] += 0.5*oneOverC[n]*CFunc[itr]*CFunc[abs(m)]*velA[itr]
+    del m, n, itr
+    return D
 
 def append_save_array(array, fp):
 
@@ -263,6 +276,8 @@ vecLen = (2*N+1)*M
 oneOverRe = 1. / Re
 assert oneOverRe != infty, "Can't set Reynold's to zero!"
 
+CFunc = ones(M)
+CFunc[0] = 2.0
 # Set the oneOverC function: 1/2 for m=0, 1 elsewhere:
 oneOverC = ones(M)
 oneOverC[0] = 1. / 2.
@@ -305,12 +320,12 @@ PSI[N*M+1] += 3.0/4.0
 #PSI[N*M+2] += 0.0
 PSI[N*M+3] += -1.0/12.0
 #
-perAmp = 1e-3
+#perAmp = 0*1e-3
 #PSI[N*M:N*M + M/2:2] += 1e-2 * perAmp*(rand(M/4))
-PSI[(N-1)*M:(N-1)*M + M/2:2] += perAmp*(rand(M/4) + 1.j*rand(M/4)) 
-PSI[(N-2)*M + 1:(N-2)*M + M/2:2] += 0.1*perAmp*(rand(M/4) + 1.j*rand(M/4)) 
-PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
-PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
+#PSI[(N-1)*M:(N-1)*M + M/2:2] += perAmp*(rand(M/4) + 1.j*rand(M/4)) 
+#PSI[(N-2)*M + 1:(N-2)*M + M/2:2] += 0.1*perAmp*(rand(M/4) + 1.j*rand(M/4)) 
+#PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
+#PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
 
 #print 'performing linear stability of Poiseuille flow test'
 
@@ -337,6 +352,40 @@ PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
 
 forcing = zeros((M,2*N+1), dtype='complex')
 forcing[0,0] = 2.0/Re
+
+#KE = 0
+#SMDY =  mk_single_diffy()
+#u0 = dot(SMDY, PSI[N*M: (N+1)*M])
+#u0sq = zeros(M, dtype='complex')
+#for n in range(0,M,2):
+#    for m in range(n-M+1, M):
+#
+#        p = abs(n-m)
+#        if (p==0):
+#            tmp = 2.0*u0[p]
+#        else:
+#            tmp = u0[p]
+#
+#        if (abs(m)==0):
+#            tmp *= 2.0*conj(u0[abs(m)])
+#        else:
+#            tmp *= conj(u0[abs(m)])
+#
+#        if (n==0):
+#            u0sq[n] += 0.25*tmp
+#        else:
+#            u0sq[n] += 0.5*tmp
+#
+#    KE += (2. / (1.-n*n)) * u0sq[n];
+#    print KE
+#
+#u0sq2 = dot(cheb_prod_mat(u0), u0)
+#print u0sq2-u0sq
+#
+#print 'KE0', KE*(15./8.)*0.5
+
+
+
 
 # --------------- SHEAR LAYER -----------------
 #
@@ -376,16 +425,18 @@ forcing[0,0] = 2.0/Re
 #        forcing[i,j] *= 1.0/(Re * delta**2) 
 #
 #del y, i, j
-#
 #forcing = f2d.to_spectral(forcing, CNSTS)
-#
-#f = h5py.File("forcing.h5", "w")
-#dset = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
-#dset[...] = forcing.T.flatten()
-#f.close()
 #
 ## set BC
 #CNSTS['U0'] = 1.0
+
+# ----------------------------------------------------------------------------
+
+
+f = h5py.File("forcing.h5", "w")
+dset = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
+dset[...] = forcing.T.flatten()
+f.close()
 
 # Form the operators
 PsiOpInvList = form_operators(dt)
