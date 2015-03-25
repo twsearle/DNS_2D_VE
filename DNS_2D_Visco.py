@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Mon 23 Mar 20:05:13 2015
+#   Last modified: Tue 24 Mar 14:31:58 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -415,7 +415,7 @@ forcing[0,0] = 2.0/Re
 #
 #del y, i, j
 #forcing = f2d.to_spectral(forcing, CNSTS)
-#
+#forcing[:, 1:] = 0
 ## set BC
 #CNSTS['U0'] = 1.0
 

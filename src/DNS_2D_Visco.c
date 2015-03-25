@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 23 Mar 18:52:55 2015
+// Last modified: Tue 24 Mar 11:49:20 2015
 
 /* Program Description:
  *
@@ -306,6 +306,12 @@ int main(int argc, char **argv)
     // load_hdf5_state("initial_cyy.h5", cyy, params);
     // load_hdf5_state("initial_cxy.h5", cxy, params);
     load_hdf5_state_visco("initial_visco.h5", psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], params);
+    load_hdf5_state("forcing.h5", forcing, params);
+
+    for (i=0; i<(N+1)*M; i++)
+    {
+	forcing2[i] = forcing[i];
+    }
 
     // load the operators from scipy 
     for (i=0; i<N+1; i++) 

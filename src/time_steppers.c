@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 23 Mar 18:41:49 2015
+// Last modified: Tue 24 Mar 11:48:13 2015
 
 #include"fields_2D.h"
 
@@ -697,7 +697,7 @@ void step_sf_SI_Crank_Nicolson_visco(
 	RHSvec[j] += 0.5*dt*(forcing[ind(0,j)] + forcing2[ind(0,j)]);
 	RHSvec[j] += u[ind(0,j)]; 
     }
-    RHSvec[0] += 2*dt*oneOverRe;
+    // RHSvec[0] += 2*dt*oneOverRe;
 
     // apply BCs
     // # dyPsi0(+-1) = 0
