@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Tue 24 Mar 14:31:58 2015
+#   Last modified: Mon 30 Mar 11:48:17 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -48,6 +48,8 @@ Outline:
 # MODULES
 from scipy import *
 from scipy import linalg
+from scipy import optimize
+from numpy.linalg import cond 
 from numpy.fft import fftshift, ifftshift
 from numpy.random import rand
 
@@ -87,12 +89,13 @@ numTimeSteps = int(totTime / dt)
 assert (totTime / dt) - float(numTimeSteps) == 0, "Non-integer number of timesteps"
 assert Wi != 0.0, "cannot have Wi = 0!"
 
-NOld = N 
-MOld = M
-kwargs = {'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0, 'Re': Re, 'Wi': Wi, 'beta': beta,
-          'kx': kx,'time': totTime, 'dt':dt, 'dealiasing':dealiasing}
+NOld = 10
+MOld = 90
+kwargs = {'NOld': NOld, 'MOld': MOld, 'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0,
+          'Re': Re, 'Wi': Wi, 'beta': beta, 'kx': kx,'time': totTime, 'dt':dt,
+          'dealiasing':dealiasing}
 
-inFileName = "pf-N{N}-M{M}-kx{kx}-Re{Re}-b{beta}-Wi{Wi}.pickle".format(**kwargs)
+inFileName = "pf-N{NOld}-M{MOld}-kx{kx}-Re{Re}-b{beta}-Wi{Wi}.pickle".format(**kwargs)
 
 CNSTS = kwargs
 
@@ -229,6 +232,219 @@ def form_operators(dt):
     PsiOpInvList = array(PsiOpInvList)
     return PsiOpInvList
 
+def stupid_transform(GLreal, CNSTS):
+    """
+    apply the Chebyshev transform the stupid way.
+    """
+
+    M = CNSTS['M']
+
+    out = zeros(M)
+
+    for i in range(M):
+        out[i] += (1./(M-1.))*GLreal[0]
+        for j in range(1,M-1):
+            out[i] += (2./(M-1.))*GLreal[j]*cos(pi*i*j/(M-1))
+        out[i] += (1./(M-1.))*GLreal[M-1]*cos(pi*i)
+    del i,j
+
+    out[0] = out[0]/2.
+    out[M-1] = out[M-1]/2.
+
+    return out
+
+def stupid_transform_i(GLspec, CNSTS):
+    """
+    apply the Chebyshev transform the stupid way.
+    """
+
+    M = CNSTS['M']
+    Mf = CNSTS['Mf']
+
+    out = zeros(Mf, dtype='complex')
+
+    for i in range(Mf):
+        out[i] += GLspec[0]
+        for j in range(1,M-1):
+            out[i] += GLspec[j]*cos(pi*i*j/(Mf-1))
+        out[i] += GLspec[M-1]*cos(pi*i)
+    del i,j
+
+    return out
+
+def perturb(psi_, totEnergy, perKEestimate, sigma, gam):
+    """
+    calculate the KE for a perturbation of amplitude 1 and then choose a
+    perturbation amplitude which gives the desired perturbation KE.
+    Then use this perturbation KE to calculate a reduction in the base profile
+    such that there is the correct total energy
+    """
+
+    SMDY =  mk_single_diffy()
+
+    pscale = optimize.fsolve(lambda pscale: pscale*tan(pscale) + gam*tanh(gam), 2)
+
+    perAmp = 1.0
+    
+    rn = zeros((N,5))
+    for n in range(N):
+        rn[n,:] = (10.0**(-n))*(0.5-rand(5))
+
+    for j in range(2):
+
+        for n in range(1,N+1):
+            if (n % 2) == 0:
+                ##------------- PURE RANDOM PERTURBATIONS -------------------
+                ## Make sure you satisfy the optimum symmetry for the
+                ## perturbation
+                #psi_[(N-n)*M + 1:(N-n)*M + M/2 :2] = (10.0**(-n+1))*perAmp*0.5*(1-rand(M/4) + 1.j*rand(M/4))
+                #psi_[(N-n)*M + 1:(N-n)*M + 6 :2] =\
+                #(10.0**((n+1)))*perAmp*0.5*(1-rand(3) + 1.j*rand(3))
+                #psi_[(N-n)*M + 1:(N-n)*M + M/2 :2] = perAmp*0.5*(rand(M/4) + 1.j*rand(M/4))
+
+                ##------------- PERTURBATIONS WHICH SATISFY BCS -------------------
+                rSpace = zeros(M, dtype='complex')
+                y = 2.0*arange(M)/(M-1.0) -1.0
+                ## exponentially decaying sinusoid
+                #rSpace = cos(1.0 * 2.0*pi * y) * exp(-(sigma*pi*y)**2)#  * rn[0]
+                #rSpace += cos(2.0 * 2.0*pi * y) * exp(-(sigma*pi*y)**2) * rn[1]
+                #rSpace += cos(3.0 * 2.0*pi * y) * exp(-(sigma*pi*y)**2) * rn[2]
+                #rSpace += cos(4.0 * 2.0*pi * y) * exp(-(sigma*pi*y)**2) * rn[3]
+                #rSpace += cos(5.0 * 2.0*pi * y) * exp(-(sigma*pi*y)**2) * rn[4]
+
+                ## sinusoidal
+                rSpace = perAmp*cos(1.0 * 2.0*pi * y) * rn[n-1,0]
+                rSpace += perAmp*cos(2.0 * 2.0*pi * y) * rn[n-1,1]
+                rSpace += perAmp*cos(3.0 * 2.0*pi * y) * rn[n-1,2]
+
+                ## low order eigenfunction of biharmonic operator
+                #rSpace = (cos(pscale*y)/cos(pscale) - cosh(gam*y)/(cosh(gam))) * rn[0]
+
+                #savetxt('p{0}.dat'.format(n), vstack((y,real(rSpace))).T)
+
+                psi_[(N+n)*M:(N+n+1)*M] = stupid_transform(rSpace, CNSTS)*1.j
+
+
+            else:
+                ##------------- PURE RANDOM PERTURBATIONS -------------------
+                ## Make sure you satisfy the optimum symmetry for the
+                ## perturbation
+                #psi_[(N-n)*M:(N-n)*M + M/2 - 1 :2] = (10.0**(-n+1))*perAmp*0.5*(1-rand(M/4) + 1.j*rand(M/4))
+                #psi_[(N-n)*M:(N-n)*M + 6 - 1 :2] =\
+                #(10.0**((n+1)))*perAmp*0.5*(1-rand(3) + 1.j*rand(3))
+                #psi_[(N-n)*M:(N-n)*M + M/2 - 1 :2] = perAmp*0.5*(rand(M/4) + 1.j*rand(M/4))
+
+                ##------------- PERTURBATIONS WHICH SATISFY BCS -------------------
+                rSpace = zeros(M, dtype='complex')
+                y = 2.0*arange(M)/(M-1.0) -1.0
+                ## exponentially decaying sinusoid
+                #rSpace = sin(1.0 * 2.0*pi * y) * exp(-(sigma*pi*y)**2)#  * rn[0]
+                #rSpace += sin(2.0 * 2.0*pi * y) * exp(-(sigma*pi*y)**2) * rn[1]
+                #rSpace += sin(3.0 * 2.0*pi * y) * exp(-(sigma*pi*y)**2) * rn[2]
+                #rSpace += sin(4.0 * 2.0*pi * y) * exp(-(sigma*pi*y)**2) * rn[3]
+                #rSpace += sin(5.0 * 2.0*pi * y) * exp(-(sigma*pi*y)**2) * rn[4]
+
+                ## sinusoidal
+                rSpace =  perAmp*sin(1.0 * 2.0*pi * y) * rn[n-1,0]
+                rSpace += perAmp*sin(2.0 * 2.0*pi * y) * rn[n-1,1]
+                rSpace += perAmp*sin(3.0 * 2.0*pi * y) * rn[n-1,2]
+
+                ## low order eigenfunction of biharmonic operator
+                #rSpace = (sin(pscale * y)/(pscale*cos(pscale)) - sinh(gam*y)/(gam*cosh(gam))) * rn[0]
+
+                #savetxt('p{0}.dat'.format(n), vstack((y,real(rSpace))).T)
+
+                psi_[(N+n)*M:(N+n+1)*M] =stupid_transform(rSpace, CNSTS)
+
+            psi_[(N-n)*M:(N-n+1)*M] = conj(psi_[(N+n)*M:(N+n+1)*M])
+            del y
+
+
+        KERest = 0
+        KERest2 = 0
+        for i in range(1,N+1):
+            u = dot(SMDY, psi_[(N+i)*M: (N+i+1)*M])
+            KE = 0
+            for n in range(0,M,2):
+                usq = 0
+                for m in range(n-M+1, M):
+
+                    p = abs(n-m)
+                    if (p==0):
+                        tmp = 2.0*u[p]
+                    else:
+                        tmp = u[p]
+
+                    if (abs(m)==0):
+                        tmp *= 2.0*conj(u[abs(m)])
+                    else:
+                        tmp *= conj(u[abs(m)])
+
+                    if (n==0):
+                        usq += 0.25*tmp
+                    else:
+                        usq += 0.5*tmp
+
+                KE += (2. / (1.-n*n)) * usq;
+
+            KERest += (15.0/8.0) * KE 
+            u = dot(cheb_prod_mat(u), conj(u))
+            KERest2 += (15.0/8.0) * dot(INTY, u) 
+
+        # Want KERest = 0.3
+        # perAmp^2 ~ 0.3/KERest
+        if j==0:
+            perAmp = real(sqrt(perKEestimate/KERest))
+            print 'perAmp = ', perAmp
+
+
+    print 'Initial Energy of the perturbation, ', KERest
+
+    # KE_tot = KE_0 + KE_Rest
+    # KE_0 = KE_tot - KE_Rest
+    # scale_fac^2 = 0.5*(KE_tot-KERest)
+    # scale_fac^2 = 0.5*(1/2-KERest) 
+
+    energy_rescale = sqrt((totEnergy - real(KERest)))
+    psi_[N*M:(N+1)*M] = energy_rescale*psi_[N*M:(N+1)*M]
+    u = dot(SMDY, psi_[N*M: (N+1)*M])
+    u = dot(cheb_prod_mat(u), u)
+    KE0 = 0.5*(15./8.)*dot(INTY, u)
+    print 'Rescaled zeroth KE = ', KE0
+    print 'total KE = ', KE0 + KERest2
+
+    return psi_
+
+def x_independent_profile(PSI):
+    """
+     I think these are the equations for the x independent stresses from the base
+     profile.
+    """
+
+    Cyy = zeros(vecLen, dtype='complex')
+    Cyy[N*M] += 1.0
+    Cxy = zeros(vecLen, dtype='complex')
+    Cxy[N*M:(N+1)*M] = Wi*dot(SMDYY, PSI[N*M:(N+1)*M])
+    Cxx = zeros(vecLen, dtype='complex')
+    Cxx = 2*Wi*Wi*Cxy*Cxy
+    Cxx[N*M] += 1.0
+
+    return (Cxx, Cxy, Cyy)
+
+def cheb_prod_mat(velA):
+    """Function to return a matrix for left-multiplying two Chebychev vectors"""
+
+    D = zeros((M, M), dtype='complex')
+
+    for n in range(M):
+        for m in range(-M+1,M):     # Bottom of range is inclusive
+            itr = abs(n-m)
+            if (itr < M):
+                D[n, abs(m)] += 0.5*oneOverC[n]*CFunc[itr]*CFunc[abs(m)]*velA[itr]
+    del m, n, itr
+    return D
+
+
 # -----------------------------------------------------------------------------
 # MAIN
 # -----------------------------------------------------------------------------
@@ -253,6 +469,8 @@ vecLen = (2*N+1)*M
 oneOverRe = 1. / Re
 assert oneOverRe != infty, "Can't set Reynold's to zero!"
 
+CFunc = ones(M)
+CFunc[0] = 2.0
 # Set the oneOverC function: 1/2 for m=0, 1 elsewhere:
 oneOverC = ones(M)
 oneOverC[0] = 1. / 2.
@@ -287,57 +505,28 @@ Cxy = zeros((2*N+1)*M,dtype='complex')
 
 
 # Read in stream function from file
-#(PSI, Cxx, Cyy, Cxy, Nu) = pickle.load(open(inFileName,'r'))
+(PSI, Cxx, Cyy, Cxy, Nu) = pickle.load(open(inFileName,'r'))
+PSI = decide_resolution(PSI, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+Cxx = decide_resolution(Cxx, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+Cyy = decide_resolution(Cyy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+Cxy = decide_resolution(Cxy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
 
 # --------------- POISEUILLE -----------------
 
-PSI[N*M]   += 2.0/3.0
-PSI[N*M+1] += 3.0/4.0
-PSI[N*M+2] += 0.0
-PSI[N*M+3] += -1.0/12.0
-
-perAmp = 1e-2
-
-for n in range(1,N+1):
-    if (n % 2) == 0:
-        PSI[(N-n)*M + 1:(N-n)*M + M/2 :2] += (0.1**(n-1))*perAmp*(rand(M/4) + 1.j*rand(M/4))
-        Cxx[(N-n)*M + 1:(N-n)*M + M/2 :2] += (0.1**(n-1))*perAmp*(rand(M/4) + 1.j*rand(M/4))
-        Cyy[(N-n)*M + 1:(N-n)*M + M/2 :2] += (0.1**(n-1))*perAmp*(rand(M/4) + 1.j*rand(M/4))
-        Cxy[(N-n)*M + 1:(N-n)*M + M/2 :2] += (0.1**(n-1))*perAmp*(rand(M/4) + 1.j*rand(M/4))
-    else:
-        PSI[(N-n)*M:(N-n)*M + M/2 - 1 :2] += (0.1**(n-1))*perAmp*(rand(M/4) + 1.j*rand(M/4))
-        Cxx[(N-n)*M:(N-n)*M + M/2 - 1 :2] += (0.1**(n-1))*perAmp*(rand(M/4) + 1.j*rand(M/4))
-        Cyy[(N-n)*M:(N-n)*M + M/2 - 1 :2] += (0.1**(n-1))*perAmp*(rand(M/4) + 1.j*rand(M/4))
-        Cxy[(N-n)*M:(N-n)*M + M/2 - 1 :2] += (0.1**(n-1))*perAmp*(rand(M/4) + 1.j*rand(M/4))
-
-    PSI[(N+n)*M:(N+n+1)*M] = conj(PSI[(N-n)*M:(N-n+1)*M])
-    Cxx[(N+n)*M:(N+n+1)*M] = conj(Cxx[(N-n)*M:(N-n+1)*M])
-    Cyy[(N+n)*M:(N+n+1)*M] = conj(Cyy[(N-n)*M:(N-n+1)*M])
-    Cxy[(N+n)*M:(N+n+1)*M] = conj(Cxy[(N-n)*M:(N-n+1)*M])
- 
-
-#print 'performing linear stability of Poiseuille flow test'
-
 #PSI[N*M]   += 2.0/3.0
 #PSI[N*M+1] += 3.0/4.0
+#PSI[N*M+2] += 0.0
 #PSI[N*M+3] += -1.0/12.0
 
-#PSI[N*M+1: (N+1)*M - M/2 :2] += perAmp*rand(M/4) 
+#Cxx, Cyy, Cxy = x_independent_profile(PSI)
 
-#PSI[(N-1)*M + 4] += 1e-2 - 1e-2j
-#PSI[(N-1)*M + 6] += 1e-3 - 1e-3j
-#PSI[(N-1)*M + 8] += 1e-4 - 1e-4j
-#PSI[(N-1)*M + 10] += 1e-4 - 1e-4j
-#
-#PSI[(N-2)*M + 3] += 1e-4 - 1e-4j
-#PSI[(N-2)*M + 5] += 1e-4 - 1e-4j
-#
 
-#PSI[(N-1)*M:N*M-M/2 -1:2] += perAmp*rand(M/4) - perAmp*1.j*rand(M/4)
-#PSI[(N-2)*M+1: (N-1)*M - M/2 :2] += 0.1*perAmp*rand(M/4) - 0.1*perAmp*1.j*rand(M/4)
+#perKEestimate = 0.25
+#totEnergy = 0.7
+#sigma = 0.1
+#gam = 2
 
-#PSI[(N+1)*M:(N+2)*M] = conj(PSI[(N-1)*M:N*M])
-#PSI[(N+2)*M:(N+3)*M] = conj(PSI[(N-2)*M:(N-1)*M])
+#PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
 
 forcing = zeros((M,2*N+1), dtype='complex')
 forcing[0,0] = 2.0/Re
