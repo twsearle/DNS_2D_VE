@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 23 Mar 12:52:32 2015
+// Last modified: Fri  3 Apr 10:37:02 2015
 
 #include"fields_2D.h"
 
@@ -169,6 +169,109 @@ void save_hdf5_state(char *filename, fftw_complex *arr, flow_params cnsts)
     status = H5Fclose(file_id);
 
 }
+void save_hdf5_state_visco(hid_t *file_id, hid_t *filetype_id, hid_t *datatype_id,
+	complex *psi, complex *cxx, complex *cyy, complex *cxy, flow_params cnsts)
+{
+    int N = cnsts.N;
+    int M = cnsts.M;
+    int i, j;
+    char group_name[30];
+
+    hid_t  dataset_id, dataspace_id, group_id;
+    herr_t status;
+    complex_hdf *wdata;
+
+    hsize_t arr_size[1];
+    arr_size[0] = (N+1)*M;
+
+    wdata = (complex_hdf *) malloc (arr_size[0] * sizeof (complex_hdf));
+
+    // create the dataspace
+    dataspace_id = H5Screate_simple(1, arr_size, NULL);
+
+    // create the dataset
+    dataset_id = H5Dcreate(*file_id, "psi", *filetype_id, dataspace_id, H5P_DEFAULT,
+			  H5P_DEFAULT, H5P_DEFAULT);
+
+    // set up the data for writing
+    for (i=0; i<N+1; i++)
+    {
+	for (j=0; j<M; j++)
+	{
+	    wdata[M*i + j].r = creal(psi[M*i + j]);
+	    wdata[M*i + j].i = cimag(psi[M*i + j]);
+	}
+    }
+    
+    // write the file 
+    status = H5Dwrite(dataset_id, *datatype_id, H5S_ALL, H5S_ALL, 
+		      H5P_DEFAULT, wdata); 
+    status = H5Dclose(dataset_id);
+
+    // create the dataset
+    dataset_id = H5Dcreate(*file_id, "cxx", *filetype_id, dataspace_id, H5P_DEFAULT,
+			  H5P_DEFAULT, H5P_DEFAULT);
+
+    // set up the data for writing
+    for (i=0; i<N+1; i++)
+    {
+	for (j=0; j<M; j++)
+	{
+	    wdata[M*i + j].r = creal(cxx[M*i + j]);
+	    wdata[M*i + j].i = cimag(cxx[M*i + j]);
+	}
+    }
+    
+    // write the file 
+    status = H5Dwrite(dataset_id, *datatype_id, H5S_ALL, H5S_ALL, 
+		      H5P_DEFAULT, wdata); 
+    status = H5Dclose(dataset_id);
+
+    // create the dataset
+    dataset_id = H5Dcreate(*file_id, "cyy", *filetype_id, dataspace_id, H5P_DEFAULT,
+			  H5P_DEFAULT, H5P_DEFAULT);
+
+    // set up the data for writing
+    for (i=0; i<N+1; i++)
+    {
+	for (j=0; j<M; j++)
+	{
+	    wdata[M*i + j].r = creal(cyy[M*i + j]);
+	    wdata[M*i + j].i = cimag(cyy[M*i + j]);
+	}
+    }
+    
+    // write the file 
+    status = H5Dwrite(dataset_id, *datatype_id, H5S_ALL, H5S_ALL, 
+		      H5P_DEFAULT, wdata); 
+    status = H5Dclose(dataset_id);
+
+    // create the dataset
+    dataset_id = H5Dcreate(*file_id, "cxy", *filetype_id, dataspace_id, H5P_DEFAULT,
+			  H5P_DEFAULT, H5P_DEFAULT);
+
+    // set up the data for writing
+    for (i=0; i<N+1; i++)
+    {
+	for (j=0; j<M; j++)
+	{
+	    wdata[M*i + j].r = creal(cxy[M*i + j]);
+	    wdata[M*i + j].i = cimag(cxy[M*i + j]);
+	}
+    }
+    
+    // write the file 
+    status = H5Dwrite(dataset_id, *datatype_id, H5S_ALL, H5S_ALL, 
+		      H5P_DEFAULT, wdata); 
+    status = H5Dclose(dataset_id);
+
+    // clean up 
+    status = H5Sclose(dataspace_id);
+    status = H5Gclose(group_id);
+    free(wdata);
+
+}
+
 
 void save_hdf5_snapshot(hid_t *file_id, hid_t *filetype_id, hid_t *datatype_id,
 	fftw_complex *arr, double time, flow_params cnsts)
@@ -189,7 +292,6 @@ void save_hdf5_snapshot(hid_t *file_id, hid_t *filetype_id, hid_t *datatype_id,
     dataspace_id = H5Screate_simple(1, arr_size, NULL);
 
     // create the dataset
-    // TODO: look into how to use nested datasets.
     sprintf(dataset_name, "/t%f", time);
 
     dataset_id = H5Dcreate(*file_id, dataset_name, *filetype_id, dataspace_id, H5P_DEFAULT,

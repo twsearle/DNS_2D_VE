@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Mon 30 Mar 11:48:17 2015
+#   Last modified: Sun  5 Apr 01:22:39 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -89,8 +89,8 @@ numTimeSteps = int(totTime / dt)
 assert (totTime / dt) - float(numTimeSteps) == 0, "Non-integer number of timesteps"
 assert Wi != 0.0, "cannot have Wi = 0!"
 
-NOld = 10
-MOld = 90
+NOld = 13
+MOld = 100
 kwargs = {'NOld': NOld, 'MOld': MOld, 'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0,
           'Re': Re, 'Wi': Wi, 'beta': beta, 'kx': kx,'time': totTime, 'dt':dt,
           'dealiasing':dealiasing}
@@ -505,11 +505,52 @@ Cxy = zeros((2*N+1)*M,dtype='complex')
 
 
 # Read in stream function from file
-(PSI, Cxx, Cyy, Cxy, Nu) = pickle.load(open(inFileName,'r'))
-PSI = decide_resolution(PSI, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
-Cxx = decide_resolution(Cxx, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
-Cyy = decide_resolution(Cyy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
-Cxy = decide_resolution(Cxy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+#(PSI, Cxx, Cyy, Cxy, Nu) = pickle.load(open(inFileName,'r'))
+#PSI = decide_resolution(PSI, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+#Cxx = decide_resolution(Cxx, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+#Cyy = decide_resolution(Cyy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+#Cxy = decide_resolution(Cxy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+
+f = h5py.File("final.h5","r")
+
+PSI = array(f["psi"])
+Cxx = array(f["cxx"])
+Cyy = array(f["cyy"])
+Cxy = array(f["cxy"])
+
+f.close()
+
+tmp = PSI.reshape((N+1, M)).T
+PSI = zeros((M, 2*N+1), dtype='complex')
+PSI[:, :N+1] = tmp
+for n in range(1, N+1):
+    PSI[:, 2*N+1 - n] = conj(PSI[:, n])
+PSI = fftshift(PSI, axes=1)
+PSI = PSI.T.flatten()
+
+tmp = Cxx.reshape((N+1, M)).T
+Cxx = zeros((M, 2*N+1), dtype='complex')
+Cxx[:, :N+1] = tmp
+for n in range(1, N+1):
+    Cxx[:, 2*N+1 - n] = conj(Cxx[:, n])
+Cxx = fftshift(Cxx, axes=1)
+Cxx = Cxx.T.flatten()
+
+tmp = Cyy.reshape((N+1, M)).T
+Cyy = zeros((M, 2*N+1), dtype='complex')
+Cyy[:, :N+1] = tmp
+for n in range(1, N+1):
+    Cyy[:, 2*N+1 - n] = conj(Cyy[:, n])
+Cyy = fftshift(Cyy, axes=1)
+Cyy = Cyy.T.flatten()
+
+tmp = Cxy.reshape((N+1, M)).T
+Cxy = zeros((M, 2*N+1), dtype='complex')
+Cxy[:, :N+1] = tmp
+for n in range(1, N+1):
+    Cxy[:, 2*N+1 - n] = conj(Cxy[:, n])
+Cxy = fftshift(Cxy, axes=1)
+Cxy = Cxy.T.flatten()
 
 # --------------- POISEUILLE -----------------
 
