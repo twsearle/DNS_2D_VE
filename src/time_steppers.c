@@ -7,11 +7,13 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 15 Apr 15:41:39 2015
+// Last modified: Mon 20 Apr 17:40:26 2015
 
 #include"fields_2D.h"
 
 // Functions
+
+
 void step_sf_SI_Crank_Nicolson(
 	complex *psi, complex *psi2, double dt, int timeStep, complex
 	*forcing, double oneOverRe, flow_params params, complex *scratch,
@@ -891,3 +893,118 @@ void stress_time_derivative(
 	}
     }
 }
+
+void equilibriate_stress(
+	complex *psi, complex *psi2, complex *psi_lam, complex *cij, complex
+	*cijNL, double dt, flow_params params, complex *scratch,
+	complex *scratch2, complex *u, complex *v, complex *lplpsi, complex
+	*biharmpsi, complex *d2ypsi, complex *dyyypsi, complex *d4ypsi, complex
+	*d2xd2ypsi, complex *d4xpsi, complex *udxlplpsi, complex *vdylplpsi,
+	complex * cyydyu, complex *dxu, complex *dyu, complex * dxv, complex *
+	dyv, complex *cxxdxu, complex *cxydyu, complex *vgradcxx, complex
+	*cxydxv, complex *cyydyv, complex *vgradcyy, complex * cxxdxv, complex
+	* vgradcxy, complex *vdyypsi, complex *d2ycxy, complex *d2xcxy, complex
+	*dxycyy_cxx, complex *dycxy, complex *d2ycxyNL, complex *d2xcxyNL,
+	complex *dxycyy_cxxNL, complex *dycxyNL, complex *RHSvec, complex
+	*opsList, fftw_plan *phys_plan, fftw_plan *spec_plan, complex
+	*scratchin, complex *scratchout, double *scratchp1, double *scratchp2,
+	hid_t *file_id, hid_t *filetype_id, hid_t *datatype_id
+	)
+
+{
+    int i;
+    int N = params.N;
+    int M = params.M;
+    double Wi = params.Wi;
+    double time = 0;
+    int timeStep, numSteps;
+    double KE0 = 1.0;
+    double KE1 = 0.0;
+    double KE2 = 0.0;
+    double KE_tot = 0.0;
+    double KE_xdepend = 0.0;
+
+
+    // Time step for approximately 2 the elastic timescale, 2*Wi.
+    // Do homotopy between laminar flow and the initial streamfunction.
+    // Update the stress according to the velocity at each timestep, but update
+    // the streamfunction according to the homotopy 
+    // psi = 0.5*(1+cos((Pi/2Wi) * time)) * psi_lam + 
+    //	     0.5*(1-cos((Pi/2Wi) * time)) * psi  
+
+    FILE *tracefp = fopen("trace_ramp.dat", "w");
+
+    // setup temporary psi to perform the homotopy from the laminar flow to the
+    // initial state.
+
+    complex *psi_tmp = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+
+    numSteps = 2.0*Wi/dt;
+
+    for (timeStep = 0; timeStep<numSteps; timeStep++)
+    {
+	// set the velocity via the homotopy
+
+	time = timeStep * dt;
+	for (i=0; i<M*(N+1); i++)
+	{
+	    psi_tmp[i] = 0.5*(1.-cos(time * M_PI/(2.0*Wi))) * psi[i];
+	    psi_tmp[i] += 0.5*(1.+cos(time * M_PI/(2.0*Wi))) * psi_lam[i];
+	}
+
+	// step the stress to t star
+
+	step_conformation_Crank_Nicolson(
+		psi_tmp, cijNL, cij, 0.5*dt, params, u, v, dxu, dyu, dxv, dyv,
+		cxxdxu, cxydyu, vgradcxx, cxydxv, cyydyv, vgradcyy, cxxdxv, cyydyu,
+		vgradcxy, scratch, scratch2, phys_plan, 
+		spec_plan, scratchin, scratchout, scratchp1, scratchp2 
+		);
+
+	// assume psi star = psi_tmp
+	// TODO: Account for a time dependent forcing, psi star will be different
+
+	// step the stress to t + h
+
+	step_conformation_Crank_Nicolson(
+		psi_tmp, cij, cijNL, dt, params, u, v, dxu, dyu, dxv, dyv,
+		cxxdxu, cxydyu, vgradcxx, cxydxv, cyydyv, vgradcyy, cxxdxv, cyydyu,
+		vgradcxy, scratch, scratch2, phys_plan, 
+		spec_plan, scratchin, scratchout, scratchp1, scratchp2 
+		);
+
+#ifdef MYDEBUG
+	// output some trajectories to check everything is going ok! 
+	if ((timeStep % (numSteps / 100)) == 0 )
+	{
+	    KE0 = calc_KE_mode(&cij[0], &cij[1*M*(N+1)], 0, params);
+	    KE1 = calc_KE_mode(&cij[0], &cij[1*M*(N+1)], 1, params);
+	    KE2 = calc_KE_mode(&cij[0], &cij[1*M*(N+1)], 2, params);
+	    KE_xdepend = KE1 + KE2; 
+	    for (i=3; i<N+1; i++)
+	    {
+		KE_xdepend += calc_KE_mode(&cij[0], &cij[1*M*(N+1)], i, params);
+	    }
+
+	    KE_tot = KE0 + KE_xdepend;
+
+	    save_hdf5_snapshot_visco(file_id, filetype_id, datatype_id,
+		    psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], time, params);
+
+	    fprintf(tracefp, "%e\t%e\t%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1, KE2, KE_xdepend);
+
+            printf("%e\t%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1, KE2);
+
+	    fflush(tracefp);
+	    H5Fflush(*file_id, H5F_SCOPE_GLOBAL);
+	}
+#endif
+
+    }
+
+    fclose(tracefp);
+    free(psi_tmp);
+}
+
+
+

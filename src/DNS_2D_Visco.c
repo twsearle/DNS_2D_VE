@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri  3 Apr 10:47:04 2015
+// Last modified: Mon 20 Apr 19:10:14 2015
 
 /* Program Description:
  *
@@ -200,7 +200,7 @@ int main(int argc, char **argv)
     // field arrays are declared as pointers and then I malloc.
     complex *scratch, *scratch2, *scratch3, *scratch4, *scratch5, *tmpop;
     complex *u, *v, *udxlplpsi, *vdylplpsi, *biharmpsi, *lplpsi;
-    complex *psi, *psiNL, *dyyypsi, *dypsi, *vdyypsi;
+    complex *psi, *psiNL, *psi_lam, *dyyypsi, *dypsi, *vdyypsi;
     complex *d2ypsi, *d4ypsi, *d4xpsi, *d2xd2ypsi;
     complex *dxu, *dyu, *dxv, *dyv;
     complex *d2ycxy, *d2xcxy, *dxycyy_cxx, *dycxy;
@@ -241,6 +241,7 @@ int main(int argc, char **argv)
 
     psi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     psiNL = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    psi_lam = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     forcing = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     forcing2 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     u = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
@@ -307,6 +308,7 @@ int main(int argc, char **argv)
     // load_hdf5_state("initial_cxy.h5", cxy, params);
     load_hdf5_state_visco("initial_visco.h5", psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], params);
     load_hdf5_state("forcing.h5", forcing, params);
+    load_hdf5_state("laminar.h5", psi_lam, params);
 
     for (i=0; i<(N+1)*M; i++)
     {
@@ -363,188 +365,202 @@ int main(int argc, char **argv)
     save_hdf5_state("./output/forcing.h5", &forcing[0], params);
     #endif
     
+    // set the test.
+    printf("\n------\nperforming the stress equilibration\n------\n");
+    printf("\nTime\t\tIntegrated square of polymer length");
+
+equilibriate_stress(
+	psi, psiNL, psi_lam, cij, cijNL, dt, params, scratch, scratch2, u, v,
+	lplpsi, biharmpsi, d2ypsi, dyyypsi, d4ypsi, d2xd2ypsi, d4xpsi,
+	udxlplpsi, vdylplpsi, cyydyu, dxu, dyu, dxv, dyv, cxxdxu, cxydyu,
+	vgradcxx, cxydxv, cyydyv, vgradcyy, cxxdxv, vgradcxy, vdyypsi, d2ycxy,
+	d2xcxy, dxycyy_cxx, dycxy, d2ycxyNL, d2xcxyNL, dxycyy_cxxNL, dycxyNL,
+	RHSvec, opsList, &phys_plan, &spec_plan, scratchin, scratchout,
+	scratchp1, scratchp2, &hdf5fp, &filetype_id, &datatype_id
+	);
+
     // perform the time iteration
     printf("\n------\nperforming the time iteration\n------\n");
     printf("\nTime\t\tKE_tot\t\t KE0\t\t KE1\t\t KE2\n");
 
-    for (timeStep=0; timeStep<=numTimeSteps; timeStep++)
+    for (timeStep=1; timeStep<=numTimeSteps; timeStep++)
     {
 
-	
-	#ifdef MYDEBUG
-	if (timeStep==0)
-	{
-	    d2x(psi, scratch, params);
-	    save_hdf5_state("./output/d2xpsi.h5", &scratch[0], params);
-	    save_hdf5_state("./output/psi.h5", &psi[0], params);
-	}
-	#endif
-	// Step the stresses using 2nd order pc CN method
+        
+        #ifdef MYDEBUG
+        if (timeStep==0)
+        {
+            d2x(psi, scratch, params);
+            save_hdf5_state("./output/d2xpsi.h5", &scratch[0], params);
+            save_hdf5_state("./output/psi.h5", &psi[0], params);
+        }
+        #endif
+        // Step the stresses using 2nd order pc CN method
 
-	// make the half step for the prediction of C and PSI for NL terms
-	// C calculation has only NL terms in psi
+        // make the half step for the prediction of C and PSI for NL terms
+        // C calculation has only NL terms in psi
 
-	for (i=0; i<3*(N+1)*M; i++)
-	{
-	    cijNL[i] = cij[i];
-	}
-	for (i=0; i<(N+1)*M; i++)
-	{
-	    psiNL[i] = psi[i];
-	}
+        for (i=0; i<3*(N+1)*M; i++)
+        {
+            cijNL[i] = cij[i];
+        }
+        for (i=0; i<(N+1)*M; i++)
+        {
+            psiNL[i] = psi[i];
+        }
 
-	step_conformation_Crank_Nicolson(
-	psi, cijNL, cij, 0.5*dt, params, u, v, dxu, dyu, dxv, dyv,
-	cxxdxu, cxydyu, vgradcxx, cxydxv, cyydyv, vgradcyy, cxxdxv, cyydyu,
-	vgradcxy, scratch, scratch2, &phys_plan, 
-	&spec_plan, scratchin, scratchout, scratchp1, scratchp2 
-	);
-	
-	step_sf_SI_Crank_Nicolson_visco(
-	psiNL, psi, cij, cijNL, forcing, forcing2, 0.5*dt, 
-	timeStep, params, scratch, scratch2, u, v, lplpsi,
-	biharmpsi, d2ypsi, dyyypsi, d4ypsi, d2xd2ypsi, d4xpsi, 
-	udxlplpsi, vdylplpsi, vdyypsi, d2ycxy, d2xcxy, dxycyy_cxx, dycxy,
-	d2ycxyNL, d2xcxyNL, dxycyy_cxxNL, dycxyNL, RHSvec, hopsList,
-	&phys_plan, &spec_plan, scratchin, scratchout,
-	scratchp1, scratchp2 );
+        step_conformation_Crank_Nicolson(
+        psi, cijNL, cij, 0.5*dt, params, u, v, dxu, dyu, dxv, dyv,
+        cxxdxu, cxydyu, vgradcxx, cxydxv, cyydyv, vgradcyy, cxxdxv, cyydyu,
+        vgradcxy, scratch, scratch2, &phys_plan, 
+        &spec_plan, scratchin, scratchout, scratchp1, scratchp2 
+        );
+        
+        step_sf_SI_Crank_Nicolson_visco(
+        psiNL, psi, cij, cijNL, forcing, forcing2, 0.5*dt, 
+        timeStep, params, scratch, scratch2, u, v, lplpsi,
+        biharmpsi, d2ypsi, dyyypsi, d4ypsi, d2xd2ypsi, d4xpsi, 
+        udxlplpsi, vdylplpsi, vdyypsi, d2ycxy, d2xcxy, dxycyy_cxx, dycxy,
+        d2ycxyNL, d2xcxyNL, dxycyy_cxxNL, dycxyNL, RHSvec, hopsList,
+        &phys_plan, &spec_plan, scratchin, scratchout,
+        scratchp1, scratchp2 );
 
-	// use the old values plus the values on the half step for the NL terms
-	step_conformation_Crank_Nicolson(
-	psiNL, cij, cijNL, dt, params, u, v, dxu, dyu, dxv, dyv,
-	cxxdxu, cxydyu, vgradcxx, cxydxv, cyydyv, vgradcyy, cxxdxv, cyydyu,
-	vgradcxy, scratch, scratch2, &phys_plan, 
-	&spec_plan, scratchin, scratchout, scratchp1, scratchp2 
-	);
+        // use the old values plus the values on the half step for the NL terms
+        step_conformation_Crank_Nicolson(
+        psiNL, cij, cijNL, dt, params, u, v, dxu, dyu, dxv, dyv,
+        cxxdxu, cxydyu, vgradcxx, cxydxv, cyydyv, vgradcyy, cxxdxv, cyydyu,
+        vgradcxy, scratch, scratch2, &phys_plan, 
+        &spec_plan, scratchin, scratchout, scratchp1, scratchp2 
+        );
 
-	step_sf_SI_Crank_Nicolson_visco(
-	psi, psiNL, cij, cijNL, forcing, forcing2, dt, 
-	timeStep, params, scratch, scratch2, u, v, lplpsi,
-	biharmpsi, d2ypsi, dyyypsi, d4ypsi, d2xd2ypsi, d4xpsi, 
-	udxlplpsi, vdylplpsi, vdyypsi, d2ycxy, d2xcxy, dxycyy_cxx, dycxy,
-	d2ycxyNL, d2xcxyNL, dxycyy_cxxNL, dycxyNL, RHSvec, opsList,
-	&phys_plan, &spec_plan, scratchin, scratchout,
-	scratchp1, scratchp2 );
+        step_sf_SI_Crank_Nicolson_visco(
+        psi, psiNL, cij, cijNL, forcing, forcing2, dt, 
+        timeStep, params, scratch, scratch2, u, v, lplpsi,
+        biharmpsi, d2ypsi, dyyypsi, d4ypsi, d2xd2ypsi, d4xpsi, 
+        udxlplpsi, vdylplpsi, vdyypsi, d2ycxy, d2xcxy, dxycyy_cxx, dycxy,
+        d2ycxyNL, d2xcxyNL, dxycyy_cxxNL, dycxyNL, RHSvec, opsList,
+        &phys_plan, &spec_plan, scratchin, scratchout,
+        scratchp1, scratchp2 );
 
-	#ifdef MYDEBUG
-	if (timeStep==0)
-	{
+        #ifdef MYDEBUG
+        if (timeStep==0)
+        {
 
-	    save_hdf5_state("./output/u.h5",  &u[0], params);
-	    save_hdf5_state("./output/v.h5", &v[0], params);
-	    save_hdf5_state("./output/lplpsi.h5", &lplpsi[0], params);
-	    save_hdf5_state("./output/d2ypsi.h5", &d2ypsi[0], params);
-	    save_hdf5_state("./output/d3ypsi.h5", &dyyypsi[0], params);
-	    save_hdf5_state("./output/d4ypsi.h5", &d4ypsi[0], params);
-	    save_hdf5_state("./output/d2xd2ypsi.h5", &d2xd2ypsi[0], params);
-	    save_hdf5_state("./output/d4xpsi.h5", &d4xpsi[0], params);
-	    save_hdf5_state("./output/biharmpsi.h5", &biharmpsi[0], params);
-	    save_hdf5_state("./output/udxlplpsi.h5", &udxlplpsi[0], params);
-	    save_hdf5_state("./output/vdylplpsi.h5", &vdylplpsi[0], params);
-	    save_hdf5_state("./output/vdyypsi.h5", &vdyypsi[0], params);
+            save_hdf5_state("./output/u.h5",  &u[0], params);
+            save_hdf5_state("./output/v.h5", &v[0], params);
+            save_hdf5_state("./output/lplpsi.h5", &lplpsi[0], params);
+            save_hdf5_state("./output/d2ypsi.h5", &d2ypsi[0], params);
+            save_hdf5_state("./output/d3ypsi.h5", &dyyypsi[0], params);
+            save_hdf5_state("./output/d4ypsi.h5", &d4ypsi[0], params);
+            save_hdf5_state("./output/d2xd2ypsi.h5", &d2xd2ypsi[0], params);
+            save_hdf5_state("./output/d4xpsi.h5", &d4xpsi[0], params);
+            save_hdf5_state("./output/biharmpsi.h5", &biharmpsi[0], params);
+            save_hdf5_state("./output/udxlplpsi.h5", &udxlplpsi[0], params);
+            save_hdf5_state("./output/vdylplpsi.h5", &vdylplpsi[0], params);
+            save_hdf5_state("./output/vdyypsi.h5", &vdyypsi[0], params);
 
-	    save_hdf5_state("./output/d2xcxy.h5", &d2xcxy[0], params);
-	    save_hdf5_state("./output/d2ycxy.h5", &d2ycxy[0], params);
-	    save_hdf5_state("./output/dxycyy_cxx.h5", &dxycyy_cxx[0], params);
-	    save_hdf5_state("./output/dycxy.h5", &dycxy[0], params);
-	}
-	#endif
-
-	
-	#ifdef MYDEBUG
-	if(timeStep==0)
-	{
-	    save_hdf5_state("./output/cxx.h5", &cij[0], params);
-	    save_hdf5_state("./output/cyy.h5", &cij[(N+1)*M], params);
-	    save_hdf5_state("./output/cxy.h5", &cij[2*(N+1)*M], params);
-
-	    save_hdf5_state("./output/dxu.h5", &dxu[0], params);
-	    save_hdf5_state("./output/dyu.h5", &dyu[0], params);
-	    save_hdf5_state("./output/dxv.h5", &dxv[0], params);
-	    save_hdf5_state("./output/dyv.h5", &dyv[0], params);
-
-	    save_hdf5_state("./output/cxxdxu.h5", &cxxdxu[0], params);
-	    save_hdf5_state("./output/cxydyu.h5", &cxydyu[0], params);
-	    save_hdf5_state("./output/cxydxv.h5", &cxydxv[0], params);
-	    save_hdf5_state("./output/cyydyv.h5", &cyydyv[0], params);
-	    save_hdf5_state("./output/cxxdxv.h5", &cxxdxv[0], params);
-	    save_hdf5_state("./output/cyydyu.h5", &cyydyu[0], params);
-
-	    save_hdf5_state("./output/vgradcxx.h5", &vgradcxx[0], params);
-	    save_hdf5_state("./output/vgradcyy.h5", &vgradcyy[0], params);
-	    save_hdf5_state("./output/vgradcxy.h5", &vgradcxy[0], params);
-
-	}
+            save_hdf5_state("./output/d2xcxy.h5", &d2xcxy[0], params);
+            save_hdf5_state("./output/d2ycxy.h5", &d2ycxy[0], params);
+            save_hdf5_state("./output/dxycyy_cxx.h5", &dxycyy_cxx[0], params);
+            save_hdf5_state("./output/dycxy.h5", &dycxy[0], params);
+        }
         #endif
 
-	#ifdef MYDEBUG
-	if (timeStep==0)
-	{
-	    save_hdf5_state("./output/cxx2.h5", &cij[0], params);
-	    save_hdf5_state("./output/cyy2.h5", &cij[(N+1)*M], params);
-	    save_hdf5_state("./output/cxy2.h5", &cij[2*(N+1)*M], params);
-	    save_hdf5_state("./output/psi2.h5", &psi[0], params);
-	}
-	#endif
+        
+        #ifdef MYDEBUG
+        if(timeStep==0)
+        {
+            save_hdf5_state("./output/cxx.h5", &cij[0], params);
+            save_hdf5_state("./output/cyy.h5", &cij[(N+1)*M], params);
+            save_hdf5_state("./output/cxy.h5", &cij[2*(N+1)*M], params);
+
+            save_hdf5_state("./output/dxu.h5", &dxu[0], params);
+            save_hdf5_state("./output/dyu.h5", &dyu[0], params);
+            save_hdf5_state("./output/dxv.h5", &dxv[0], params);
+            save_hdf5_state("./output/dyv.h5", &dyv[0], params);
+
+            save_hdf5_state("./output/cxxdxu.h5", &cxxdxu[0], params);
+            save_hdf5_state("./output/cxydyu.h5", &cxydyu[0], params);
+            save_hdf5_state("./output/cxydxv.h5", &cxydxv[0], params);
+            save_hdf5_state("./output/cyydyv.h5", &cyydyv[0], params);
+            save_hdf5_state("./output/cxxdxv.h5", &cxxdxv[0], params);
+            save_hdf5_state("./output/cyydyu.h5", &cyydyu[0], params);
+
+            save_hdf5_state("./output/vgradcxx.h5", &vgradcxx[0], params);
+            save_hdf5_state("./output/vgradcyy.h5", &vgradcyy[0], params);
+            save_hdf5_state("./output/vgradcxy.h5", &vgradcxy[0], params);
+
+        }
+        #endif
+
+        #ifdef MYDEBUG
+        if (timeStep==0)
+        {
+            save_hdf5_state("./output/cxx2.h5", &cij[0], params);
+            save_hdf5_state("./output/cyy2.h5", &cij[(N+1)*M], params);
+            save_hdf5_state("./output/cxy2.h5", &cij[2*(N+1)*M], params);
+            save_hdf5_state("./output/psi2.h5", &psi[0], params);
+        }
+        #endif
 
 
-	// output some information at every frame
-	if ((timeStep % stepsPerFrame) == 0 )
-	{
-	    time = timeStep*dt;
+        // output some information at every frame
+        if ((timeStep % stepsPerFrame) == 0 )
+        {
+            time = timeStep*dt;
 
-	    double normU1 = 0;
-	    double normU2 = 0;
-	    double normU0 = 0;
+            double normU1 = 0;
+            double normU2 = 0;
+            double normU0 = 0;
 
-	    for (i=0; i<N+1; i++)
-	    {
-		for (j=0; j<M; j++)
-		{
-		    scratch[ind(i,j)] = u[ind(i,j)];
-		}
-	    }
-	    scratch[ind(0,0)] -= 0.5;
-	    scratch[ind(0,2)] += 0.5;
-	    fprintf(trace1mode, "%e\t%e\t%e\t%e\t%e\t%e\t%e\n", 
-		    time, creal(scratch[ind(0,3)]), cimag(scratch[ind(0,3)]),
-		     creal(scratch[ind(1,3)]), cimag(scratch[ind(1,3)]),
-		      creal(scratch[ind(2,3)]), cimag(scratch[ind(2,3)]));
+            for (i=0; i<N+1; i++)
+            {
+        	for (j=0; j<M; j++)
+        	{
+        	    scratch[ind(i,j)] = u[ind(i,j)];
+        	}
+            }
+            scratch[ind(0,0)] -= 0.5;
+            scratch[ind(0,2)] += 0.5;
+            fprintf(trace1mode, "%e\t%e\t%e\t%e\t%e\t%e\t%e\n", 
+        	    time, creal(scratch[ind(0,3)]), cimag(scratch[ind(0,3)]),
+        	     creal(scratch[ind(1,3)]), cimag(scratch[ind(1,3)]),
+        	      creal(scratch[ind(2,3)]), cimag(scratch[ind(2,3)]));
 
-	    for (j=M-1; j>=0; j=j-1)
-	    {
-		normU0 += creal(scratch[ind(0,j)]*scratch[ind(0,j)]); 
-		normU1 += creal(u[ind(1,j)]*conj(u[ind(1,j)])); 
-		normU2 += creal(u[ind(2,j)]*conj(u[ind(2,j)])); 
-	    }
-	    normU0 = normU0;//-(1./sqrt(2.));
-	    normU1 = normU1;
-	    normU2 = normU2;
+            for (j=M-1; j>=0; j=j-1)
+            {
+        	normU0 += creal(scratch[ind(0,j)]*scratch[ind(0,j)]); 
+        	normU1 += creal(u[ind(1,j)]*conj(u[ind(1,j)])); 
+        	normU2 += creal(u[ind(2,j)]*conj(u[ind(2,j)])); 
+            }
+            normU0 = normU0;//-(1./sqrt(2.));
+            normU1 = normU1;
+            normU2 = normU2;
 
-	    fprintf(traceU, "%e\t%e\t%e\t%e\t\n", time, normU0, normU1, normU2);
+            fprintf(traceU, "%e\t%e\t%e\t%e\t\n", time, normU0, normU1, normU2);
 
-	    KE0 = calc_KE_mode(u, v, 0, params) * (15.0/ 8.0);
-	    KE1 = calc_KE_mode(u, v, 1, params) * (15.0/ 8.0);
-	    KE2 = calc_KE_mode(u, v, 2, params) * (15.0/ 8.0);
-	    KE_xdepend = KE1 + KE2; 
-	    for (i=3; i<N+1; i++)
-	    {
-		KE_xdepend += calc_KE_mode(u, v, i, params) * (15.0/ 8.0);
-	    }
+            KE0 = calc_KE_mode(u, v, 0, params) * (15.0/ 8.0);
+            KE1 = calc_KE_mode(u, v, 1, params) * (15.0/ 8.0);
+            KE2 = calc_KE_mode(u, v, 2, params) * (15.0/ 8.0);
+            KE_xdepend = KE1 + KE2; 
+            for (i=3; i<N+1; i++)
+            {
+        	KE_xdepend += calc_KE_mode(u, v, i, params) * (15.0/ 8.0);
+            }
     
-	    KE_tot = KE0 + KE_xdepend;
+            KE_tot = KE0 + KE_xdepend;
 
-	    printf("%e\t%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1, KE2);
-	     save_hdf5_snapshot_visco(&hdf5fp, &filetype_id, &datatype_id,
-	 	    psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], time, params);
-	     
-	     fprintf(tracefp, "%e\t%e\t%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1, KE2, KE_xdepend);
-	     fflush(traceU);
-	     fflush(trace1mode);
-	     fflush(tracefp);
-	     H5Fflush(hdf5fp, H5F_SCOPE_GLOBAL);
+            printf("%e\t%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1, KE2);
+             save_hdf5_snapshot_visco(&hdf5fp, &filetype_id, &datatype_id,
+         	    psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], time, params);
+             
+             fprintf(tracefp, "%e\t%e\t%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1, KE2, KE_xdepend);
+             fflush(traceU);
+             fflush(trace1mode);
+             fflush(tracefp);
+             H5Fflush(hdf5fp, H5F_SCOPE_GLOBAL);
 
-	 }
+         }
     }
     
 
@@ -578,6 +594,7 @@ int main(int argc, char **argv)
     fftw_free(scratch5);
     fftw_free(psi);
     fftw_free(psiNL);
+    fftw_free(psi_lam);
     fftw_free(cij);
     fftw_free(cijNL);
     fftw_free(forcing);

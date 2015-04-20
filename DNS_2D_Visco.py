@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Sun  5 Apr 01:22:39 2015
+#   Last modified: Mon 20 Apr 17:35:04 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -511,63 +511,77 @@ Cxy = zeros((2*N+1)*M,dtype='complex')
 #Cyy = decide_resolution(Cyy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
 #Cxy = decide_resolution(Cxy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
 
-f = h5py.File("final.h5","r")
-
-PSI = array(f["psi"])
-Cxx = array(f["cxx"])
-Cyy = array(f["cyy"])
-Cxy = array(f["cxy"])
-
-f.close()
-
-tmp = PSI.reshape((N+1, M)).T
-PSI = zeros((M, 2*N+1), dtype='complex')
-PSI[:, :N+1] = tmp
-for n in range(1, N+1):
-    PSI[:, 2*N+1 - n] = conj(PSI[:, n])
-PSI = fftshift(PSI, axes=1)
-PSI = PSI.T.flatten()
-
-tmp = Cxx.reshape((N+1, M)).T
-Cxx = zeros((M, 2*N+1), dtype='complex')
-Cxx[:, :N+1] = tmp
-for n in range(1, N+1):
-    Cxx[:, 2*N+1 - n] = conj(Cxx[:, n])
-Cxx = fftshift(Cxx, axes=1)
-Cxx = Cxx.T.flatten()
-
-tmp = Cyy.reshape((N+1, M)).T
-Cyy = zeros((M, 2*N+1), dtype='complex')
-Cyy[:, :N+1] = tmp
-for n in range(1, N+1):
-    Cyy[:, 2*N+1 - n] = conj(Cyy[:, n])
-Cyy = fftshift(Cyy, axes=1)
-Cyy = Cyy.T.flatten()
-
-tmp = Cxy.reshape((N+1, M)).T
-Cxy = zeros((M, 2*N+1), dtype='complex')
-Cxy[:, :N+1] = tmp
-for n in range(1, N+1):
-    Cxy[:, 2*N+1 - n] = conj(Cxy[:, n])
-Cxy = fftshift(Cxy, axes=1)
-Cxy = Cxy.T.flatten()
+#f = h5py.File("final.h5","r")
+#
+#PSI = array(f["psi"])
+#Cxx = array(f["cxx"])
+#Cyy = array(f["cyy"])
+#Cxy = array(f["cxy"])
+#
+#f.close()
+#
+#tmp = PSI.reshape((N+1, M)).T
+#PSI = zeros((M, 2*N+1), dtype='complex')
+#PSI[:, :N+1] = tmp
+#for n in range(1, N+1):
+#    PSI[:, 2*N+1 - n] = conj(PSI[:, n])
+#PSI = fftshift(PSI, axes=1)
+#PSI = PSI.T.flatten()
+#
+#tmp = Cxx.reshape((N+1, M)).T
+#Cxx = zeros((M, 2*N+1), dtype='complex')
+#Cxx[:, :N+1] = tmp
+#for n in range(1, N+1):
+#    Cxx[:, 2*N+1 - n] = conj(Cxx[:, n])
+#Cxx = fftshift(Cxx, axes=1)
+#Cxx = Cxx.T.flatten()
+#
+#tmp = Cyy.reshape((N+1, M)).T
+#Cyy = zeros((M, 2*N+1), dtype='complex')
+#Cyy[:, :N+1] = tmp
+#for n in range(1, N+1):
+#    Cyy[:, 2*N+1 - n] = conj(Cyy[:, n])
+#Cyy = fftshift(Cyy, axes=1)
+#Cyy = Cyy.T.flatten()
+#
+#tmp = Cxy.reshape((N+1, M)).T
+#Cxy = zeros((M, 2*N+1), dtype='complex')
+#Cxy[:, :N+1] = tmp
+#for n in range(1, N+1):
+#    Cxy[:, 2*N+1 - n] = conj(Cxy[:, n])
+#Cxy = fftshift(Cxy, axes=1)
+#Cxy = Cxy.T.flatten()
 
 # --------------- POISEUILLE -----------------
 
-#PSI[N*M]   += 2.0/3.0
-#PSI[N*M+1] += 3.0/4.0
-#PSI[N*M+2] += 0.0
-#PSI[N*M+3] += -1.0/12.0
+plugAmp = 0.02 #* (M/32.0)
 
-#Cxx, Cyy, Cxy = x_independent_profile(PSI)
+PSI[N*M]   += (1.-plugAmp) * 2.0/3.0
+PSI[N*M+1] += (1.-plugAmp) * 3.0/4.0
+PSI[N*M+2] += (1.-plugAmp) * 0.0
+PSI[N*M+3] += (1.-plugAmp) * -1.0/12.0
 
+# set initial stress guess based on laminar flow
+Cxx, Cyy, Cxy = x_independent_profile(PSI)
+psiLam = copy(PSI)
 
-#perKEestimate = 0.25
-#totEnergy = 0.7
-#sigma = 0.1
-#gam = 2
+# --- PLUG  ---
 
-#PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
+PSI[N*M]   += (plugAmp) * (5.0/8.0) * 4.0/5.0
+PSI[N*M+1] += (plugAmp) * (5.0/8.0) * 7.0/8.0
+PSI[N*M+3] += (plugAmp) * (5.0/8.0) * -1.0/16.0
+PSI[N*M+5] += (plugAmp) * (5.0/8.0) * -1.0/80.0
+
+#PSI[N*M:] = 0
+#PSI[:(N+1)*M] = 0
+
+perKEestimate = 0.02
+totEnergy = 0.7
+sigma = 0.1
+gam = 2
+
+PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
+
 
 forcing = zeros((M,2*N+1), dtype='complex')
 forcing[0,0] = 2.0/Re
@@ -651,6 +665,13 @@ forcing[0,0] = 2.0/Re
 
 # ----------------------------------------------------------------------------
 
+##  output forcing and the streamfunction corresponding to the initial stress
+f = h5py.File("laminar.h5", "w")
+dset = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
+psiLam = psiLam.reshape(2*N+1, M).T
+psiLam = ifftshift(psiLam, axes=1)
+dset[...] = psiLam.T.flatten()
+f.close()
 
 f = h5py.File("forcing.h5", "w")
 dset = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
