@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 23 Mar 12:34:28 2015
+// Last modified: Wed 22 Apr 14:34:09 2015
 
 /* Program Description:
  *
@@ -87,11 +87,12 @@ int main(int argc, char **argv)
     params.Re = 400;
     params.Wi = 1e-05;
     params.beta = 1.0;
+    params.Omega = 1.0;
     params.dealiasing = 0;
 
     // Read in parameters from cline args.
 
-    while ((shortArg = getopt (argc, argv, "dN:M:U:k:R:W:b:t:s:T:")) != -1)
+    while ((shortArg = getopt (argc, argv, "dN:M:U:k:R:W:b:w:t:s:T:")) != -1)
 	switch (shortArg)
 	  {
 	  case 'N':
@@ -114,6 +115,9 @@ int main(int argc, char **argv)
 	    break;
 	  case 'b':
 	    params.beta = atof(optarg);
+	    break;
+	  case 'w':
+	    params.Omega = atof(optarg);
 	    break;
 	  case 't':
 	    dt = atof(optarg);
@@ -159,6 +163,7 @@ int main(int argc, char **argv)
     printf("\nRe                  \t %e ", params.Re);
     printf("\nWi                  \t %e ", params.Wi);
     printf("\nbeta                \t %e ", params.beta);
+    printf("\nOmega               \t %e ", params.Omega);
     printf("\nTime Step           \t %e ", dt);
     printf("\nNumber of Time Steps\t %d ", numTimeSteps);
     printf("\nTime Steps per frame\t %d \n", stepsPerFrame);
@@ -326,6 +331,8 @@ int main(int argc, char **argv)
     for (timeStep=0; timeStep<=numTimeSteps; timeStep++)
     {
 
+	time = timeStep*dt;
+
 	// predictor step to calculate nonlinear terms
 	
 	for (i=0; i<N+1; i++)
@@ -336,11 +343,16 @@ int main(int argc, char **argv)
 	    }
 	}
 
+
 	step_sf_SI_Crank_Nicolson(
 	    psi2, psi, dt/2., timeStep, forcing, oneOverRe, params, scratch, scratch2, u, v, lplpsi,
 	    biharmpsi, d2ypsi, dyyypsi, d4ypsi, d2xd2ypsi, d4xpsi, udxlplpsi,
 	    vdylplpsi, vdyypsi, RHSvec, hopsList, &phys_plan, &spec_plan,
 	    scratchin, scratchout, scratchp1, scratchp2);
+
+	#ifdef OSCIL_FLOW
+	forcing[ind(0,0)] = cos(params.Omega*time) / params.Re;
+	#endif
 
 	// 'corrector' step to calculate full step based on nonlinear terms from predictor step
 	step_sf_SI_Crank_Nicolson(
@@ -357,7 +369,6 @@ int main(int argc, char **argv)
 	// output some information at every frame
 	if ((timeStep % stepsPerFrame) == 0 )
 	{
-	    time = timeStep*dt;
 
 	    double normU1 = 0;
 	    double normU2 = 0;

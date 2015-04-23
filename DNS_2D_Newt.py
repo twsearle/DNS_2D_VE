@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Thu 26 Mar 15:57:15 2015
+#   Last modified: Thu 23 Apr 15:10:59 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -68,6 +68,8 @@ Wi = config.getfloat('General', 'Wi')
 beta = config.getfloat('General', 'beta')
 kx = config.getfloat('General', 'kx')
 
+Omega = config.getfloat('Oscillatory Flow', 'Omega')
+
 dt = config.getfloat('Time Iteration', 'dt')
 totTime = config.getfloat('Time Iteration', 'totTime')
 numFrames = config.getint('Time Iteration', 'numFrames')
@@ -89,7 +91,7 @@ assert Wi != 0.0, "cannot have Wi = 0!"
 NOld = N 
 MOld = M
 kwargs = {'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0, 'Re': Re, 'Wi': Wi, 'beta': beta,
-          'kx': kx,'time': totTime, 'dt':dt, 'dealiasing':dealiasing}
+          'kx': kx, 'Omega':Omega, 'time': totTime, 'dt':dt, 'dealiasing':dealiasing}
 baseFileName  = "-N{N}-M{M}-kx{kx}-Re{Re}.pickle".format(**kwargs)
 outFileName  = "pf{0}".format(baseFileName)
 outFileNameTrace = "trace{0}.dat".format(baseFileName[:-7])
@@ -499,34 +501,34 @@ PSI = zeros((2*N+1)*M,dtype='complex')
 
 # --------------- POISEUILLE -----------------
 
-
-plugAmp = 0.02 #* (M/32.0)
-
-PSI[N*M]   += (1.-plugAmp) * 2.0/3.0
-PSI[N*M+1] += (1.-plugAmp) * 3.0/4.0
-PSI[N*M+2] += (1.-plugAmp) * 0.0
-PSI[N*M+3] += (1.-plugAmp) * -1.0/12.0
-
-
-# --------------- PLUG  -----------------
-
-PSI[N*M]   += (plugAmp) * (5.0/8.0) * 4.0/5.0
-PSI[N*M+1] += (plugAmp) * (5.0/8.0) * 7.0/8.0
-PSI[N*M+3] += (plugAmp) * (5.0/8.0) * -1.0/16.0
-PSI[N*M+5] += (plugAmp) * (5.0/8.0) * -1.0/80.0
-
-#PSI[N*M:] = 0
-#PSI[:(N+1)*M] = 0
-
-perKEestimate = 0.2
-totEnergy = 0.8
-sigma = 0.1
-gam = 2
-
-PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
-
-forcing = zeros((M,2*N+1), dtype='complex')
-forcing[0,0] = 2.0/Re
+#
+#plugAmp = 0.02 #* (M/32.0)
+#
+#PSI[N*M]   += (1.-plugAmp) * 2.0/3.0
+#PSI[N*M+1] += (1.-plugAmp) * 3.0/4.0
+#PSI[N*M+2] += (1.-plugAmp) * 0.0
+#PSI[N*M+3] += (1.-plugAmp) * -1.0/12.0
+#
+#
+## --------------- PLUG  -----------------
+#
+#PSI[N*M]   += (plugAmp) * (5.0/8.0) * 4.0/5.0
+#PSI[N*M+1] += (plugAmp) * (5.0/8.0) * 7.0/8.0
+#PSI[N*M+3] += (plugAmp) * (5.0/8.0) * -1.0/16.0
+#PSI[N*M+5] += (plugAmp) * (5.0/8.0) * -1.0/80.0
+#
+##PSI[N*M:] = 0
+##PSI[:(N+1)*M] = 0
+#
+#perKEestimate = 0.2
+#totEnergy = 0.8
+#sigma = 0.1
+#gam = 2
+#
+#PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
+#
+#forcing = zeros((M,2*N+1), dtype='complex')
+#forcing[0,0] = 2.0/Re
 
 
 # --------------- SHEAR LAYER -----------------
@@ -571,6 +573,14 @@ forcing[0,0] = 2.0/Re
 #
 ## set BC
 #CNSTS['U0'] = 1.0
+
+# --------------- OSCILLATORY FLOW -----------------
+#
+
+# PSI
+
+forcing = zeros((M,2*N+1), dtype='complex')
+forcing[0,0] = Omega / Re
 
 # ----------------------------------------------------------------------------
 
@@ -639,14 +649,18 @@ if dealiasing:
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),
+             "{0:e}".format(CNSTS["beta"]), "-w",
+             "{0:e}".format(CNSTS["Omega"]),
+             "-t", "{0:e}".format(CNSTS["dt"]),
              "-s", "{0:d}".format(stepsPerFrame), "-T",
              "{0:d}".format(numTimeSteps), "-d"]
-    print "./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M", \
+
+    print "./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
-             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),\
+             "{0:e}".format(CNSTS["beta"]), "-w", "{0:e}".format(CNSTS["Omega"]),\
+             "-t", "{0:e}".format(CNSTS["dt"]),\
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
              "{0:d}".format(numTimeSteps), "-d"
 
@@ -655,14 +669,19 @@ else:
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),
+             "{0:e}".format(CNSTS["beta"]), "-w",
+             "{0:e}".format(CNSTS["Omega"]),
+             "-t", "{0:e}".format(CNSTS["dt"]),
              "-s", "{0:d}".format(stepsPerFrame), "-T",
              "{0:d}".format(numTimeSteps)]
-    print "./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M", \
+
+    print "./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
-             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),\
+             "{0:e}".format(CNSTS["beta"]), "-w",\
+    "{0:e}".format(CNSTS["Omega"]),\
+             "-t", "{0:e}".format(CNSTS["dt"]),\
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
              "{0:d}".format(numTimeSteps)
 

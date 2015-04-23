@@ -1,5 +1,6 @@
 CC=gcc
 DEBUGFLAGS = -pg -g -ggdb -DMYDEBUG
+OSCILFLAGS = -DOSCIL_FLOW
 CFLAGS = -Wall -fpic -Iinclude $(TOBYCPATHS) 
 #CFLAGS = $(DEBUGFLAGS) -Wall -fpic -Iinclude $(TOBYCPATHS) 
 #-L/opt/local/lib -I/opt/local/include 
@@ -46,6 +47,12 @@ debug :
 	$(CC) -c src/DNS_2D_Newt.c -o obj/DNS_2D_Newt.o $(DEBUGFLAGS) $(CFLAGS)
 	$(CC) -c src/time_steppers.c -o obj/time_steppers.o $(DEBUGFLAGS) $(CFLAGS) 
 	$(CC) -o DNS_2D_Newt obj/DNS_2D_Newt.o obj/time_steppers.o obj/fields_2D.o $(DEBUGFLAGS) $(CFLAGS) -lhdf5 -lhdf5_hl -lfftw3 -lm
+
+oscil : 
+	$(CC) -c src/fields_2D.c -o obj/fields_2D.o $(OSCILFLAGS) $(CFLAGS) 
+	$(CC) -c src/DNS_2D_Newt.c -o obj/DNS_2D_Newt.o $(OSCILFLAGS) $(CFLAGS)
+	$(CC) -c src/time_steppers.c -o obj/time_steppers.o $(OSCILFLAGS) $(CFLAGS) 
+	$(CC) -o DNS_2D_Newt obj/DNS_2D_Newt.o obj/time_steppers.o obj/fields_2D.o $(OSCILFLAGS) $(CFLAGS) -lhdf5 -lhdf5_hl -lfftw3 -lm
 
 
 .PHONY : clean debug
