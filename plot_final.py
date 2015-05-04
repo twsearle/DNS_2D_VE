@@ -238,6 +238,8 @@ if args.Newt:
     psi = array(f["/psi"])
     psi_ti = psi_ti.reshape((2*N+1, M)).T
 
+    psi_true, Nu = pickle.load(open(twsFileName, 'r'))
+
 else:
     psi_ti, cxx_ti, cyy_ti, cxy_ti = load_hdf5_snapshot_visco(f, time)
 

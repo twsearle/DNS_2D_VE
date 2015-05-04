@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri  3 Apr 10:37:02 2015
+// Last modified: Mon  4 May 17:05:05 2015
 
 #include"fields_2D.h"
 
@@ -1563,4 +1563,101 @@ double calc_KE_mode(fftw_complex *u, fftw_complex *v, int n, flow_params cnsts)
 	} else {
 	    return creal(KE);
 	}
+}
+
+void trC_tensor(complex *cij, complex *trC, double *scratchp1, double
+	*scratchp2, fftw_complex *scratchin, fftw_complex *scratchout,
+	fftw_plan *phys_plan, fftw_plan *spec_plan, flow_params cnsts)
+{
+    // Calculate the trace of the conformation tensor. This is both a measure
+    // of the polymer stretch and a useful thing to be able to do for a FENE
+    // code.
+
+    int i=0;
+    int N = cnsts.N;
+    int M = cnsts.M;
+
+    // Form a sum of those stresses at every point in the domain
+    for(i=0;i<(N+1)*M; i++)
+    {
+	trC[i] = cij[i] + cij[(N+1)*M + i];
+    }
+
+    // Square this result
+    //fft_convolve_r(trC, trC, trC, scratchp1, scratchp2, 
+    //        scratchin, scratchout, phys_plan, spec_plan, cnsts);
+
+
+}
+
+void diagonalised_C(complex *cij, complex *ecij, double *rcij, double
+	*scratchp1, double *scratchp2, fftw_complex *scratchin, fftw_complex
+	*scratchout, fftw_plan *phys_plan, fftw_plan
+	*spec_plan, flow_params cnsts)
+{
+    // Calculate the trace of the diagonalised conformation tensor. This is 
+    // the root of the polymer stretch.
+    
+    int i =0; 
+    int N = cnsts.N;
+    int M = cnsts.M;
+    int Nf = cnsts.Nf;
+    int Mf = cnsts.Mf;
+
+    // First calculate the real space stresses
+    to_physical_r(&cij[0], &rcij[0], scratchin, scratchout, phys_plan, cnsts);
+    to_physical_r(&cij[M*(N+1)], &rcij[Mf*(2*Nf+1)], scratchin, scratchout, phys_plan, cnsts);
+    to_physical_r(&cij[2*M*(N+1)], &rcij[2*Mf*(2*Nf+1)], scratchin, scratchout, phys_plan, cnsts);
+
+    // Find the eigenvalues of the stress tensor at every point in the domain.
+    for (i=0; i<Mf*(2*Nf+1);i++)
+    {
+	scratchp1[i] = rcij[i] + rcij[Mf*(2*Nf+1) + i];
+	scratchp1[i] += sqrt(
+			    pow(rcij[i] + rcij[Mf*(2*Nf+1) + i],2)
+			    - 4*(rcij[i] * rcij[Mf*(2*Nf+1) + i] 
+				    - rcij[2*Mf*(2*Nf+1) + i]));
+	scratchp1[i] *= 0.5;
+
+	scratchp2[i] = rcij[i] + rcij[Mf*(2*Nf+1) + i]; 
+	scratchp2[i] -= sqrt(
+			    pow(rcij[i] + rcij[Mf*(2*Nf+1) + i],2)
+			    - 4*(rcij[i] * rcij[Mf*(2*Nf+1) + i] 
+				    - rcij[2*Mf*(2*Nf+1) + i]));
+	scratchp2[i] *= 0.5;
+
+    }
+
+    to_spectral_r(scratchp1, &ecij[0], scratchin, scratchout, spec_plan, cnsts);
+    to_spectral_r(scratchp2, &ecij[M*(N+1)], scratchin, scratchout, spec_plan, cnsts);
+
+}
+
+double calc_EE_mode(complex *trC, int n, flow_params cnsts)
+{
+    // Use the (diagonalised) stress (??) to calculate the Trace of C
+    // (?) and integrate it over y for the mode in question to get the Elastic
+    // energy
+    
+    int j=0;
+    int M=cnsts.M;
+
+    complex EE=0;
+
+    for (j=0; j<M; j+=2)
+    {
+
+	EE += (2. / (1.-j*j)) * trC[ind(n,j)];
+
+    }
+
+    if (n == 0)
+    {
+	return 0.5*creal(EE);
+    } else {
+	return creal(EE);
+    }
+
+
+    return EE;
 }

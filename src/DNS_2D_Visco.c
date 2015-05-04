@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 20 Apr 19:10:14 2015
+// Last modified: Mon  4 May 17:08:07 2015
 
 /* Program Description:
  *
@@ -75,6 +75,11 @@ int main(int argc, char **argv)
     double KE2 = 0.0;
     double KE_tot = 0.0;
     double KE_xdepend = 0.0;
+    double EE0 = 1.0;
+    double EE1 = 0.0;
+    double EE2 = 0.0;
+    double EE_tot = 0.0;
+    double EE_xdepend = 0.0;
 
     opterr = 0;
     int shortArg;
@@ -87,11 +92,12 @@ int main(int argc, char **argv)
     params.Re = 400;
     params.Wi = 1e-05;
     params.beta = 1.0;
+    params.Omega = 1.0;
     params.dealiasing = 0;
 
     // Read in parameters from cline args.
 
-    while ((shortArg = getopt (argc, argv, "dN:M:U:k:R:W:b:t:s:T:")) != -1)
+    while ((shortArg = getopt (argc, argv, "dN:M:U:k:R:W:b:w:t:s:T:")) != -1)
 	switch (shortArg)
 	  {
 	  case 'N':
@@ -114,6 +120,9 @@ int main(int argc, char **argv)
 	    break;
 	  case 'b':
 	    params.beta = atof(optarg);
+	    break;
+	  case 'w':
+	    params.Omega = atof(optarg);
 	    break;
 	  case 't':
 	    dt = atof(optarg);
@@ -141,6 +150,7 @@ int main(int argc, char **argv)
 	    abort ();
 	  }
 
+
     if (params.dealiasing == 1)
     {
 	params.Nf = (3*params.N)/2 + 1;
@@ -163,7 +173,7 @@ int main(int argc, char **argv)
     printf("\nNumber of Time Steps\t %d ", numTimeSteps);
     printf("\nTime Steps per frame\t %d \n", stepsPerFrame);
 
-    FILE *tracefp, *traceU, *trace1mode;
+    FILE *tracefp, *traceU, *trace1mode, *traceStressfp;
     char *trace_fn, *traj_fn;
     int i, j;
     int N = params.N;
@@ -175,6 +185,7 @@ int main(int argc, char **argv)
     traj_fn = "./output/traj.h5";
 
     tracefp = fopen(trace_fn, "w");
+    traceStressfp = fopen("./output/traceStress.dat", "w");
     traceU = fopen("./output/traceU.dat", "w");
     trace1mode = fopen("./output/traceMode.dat", "w");
 
@@ -207,9 +218,10 @@ int main(int argc, char **argv)
     complex *d2ycxyNL, *d2xcxyNL, *dxycyy_cxxNL, *dycxyNL;
     complex *cxxdxu, *cxydyu, *vgradcxx, *cxydxv, *cyydyv;
     complex *vgradcyy, *cxxdxv, *cyydyu, *vgradcxy;
-    complex *forcing, *forcing2;
+    complex *forcing;
 
     complex *cij, *cijNL;
+    complex *trC;
 
     fftw_complex *scratchin, *scratchout;
     double *scratchp1, *scratchp2;
@@ -243,7 +255,6 @@ int main(int argc, char **argv)
     psiNL = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     psi_lam = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     forcing = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    forcing2 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     u = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     v = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     udxlplpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
@@ -281,6 +292,7 @@ int main(int argc, char **argv)
     d2xcxyNL = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     dxycyy_cxxNL = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     dycxyNL = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    trC = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
 
     cij = (complex*) fftw_malloc(3*(N+1)*M * sizeof(complex));
     cijNL = (complex*) fftw_malloc(3*(N+1)*M * sizeof(complex));
@@ -309,11 +321,6 @@ int main(int argc, char **argv)
     load_hdf5_state_visco("initial_visco.h5", psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], params);
     load_hdf5_state("forcing.h5", forcing, params);
     load_hdf5_state("laminar.h5", psi_lam, params);
-
-    for (i=0; i<(N+1)*M; i++)
-    {
-	forcing2[i] = forcing[i];
-    }
 
     // load the operators from scipy 
     for (i=0; i<N+1; i++) 
@@ -367,7 +374,9 @@ int main(int argc, char **argv)
     
     // set the test.
     printf("\n------\nperforming the stress equilibration\n------\n");
-    printf("\nTime\t\tIntegrated square of polymer length");
+#ifdef MYDEBUG   
+    printf("\nTime\t\tIntegrated TrC");
+#endif
 
 equilibriate_stress(
 	psi, psiNL, psi_lam, cij, cijNL, dt, params, scratch, scratch2, u, v,
@@ -381,11 +390,12 @@ equilibriate_stress(
 
     // perform the time iteration
     printf("\n------\nperforming the time iteration\n------\n");
-    printf("\nTime\t\tKE_tot\t\t KE0\t\t KE1\t\t KE2\n");
+    printf("\nTime\t\tKE_tot\t\t KE0\t\t KE1\t\t EE0\n");
 
     for (timeStep=1; timeStep<=numTimeSteps; timeStep++)
     {
 
+	time = timeStep*dt;
         
         #ifdef MYDEBUG
         if (timeStep==0)
@@ -409,6 +419,11 @@ equilibriate_stress(
             psiNL[i] = psi[i];
         }
 
+	// calculate forcing 
+	#ifdef OSCIL_FLOW
+	forcing[ind(0,0)] = cos(params.Omega*time) / params.Re;
+	#endif
+
         step_conformation_Crank_Nicolson(
         psi, cijNL, cij, 0.5*dt, params, u, v, dxu, dyu, dxv, dyv,
         cxxdxu, cxydyu, vgradcxx, cxydxv, cyydyv, vgradcyy, cxxdxv, cyydyu,
@@ -417,13 +432,18 @@ equilibriate_stress(
         );
         
         step_sf_SI_Crank_Nicolson_visco(
-        psiNL, psi, cij, cijNL, forcing, forcing2, 0.5*dt, 
+        psiNL, psi, cij, cijNL, forcing, 0.5*dt, 
         timeStep, params, scratch, scratch2, u, v, lplpsi,
         biharmpsi, d2ypsi, dyyypsi, d4ypsi, d2xd2ypsi, d4xpsi, 
         udxlplpsi, vdylplpsi, vdyypsi, d2ycxy, d2xcxy, dxycyy_cxx, dycxy,
         d2ycxyNL, d2xcxyNL, dxycyy_cxxNL, dycxyNL, RHSvec, hopsList,
         &phys_plan, &spec_plan, scratchin, scratchout,
         scratchp1, scratchp2 );
+
+	// calculate forcing on the half step
+	#ifdef OSCIL_FLOW
+	forcing[ind(0,0)] = cos(params.Omega*(time + dt/2.0)) / params.Re;
+	#endif
 
         // use the old values plus the values on the half step for the NL terms
         step_conformation_Crank_Nicolson(
@@ -434,7 +454,7 @@ equilibriate_stress(
         );
 
         step_sf_SI_Crank_Nicolson_visco(
-        psi, psiNL, cij, cijNL, forcing, forcing2, dt, 
+        psi, psiNL, cij, cijNL, forcing, dt, 
         timeStep, params, scratch, scratch2, u, v, lplpsi,
         biharmpsi, d2ypsi, dyyypsi, d4ypsi, d2xd2ypsi, d4xpsi, 
         udxlplpsi, vdylplpsi, vdyypsi, d2ycxy, d2xcxy, dxycyy_cxx, dycxy,
@@ -550,15 +570,39 @@ equilibriate_stress(
     
             KE_tot = KE0 + KE_xdepend;
 
-            printf("%e\t%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1, KE2);
-             save_hdf5_snapshot_visco(&hdf5fp, &filetype_id, &datatype_id,
-         	    psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], time, params);
+	    trC_tensor(cij, trC, scratchp1, scratchp2, scratchin, scratchout,
+		    &phys_plan, &spec_plan, params);
+
+	    calc_EE_mode(&trC[0], 0, params);
+
+	    EE0 = calc_EE_mode(&trC[0], 0, params);
+	    EE1 = calc_EE_mode(&trC[0], 1, params);
+	    EE2 = calc_EE_mode(&trC[0], 2, params);
+
+	    EE_xdepend = EE1 + EE2; 
+	    for (i=3; i<N+1; i++)
+	    {
+		EE_xdepend += calc_EE_mode(&trC[0], i, params);
+	    }
+
+	    EE_tot = EE0 + EE_xdepend;
+
+	    // NOTE: As it stands. EE0 is the total (summed over x and y)
+	    // Elastic Kinetic energy.
+	    // I don't think the other components have a meaning yet.
+
+	    fprintf(traceStressfp, "%e\t%e\n", time, EE0);
+
+            printf("%e\t%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1, EE0);
+
+            save_hdf5_snapshot_visco(&hdf5fp, &filetype_id, &datatype_id,
+		 psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], time, params);
              
-             fprintf(tracefp, "%e\t%e\t%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1, KE2, KE_xdepend);
-             fflush(traceU);
-             fflush(trace1mode);
-             fflush(tracefp);
-             H5Fflush(hdf5fp, H5F_SCOPE_GLOBAL);
+            fprintf(tracefp, "%e\t%e\t%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1, KE2, KE_xdepend);
+            fflush(traceU);
+            fflush(trace1mode);
+            fflush(tracefp);
+            H5Fflush(hdf5fp, H5F_SCOPE_GLOBAL);
 
          }
     }
@@ -571,6 +615,7 @@ equilibriate_stress(
     &filetype_id, &datatype_id, psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], params);
 
     fclose(tracefp);
+    fclose(traceStressfp);
     fclose(traceU);
     fclose(trace1mode);
 
@@ -598,7 +643,6 @@ equilibriate_stress(
     fftw_free(cij);
     fftw_free(cijNL);
     fftw_free(forcing);
-    fftw_free(forcing2);
     fftw_free(u);
     fftw_free(v);
     fftw_free(udxlplpsi);
@@ -638,6 +682,7 @@ equilibriate_stress(
     fftw_free(d2xcxyNL);
     fftw_free(dxycyy_cxxNL);
     fftw_free(dycxyNL);
+    fftw_free(trC);
 
     printf("quitting c program\n");
 

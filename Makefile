@@ -1,6 +1,8 @@
 CC=gcc
 DEBUGFLAGS = -pg -g -ggdb -DMYDEBUG
+OSCILFLAGS = -DOSCIL_FLOW
 CFLAGS = -Wall -fpic -Iinclude $(TOBYCPATHS) 
+
 #CFLAGS = $(DEBUGFLAGS) -Wall -fpic -Iinclude $(TOBYCPATHS) 
 #-L/opt/local/lib -I/opt/local/include 
 
@@ -56,8 +58,16 @@ debug : obj/fields_2D.o obj/time_steppers.o obj/DNS_2D_Newt.o obj/DNS_2D_Visco.o
 	$(CC) -c src/DNS_2D_Visco.c -o obj/DNS_2D_Visco.o $(DEBUGFLAGS) $(CFLAGS)
 	$(CC) -o DNS_2D_Visco obj/DNS_2D_Visco.o obj/time_steppers.o obj/fields_2D.o $(DEBUGFLAGS) $(CFLAGS) -lhdf5 -lhdf5_hl -lfftw3 -lm
 
+oscil : obj/fields_2D.o obj/time_steppers.o obj/DNS_2D_Newt.o obj/DNS_2D_Visco.o 
+	$(CC) -c src/time_steppers.c -o obj/time_steppers.o $(OSCILFLAGS) $(CFLAGS) 
+	$(CC) -c src/fields_2D.c -o obj/fields_2D.o $(OSCILFLAGS) $(CFLAGS) 
+	$(CC) -c src/DNS_2D_Newt.c -o obj/DNS_2D_Newt.o $(OSCILFLAGS) $(CFLAGS)
+	$(CC) -o DNS_2D_Newt obj/DNS_2D_Newt.o obj/time_steppers.o obj/fields_2D.o $(OSCILFLAGS) $(CFLAGS) -lhdf5 -lhdf5_hl -lfftw3 -lm
+	$(CC) -c src/DNS_2D_Visco.c -o obj/DNS_2D_Visco.o $(OSCILFLAGS) $(CFLAGS)
+	$(CC) -o DNS_2D_Visco obj/DNS_2D_Visco.o obj/time_steppers.o obj/fields_2D.o $(OSCILFLAGS) $(CFLAGS) -lhdf5 -lhdf5_hl -lfftw3 -lm
 
-.PHONY : clean debug
+
+.PHONY : clean debug oscil
 clean :
 	rm -f ./obj/*.o DNS_2D_Newt test_fields test_fields_1 test_fields_2
 	rm -f ./operators/*.h5

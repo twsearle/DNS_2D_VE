@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri  3 Apr 10:43:46 2015
+// Last modified: Mon  4 May 17:03:25 2015
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -105,6 +105,17 @@ void load_hdf5_operator(char *filename, fftw_complex *arr, flow_params cnsts);
 
 double calc_KE_mode(fftw_complex *u, fftw_complex *v, int n, flow_params cnsts);
 
+void trC_tensor(complex *cij, complex *trC, double *scratchp1, double
+	*scratchp2, fftw_complex *scratchin, fftw_complex *scratchout,
+	fftw_plan *phys_plan, fftw_plan *spec_plan, flow_params cnsts);
+
+void diagonalised_C(complex *cij, complex *ecij, double *rcij, double
+	*scratchp1, double *scratchp2, fftw_complex *scratchin, fftw_complex
+	*scratchout, fftw_plan *phys_plan, fftw_plan
+	*spec_plan, flow_params cnsts);
+
+double calc_EE_mode(complex *trC, int n, flow_params cnsts);
+
 struct flow_params {
     int N;
     int M;
@@ -116,6 +127,7 @@ struct flow_params {
     double Re;
     double Wi;
     double beta;
+    double Omega;
 };
 
 struct complex_hdf {

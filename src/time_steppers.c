@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 20 Apr 17:40:26 2015
+// Last modified: Mon  4 May 17:14:28 2015
 
 #include"fields_2D.h"
 
@@ -406,10 +406,14 @@ void step_conformation_Crank_Nicolson(
 	    cij[(N+1)*M + ind(i,j)] += 0.5*dt*oneOverWi*cij[(N+1)*M + ind(i,j)];
 	    cij[(N+1)*M + ind(i,j)] += cij[(N+1)*M + ind(i,j)];
 
+	    cij[(N+1)*M + ind(i,j)] *= 1./(1.+0.5*oneOverWi);
+
 	    cij[2*(N+1)*M + ind(i,j)] = dt*cxxdxv[ind(i,j)] + dt*cyydyu[ind(i,j)];
 	    cij[2*(N+1)*M + ind(i,j)] += - dt*vgradcxy[ind(i,j)];
 	    cij[2*(N+1)*M + ind(i,j)] += 0.5*dt*oneOverWi*cij[2*(N+1)*M + ind(i,j)];
 	    cij[2*(N+1)*M + ind(i,j)] += cij[2*(N+1)*M + ind(i,j)];
+
+	    cij[2*(N+1)*M + ind(i,j)] *= 1./(1.+0.5*oneOverWi);
 	}
     }
     cij[0] += oneOverWi;
@@ -418,7 +422,7 @@ void step_conformation_Crank_Nicolson(
 
 void step_sf_SI_Crank_Nicolson_visco(
 	complex *psi, complex *psiNL, complex *cij, complex *cijNL, complex
-	*forcing, complex *forcing2, double dt, int timeStep, flow_params
+	*forcing, double dt, int timeStep, flow_params
 	params, complex *scratch, complex *scratch2, complex *u, complex *v,
 	complex *lplpsi, complex *biharmpsi, complex *d2ypsi, complex *dyyypsi,
 	complex *d4ypsi, complex *d2xd2ypsi, complex *d4xpsi, complex
@@ -647,7 +651,7 @@ void step_sf_SI_Crank_Nicolson_visco(
 			                 d2xcxyNL[ind(i,j)] 
 				       + dxycyy_cxxNL[ind(i,j)] 
 				       - d2ycxyNL[ind(i,j)]);
-	    RHSvec[j] += 0.5*dt*(forcing[ind(i,j)] + forcing2[ind(i,j)]);
+	    RHSvec[j] += dt*forcing[ind(i,j)];
 	    RHSvec[j] += + lplpsi[ind(i,j)];
 
 
@@ -697,7 +701,7 @@ void step_sf_SI_Crank_Nicolson_visco(
 	RHSvec[j] += - dt*creal(vdyypsi[ind(0,j)]);
 	RHSvec[j] += dt*0.5*(1.-beta)*oneOverRe*creal(dycxy[ind(0,j)]); 
 	RHSvec[j] += dt*0.5*(1.-beta)*oneOverRe*creal(dycxyNL[ind(0,j)]); 
-	RHSvec[j] += 0.5*dt*creal(forcing[ind(0,j)] + forcing2[ind(0,j)]);
+	RHSvec[j] += dt*creal(forcing[ind(0,j)]);
 	RHSvec[j] += creal(u[ind(0,j)]); 
     }
     // RHSvec[0] += 2*dt*oneOverRe;
@@ -918,12 +922,13 @@ void equilibriate_stress(
     double Wi = params.Wi;
     double time = 0;
     int timeStep, numSteps;
-    double KE0 = 1.0;
-    double KE1 = 0.0;
-    double KE2 = 0.0;
-    double KE_tot = 0.0;
-    double KE_xdepend = 0.0;
-
+#ifdef MYDEBUG 
+    double EE0 = 1.0;
+    double EE1 = 0.0;
+    double EE2 = 0.0;
+    double EE_tot = 0.0;
+    double EE_xdepend = 0.0;
+#endif
 
     // Time step for approximately 2 the elastic timescale, 2*Wi.
     // Do homotopy between laminar flow and the initial streamfunction.
@@ -938,6 +943,8 @@ void equilibriate_stress(
     // initial state.
 
     complex *psi_tmp = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+
+    complex *trC = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
 
     numSteps = 2.0*Wi/dt;
 
@@ -962,7 +969,7 @@ void equilibriate_stress(
 		);
 
 	// assume psi star = psi_tmp
-	// TODO: Account for a time dependent forcing, psi star will be different
+	// TODO: Account for a time dependent forcing, psi star will be different?
 
 	// step the stress to t + h
 
@@ -977,23 +984,34 @@ void equilibriate_stress(
 	// output some trajectories to check everything is going ok! 
 	if ((timeStep % (numSteps / 100)) == 0 )
 	{
-	    KE0 = calc_KE_mode(&cij[0], &cij[1*M*(N+1)], 0, params);
-	    KE1 = calc_KE_mode(&cij[0], &cij[1*M*(N+1)], 1, params);
-	    KE2 = calc_KE_mode(&cij[0], &cij[1*M*(N+1)], 2, params);
-	    KE_xdepend = KE1 + KE2; 
+	    trC_tensor(cij, trC, scratchp1, scratchp2, scratchin, scratchout,
+		    phys_plan, spec_plan, cnsts);
+
+	//    diagonalised_C(complex *cij, complex *ecij, double *rcij, double
+	//	    *scratchp1, double *scratchp2, fftw_complex *scratchin, fftw_complex
+	//	    *scratchout, fftw_plan *phys_plan, fftw_plan
+	//	    *spec_plan, flow_params cnsts)
+
+	    calc_EE_mode(&trC[0], 0, params);
+
+	    EE0 = calc_EE_mode(&trC[0], 0, params);
+	    EE1 = calc_EE_mode(&trC[0], 1, params);
+	    EE2 = calc_EE_mode(&trC[0], 2, params);
+
+	    EE_xdepend = EE1 + EE2; 
 	    for (i=3; i<N+1; i++)
 	    {
-		KE_xdepend += calc_KE_mode(&cij[0], &cij[1*M*(N+1)], i, params);
+		EE_xdepend += calc_EE_mode(&trC[0], i, params);
 	    }
 
-	    KE_tot = KE0 + KE_xdepend;
+	    EE_tot = EE0 + EE_xdepend;
 
 	    save_hdf5_snapshot_visco(file_id, filetype_id, datatype_id,
 		    psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], time, params);
 
-	    fprintf(tracefp, "%e\t%e\t%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1, KE2, KE_xdepend);
+	    fprintf(tracefp, "%e\t%e\t%e\t%e\t%e\t%e\n", time, EE_tot, EE0, EE1, EE2, EE_xdepend);
 
-            printf("%e\t%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1, KE2);
+            printf("%e\t%e\t%e\t%e\t%e\n", time, EE_tot, EE0, EE1, EE2);
 
 	    fflush(tracefp);
 	    H5Fflush(*file_id, H5F_SCOPE_GLOBAL);
@@ -1004,6 +1022,7 @@ void equilibriate_stress(
 
     fclose(tracefp);
     free(psi_tmp);
+    free(trC);
 }
 
 

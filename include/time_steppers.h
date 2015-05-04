@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 20 Apr 16:13:56 2015
+// Last modified: Fri 24 Apr 14:47:12 2015
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -21,7 +21,7 @@
 //prototypes
 void step_sf_SI_Crank_Nicolson_visco(
 	complex *psi, complex *psiNL, complex *cij, complex *cijNL, complex
-	*forcing, complex *forcing2, double dt, int timeStep, flow_params
+	*forcing, double dt, int timeStep, flow_params
 	params, complex *scratch, complex *scratch2, complex *u, complex *v,
 	complex *lplpsi, complex *biharmpsi, complex *d2ypsi, complex *dyyypsi,
 	complex *d4ypsi, complex *d2xd2ypsi, complex *d4xpsi, complex

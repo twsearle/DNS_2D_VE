@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Mon 20 Apr 17:35:04 2015
+#   Last modified: Mon  4 May 17:15:32 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -71,6 +71,8 @@ Wi = config.getfloat('General', 'Wi')
 beta = config.getfloat('General', 'beta')
 kx = config.getfloat('General', 'kx')
 
+Omega = config.getfloat('Oscillatory Flow', 'Omega')
+
 dt = config.getfloat('Time Iteration', 'dt')
 totTime = config.getfloat('Time Iteration', 'totTime')
 numFrames = config.getint('Time Iteration', 'numFrames')
@@ -92,7 +94,7 @@ assert Wi != 0.0, "cannot have Wi = 0!"
 NOld = 13
 MOld = 100
 kwargs = {'NOld': NOld, 'MOld': MOld, 'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0,
-          'Re': Re, 'Wi': Wi, 'beta': beta, 'kx': kx,'time': totTime, 'dt':dt,
+          'Re': Re, 'Wi': Wi, 'beta': beta, 'Omega':Omega, 'kx': kx,'time': totTime, 'dt':dt,
           'dealiasing':dealiasing}
 
 inFileName = "pf-N{NOld}-M{MOld}-kx{kx}-Re{Re}-b{beta}-Wi{Wi}.pickle".format(**kwargs)
@@ -575,7 +577,7 @@ PSI[N*M+5] += (plugAmp) * (5.0/8.0) * -1.0/80.0
 #PSI[N*M:] = 0
 #PSI[:(N+1)*M] = 0
 
-perKEestimate = 0.02
+perKEestimate = 0.04
 totEnergy = 0.7
 sigma = 0.1
 gam = 2
@@ -662,6 +664,15 @@ forcing[0,0] = 2.0/Re
 #forcing[:, 1:] = 0
 ## set BC
 #CNSTS['U0'] = 1.0
+
+# --------------- OSCILLATORY FLOW -----------------
+#
+
+# PSI
+
+#forcing = zeros((M,2*N+1), dtype='complex')
+#forcing[0,0] = Omega / Re
+
 
 # ----------------------------------------------------------------------------
 
@@ -750,14 +761,18 @@ if dealiasing:
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),
+             "{0:e}".format(CNSTS["beta"]), "-w",
+             "{0:e}".format(CNSTS["Omega"]),
+             "-t", "{0:e}".format(CNSTS["dt"]),
              "-s", "{0:d}".format(stepsPerFrame), "-T",
              "{0:d}".format(numTimeSteps), "-d"]
-    print "./DNS_2D_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M", \
+
+    print "./DNS_2D_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
-             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),\
+             "{0:e}".format(CNSTS["beta"]), "-w", "{0:e}".format(CNSTS["Omega"]),\
+             "-t", "{0:e}".format(CNSTS["dt"]),\
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
              "{0:d}".format(numTimeSteps), "-d"
 
@@ -766,14 +781,19 @@ else:
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),
+             "{0:e}".format(CNSTS["beta"]), "-w",
+             "{0:e}".format(CNSTS["Omega"]),
+             "-t", "{0:e}".format(CNSTS["dt"]),
              "-s", "{0:d}".format(stepsPerFrame), "-T",
              "{0:d}".format(numTimeSteps)]
-    print "./DNS_2D_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M", \
+
+    print "./DNS_2D_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
-             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),\
+             "{0:e}".format(CNSTS["beta"]), "-w",\
+    "{0:e}".format(CNSTS["Omega"]),\
+             "-t", "{0:e}".format(CNSTS["dt"]),\
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
              "{0:d}".format(numTimeSteps)
 
