@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Mon  4 May 17:15:32 2015
+#   Last modified: Tue  5 May 10:34:14 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -577,8 +577,8 @@ PSI[N*M+5] += (plugAmp) * (5.0/8.0) * -1.0/80.0
 #PSI[N*M:] = 0
 #PSI[:(N+1)*M] = 0
 
-perKEestimate = 0.04
-totEnergy = 0.7
+perKEestimate = 0.1
+totEnergy = 0.9
 sigma = 0.1
 gam = 2
 

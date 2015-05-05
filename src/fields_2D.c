@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon  4 May 17:05:05 2015
+// Last modified: Tue  5 May 10:10:39 2015
 
 #include"fields_2D.h"
 
@@ -267,7 +267,6 @@ void save_hdf5_state_visco(hid_t *file_id, hid_t *filetype_id, hid_t *datatype_i
 
     // clean up 
     status = H5Sclose(dataspace_id);
-    status = H5Gclose(group_id);
     free(wdata);
 
 }
