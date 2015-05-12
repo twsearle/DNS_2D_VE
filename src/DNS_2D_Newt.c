@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 23 Mar 17:32:38 2015
+// Last modified: Tue  5 May 16:11:29 2015
 
 /* Program Description:
  *
@@ -70,6 +70,7 @@ int main(int argc, char **argv)
     int numTimeSteps = 0;
     int timeStep = 0;
     double dt = 0;
+    double time = 0;
     double KE0 = 1.0;
     double KE1 = 0.0;
     double KE2 = 0.0;
@@ -87,11 +88,12 @@ int main(int argc, char **argv)
     params.Re = 400;
     params.Wi = 1e-05;
     params.beta = 1.0;
+    params.Omega = 1.0;
     params.dealiasing = 0;
 
     // Read in parameters from cline args.
 
-    while ((shortArg = getopt (argc, argv, "dN:M:U:k:R:W:b:t:s:T:")) != -1)
+    while ((shortArg = getopt (argc, argv, "dN:M:U:k:R:W:b:w:t:s:T:")) != -1)
 	switch (shortArg)
 	  {
 	  case 'N':
@@ -114,6 +116,9 @@ int main(int argc, char **argv)
 	    break;
 	  case 'b':
 	    params.beta = atof(optarg);
+	    break;
+	  case 'w':
+	    params.Omega = atof(optarg);
 	    break;
 	  case 't':
 	    dt = atof(optarg);
@@ -159,6 +164,7 @@ int main(int argc, char **argv)
     printf("\nRe                  \t %e ", params.Re);
     printf("\nWi                  \t %e ", params.Wi);
     printf("\nbeta                \t %e ", params.beta);
+    printf("\nOmega               \t %e ", params.Omega);
     printf("\nTime Step           \t %e ", dt);
     printf("\nNumber of Time Steps\t %d ", numTimeSteps);
     printf("\nTime Steps per frame\t %d \n", stepsPerFrame);
@@ -198,19 +204,12 @@ int main(int argc, char **argv)
     hdf5fp = H5Fcreate(traj_fn, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 
     // field arrays are declared as pointers and then I malloc.
-    complex *scratch, *scratch2, *scratch3, *scratch4, *tmpop;
-    complex *psi, *psi2, *u, *v, *udxlplpsi, *vdylplpsi, *biharmpsi, *lplpsi;
-    complex *dyyypsi, *dypsi, *vdyypsi, *forcing;
-    complex *d2ypsi, *d4ypsi, *d4xpsi, *d2xd2ypsi;
+    complex *psi, *psi2, *forcing;
+    complex *tmpop;
 
-    fftw_complex *scratchin, *scratchout;
-    double *scratchp1, *scratchp2;
+    complex *opsList, *hopsList;
 
-    fftw_complex *RHSvec;
-    double time = 0;
-    double oneOverRe = 1./params.Re;
-    
-    fftw_complex *opsList, *hopsList;
+    flow_scratch scr;
 
     fftw_plan phys_plan, spec_plan;
 
@@ -225,43 +224,46 @@ int main(int argc, char **argv)
     tmpop = (complex*) fftw_malloc(M*M * sizeof(complex));
     opsList = (complex*) fftw_malloc((N+1)*M*M * sizeof(complex));
     hopsList = (complex*) fftw_malloc((N+1)*M*M * sizeof(complex));
-
-    scratch = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scratch2 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scratch3 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scratch4 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-
     psi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     forcing = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     psi2 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    u = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    v = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    udxlplpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    vdylplpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    lplpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    biharmpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    d2ypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    dyyypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    d4ypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    d4xpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    d2xd2ypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    dypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    vdyypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
 
-    scratchin = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
-    scratchout = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
+    scr.scratch = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.scratch2 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.scratch3 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.scratch4 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
 
-    scratchp1 = (double*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(double));
-    scratchp2 = (double*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(double));
+    scr.u = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.v = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.udxlplpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.vdylplpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.lplpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.biharmpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.d2ypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.dyyypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.d4ypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.d4xpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.d2xd2ypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.dypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.vdyypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
 
-    RHSvec = (complex*) fftw_malloc(M * sizeof(complex));
+    scr.scratchin = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
+    scr.scratchout = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
+
+    scr.scratchp1 = (double*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(double));
+    scr.scratchp2 = (double*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(double));
+
+    scr.RHSvec = (complex*) fftw_malloc(M * sizeof(complex));
 
     // Set up some dft plans
     printf("\n------\nSetting up fftw3 plans\n------\n");
-    phys_plan = fftw_plan_dft_2d(2*Nf+1, 2*Mf-2,  scratchin, scratchout,
+    phys_plan = fftw_plan_dft_2d(2*Nf+1, 2*Mf-2,  scr.scratchin, scr.scratchout,
 			 FFTW_BACKWARD, fftwFlag);
-    spec_plan = fftw_plan_dft_2d(2*Nf+1, 2*Mf-2,  scratchin, scratchout,
+    spec_plan = fftw_plan_dft_2d(2*Nf+1, 2*Mf-2,  scr.scratchin, scr.scratchout,
 			 FFTW_FORWARD, fftwFlag);
+
+    scr.phys_plan = &phys_plan;
+    scr.spec_plan = &spec_plan;
 
     printf("\n------\nLoading initial streamfunction and operators\n------\n");
 
@@ -321,10 +323,12 @@ int main(int argc, char **argv)
     
     // perform the time iteration
     printf("\n------\nperforming the time iteration\n------\n");
-    printf("\nTime\t\tKE_tot\t\t KE0\t\t KE1\t\t KE2\n");
+    printf("\nTime:\t\tKE0:\n");
 
     for (timeStep=0; timeStep<=numTimeSteps; timeStep++)
     {
+
+	time = timeStep*dt;
 
 	// predictor step to calculate nonlinear terms
 	
@@ -336,18 +340,18 @@ int main(int argc, char **argv)
 	    }
 	}
 
-	step_sf_SI_Crank_Nicolson(
-	    psi2, psi, dt/2., timeStep, forcing, oneOverRe, params, scratch, scratch2, u, v, lplpsi,
-	    biharmpsi, d2ypsi, dyyypsi, d4ypsi, d2xd2ypsi, d4xpsi, udxlplpsi,
-	    vdylplpsi, vdyypsi, RHSvec, hopsList, &phys_plan, &spec_plan,
-	    scratchin, scratchout, scratchp1, scratchp2);
+	#ifdef OSCIL_FLOW
+	forcing[ind(0,0)] = cos(params.Omega*time) / params.Re;
+	#endif
+
+	step_sf_SI_Crank_Nicolson( psi2, psi, dt/2., timeStep, forcing, hopsList, scr, params);
+
+	#ifdef OSCIL_FLOW
+	forcing[ind(0,0)] = cos(params.Omega*(time+0.5*dt)) / params.Re;
+	#endif
 
 	// 'corrector' step to calculate full step based on nonlinear terms from predictor step
-	step_sf_SI_Crank_Nicolson(
-	    psi, psi2, dt, timeStep, forcing, oneOverRe, params, scratch, scratch2, u, v, lplpsi,
-	    biharmpsi, d2ypsi, dyyypsi, d4ypsi, d2xd2ypsi, d4xpsi, udxlplpsi,
-	    vdylplpsi, vdyypsi, RHSvec, opsList, &phys_plan, &spec_plan,
-	    scratchin, scratchout, scratchp1, scratchp2);
+	step_sf_SI_Crank_Nicolson( psi, psi2, dt, timeStep, forcing, opsList, scr, params);
 
 	if (timeStep==0)
 	{
@@ -357,7 +361,6 @@ int main(int argc, char **argv)
 	// output some information at every frame
 	if ((timeStep % stepsPerFrame) == 0 )
 	{
-	    time = timeStep*dt;
 
 	    double normU1 = 0;
 	    double normU2 = 0;
@@ -367,21 +370,21 @@ int main(int argc, char **argv)
 	    {
 		for (j=0; j<M; j++)
 		{
-		    scratch[ind(i,j)] = u[ind(i,j)];
+		    scr.scratch[ind(i,j)] = scr.u[ind(i,j)];
 		}
 	    }
-	    scratch[ind(0,0)] -= 0.5;
-	    scratch[ind(0,2)] += 0.5;
+	    scr.scratch[ind(0,0)] -= 0.5;
+	    scr.scratch[ind(0,2)] += 0.5;
 	    fprintf(trace1mode, "%e\t%e\t%e\t%e\t%e\t%e\t%e\n", 
-		    time, creal(scratch[ind(0,3)]), cimag(scratch[ind(0,3)]),
-		     creal(scratch[ind(1,3)]), cimag(scratch[ind(1,3)]),
-		      creal(scratch[ind(2,3)]), cimag(scratch[ind(2,3)]));
+		    time, creal(scr.scratch[ind(0,3)]), cimag(scr.scratch[ind(0,3)]),
+		     creal(scr.scratch[ind(1,3)]), cimag(scr.scratch[ind(1,3)]),
+		      creal(scr.scratch[ind(2,3)]), cimag(scr.scratch[ind(2,3)]));
 
 	    for (j=M-1; j>=0; j=j-1)
 	    {
-		normU0 += creal(scratch[ind(0,j)]*scratch[ind(0,j)]); 
-		normU1 += creal(u[ind(1,j)]*conj(u[ind(1,j)])); 
-		normU2 += creal(u[ind(2,j)]*conj(u[ind(2,j)])); 
+		normU0 += creal(scr.scratch[ind(0,j)]*scr.scratch[ind(0,j)]); 
+		normU1 += creal(scr.u[ind(1,j)]*conj(scr.u[ind(1,j)])); 
+		normU2 += creal(scr.u[ind(2,j)]*conj(scr.u[ind(2,j)])); 
 	    }
 	    normU0 = normU0;//-(1./sqrt(2.));
 	    normU1 = normU1;
@@ -389,13 +392,13 @@ int main(int argc, char **argv)
 
 	    fprintf(traceU, "%e\t%e\t%e\t%e\t\n", time, normU0, normU1, normU2);
 
-	    KE0 = calc_KE_mode(u, v, 0, params) * (15.0/ 8.0);
-	    KE1 = calc_KE_mode(u, v, 1, params) * (15.0/ 8.0);
-	    KE2 = calc_KE_mode(u, v, 2, params) * (15.0/ 8.0);
+	    KE0 = calc_KE_mode(scr.u, scr.v, 0, params) * (15.0/ 8.0);
+	    KE1 = calc_KE_mode(scr.u, scr.v, 1, params) * (15.0/ 8.0);
+	    KE2 = calc_KE_mode(scr.u, scr.v, 2, params) * (15.0/ 8.0);
 	    KE_xdepend = KE1 + KE2; 
 	    for (i=3; i<N+1; i++)
 	    {
-		KE_xdepend += calc_KE_mode(u, v, i, params) * (15.0/ 8.0);
+		KE_xdepend += calc_KE_mode(scr.u, scr.v, i, params) * (15.0/ 8.0);
 	    }
     
 	    KE_tot = KE0 + KE_xdepend;
@@ -436,31 +439,32 @@ int main(int argc, char **argv)
     fftw_free(tmpop);
     fftw_free(opsList);
     fftw_free(hopsList);
-    fftw_free(scratch);
-    fftw_free(scratch2);
-    fftw_free(scratch3);
-    fftw_free(scratch4);
     fftw_free(psi);
     fftw_free(forcing);
     fftw_free(psi2);
-    fftw_free(u);
-    fftw_free(v);
-    fftw_free(udxlplpsi);
-    fftw_free(vdylplpsi);
-    fftw_free(lplpsi);
-    fftw_free(biharmpsi);
-    fftw_free(scratchin);
-    fftw_free(scratchout);
-    fftw_free(scratchp1);
-    fftw_free(scratchp2);
-    fftw_free(d2ypsi);
-    fftw_free(dyyypsi);
-    fftw_free(d4ypsi);
-    fftw_free(d4xpsi);
-    fftw_free(d2xd2ypsi);
-    fftw_free(dypsi);
-    fftw_free(vdyypsi);
-    fftw_free(RHSvec);
+
+    fftw_free(scr.scratch);
+    fftw_free(scr.scratch2);
+    fftw_free(scr.scratch3);
+    fftw_free(scr.scratch4);
+    fftw_free(scr.u);
+    fftw_free(scr.v);
+    fftw_free(scr.udxlplpsi);
+    fftw_free(scr.vdylplpsi);
+    fftw_free(scr.lplpsi);
+    fftw_free(scr.biharmpsi);
+    fftw_free(scr.scratchin);
+    fftw_free(scr.scratchout);
+    fftw_free(scr.scratchp1);
+    fftw_free(scr.scratchp2);
+    fftw_free(scr.d2ypsi);
+    fftw_free(scr.dyyypsi);
+    fftw_free(scr.d4ypsi);
+    fftw_free(scr.d4xpsi);
+    fftw_free(scr.d2xd2ypsi);
+    fftw_free(scr.dypsi);
+    fftw_free(scr.vdyypsi);
+    fftw_free(scr.RHSvec);
 
     printf("quitting c program\n");
 

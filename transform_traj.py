@@ -193,7 +193,7 @@ if args.Newt:
 
 else:
 
-    for frameNum in range(numFrames):
+    for frameNum in range(1,numFrames):
         time = (totTime / numFrames) * frameNum
         psi, cxx, cyy, cxy = load_hdf5_snapshot_visco(f, time)
 

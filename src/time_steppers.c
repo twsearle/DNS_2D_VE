@@ -7,27 +7,20 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon  4 May 17:14:28 2015
+// Last modified: Tue  5 May 22:35:47 2015
 
 #include"fields_2D.h"
 
 // Functions
 
-
 void step_sf_SI_Crank_Nicolson(
 	complex *psi, complex *psi2, double dt, int timeStep, complex
-	*forcing, double oneOverRe, flow_params params, complex *scratch,
-	complex *scratch2, complex *u, complex *v, complex *lplpsi, complex
-	*biharmpsi, complex *d2ypsi, complex *dyyypsi, complex *d4ypsi,
-	complex *d2xd2ypsi, complex *d4xpsi, complex *udxlplpsi, complex
-	*vdylplpsi, complex *vdyypsi, complex *RHSvec, complex *opsList,
-	fftw_plan *phys_plan, fftw_plan *spec_plan, complex *scratchin,
-	complex *scratchout, double *scratchp1, double *scratchp2 
-	)
+	*forcing, complex *opsList, flow_scratch scr, flow_params params)
 {
     int i, j, l;
     int N = params.N;
     int M = params.M;
+    double oneOverRe = 1. / params.Re;
 
     // First of all calculate the nonlinear terms on psi2, then calculate
     // linear terms on psi then calculate RHS for each mode, then solve for the
@@ -35,70 +28,70 @@ void step_sf_SI_Crank_Nicolson(
 
     // -----------Nonlinear Terms --------------
     //
-    // 
-    dy(psi2, u, params);
+    // u
+    dy(psi2, scr.u, params);
 
     // v
-    dx(psi2, v, params);
+    dx(psi2, scr.v, params);
     for(i=0; i<N+1; i++)
     {
 	for(j=0; j<M; j++)
 	{
-	    v[ind(i,j)] = -v[ind(i,j)];
+	    scr.v[ind(i,j)] = -scr.v[ind(i,j)];
 	}
     }
 
 
     // lplpsi dyy(psi) + dxx(psi)
 
-    d2x(psi2, scratch, params);
-    dy(u, lplpsi, params);
+    d2x(psi2, scr.scratch, params);
+    dy(scr.u, scr.lplpsi, params);
     for(i=0; i<N+1; i++)
     {
 	for(j=0; j<M; j++)
 	{
-	    lplpsi[ind(i,j)] = lplpsi[ind(i,j)] + scratch[ind(i,j)];
+	    scr.lplpsi[ind(i,j)] = scr.lplpsi[ind(i,j)] + scr.scratch[ind(i,j)];
 	}
     }
 
 
     // udxlplpsi 
-    dx(lplpsi, udxlplpsi, params);
+    dx(scr.lplpsi, scr.udxlplpsi, params);
     #ifdef MYDEBUG
     if(timeStep==0)
     {
-	save_hdf5_state("./output/dxlplpsi.h5", &udxlplpsi[0], params);
+	save_hdf5_state("./output/dxlplpsi.h5", &scr.udxlplpsi[0], params);
     }
     #endif
 
 
-    fft_convolve_r(udxlplpsi, u, udxlplpsi, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    fft_convolve_r(scr.udxlplpsi, scr.u, scr.udxlplpsi, 
+	    scr, params);
 
     // vdylplpsi 
-    dy(lplpsi, vdylplpsi, params);
+    dy(scr.lplpsi, scr.vdylplpsi, params);
 
     #ifdef MYDEBUG
     if(timeStep==0)
     {
-	save_hdf5_state("./output/dylplpsi.h5", &vdylplpsi[0], params);
+	save_hdf5_state("./output/dylplpsi.h5", &scr.vdylplpsi[0], params);
     }
     #endif
 
 
-    fft_convolve_r(vdylplpsi, v, vdylplpsi, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    fft_convolve_r(scr.vdylplpsi, scr.v, scr.vdylplpsi, 
+	    scr, params);
 
     //vdyypsi = vdyu
-    dy(u, d2ypsi, params);
+    dy(scr.u, scr.d2ypsi, params);
 
-    fft_convolve_r(d2ypsi, v, vdyypsi, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    fft_convolve_r(scr.d2ypsi, scr.v, scr.vdyypsi, 
+	    scr, params);
 
 #ifdef MYDEBUG
     if(timeStep==0)
     {
-	save_hdf5_state("./output/vdyypsi.h5", &vdyypsi[0], params);
+	save_hdf5_state("./output/vdyypsi.h5", &scr.vdyypsi[0], params);
     }
 #endif
 
@@ -106,47 +99,47 @@ void step_sf_SI_Crank_Nicolson(
     
     // lplpsi dyy(psi) + dxx(psi)
 
-    d2x(psi, scratch, params);
-    dy(psi, u, params);
-    dy(u, lplpsi, params);
+    d2x(psi, scr.scratch, params);
+    dy(psi, scr.u, params);
+    dy(scr.u, scr.lplpsi, params);
 
     for(i=0; i<N+1; i++)
     {
 	for(j=0; j<M; j++)
 	{
-	    lplpsi[ind(i,j)] = lplpsi[ind(i,j)] + scratch[ind(i,j)];
+	    scr.lplpsi[ind(i,j)] = scr.lplpsi[ind(i,j)] + scr.scratch[ind(i,j)];
 	}
     }
 
     // biharmpsi (dyy + dxx)lplpsi
 
-    dy(u, d2ypsi, params);
-    dy(d2ypsi, dyyypsi, params);
-    dy(dyyypsi, d4ypsi, params);
+    dy(scr.u, scr.d2ypsi, params);
+    dy(scr.d2ypsi, scr.dyyypsi, params);
+    dy(scr.dyyypsi, scr.d4ypsi, params);
 
-    d2x(psi, scratch, params);
+    d2x(psi, scr.scratch, params);
 
 #ifdef MYDEBUG
     if(timeStep==0)
     {
-	save_hdf5_state("./output/d2xpsi.h5", &scratch[0], params);
+	save_hdf5_state("./output/d2xpsi.h5", &scr.scratch[0], params);
     }
 #endif
 
-    dy(scratch, scratch2, params);
-    dy(scratch2, d2xd2ypsi, params);
+    dy(scr.scratch, scr.scratch2, params);
+    dy(scr.scratch2, scr.d2xd2ypsi, params);
 
 
-    d4x(psi, d4xpsi, params);
+    d4x(psi, scr.d4xpsi, params);
 
     for(i=0; i<N+1; i++)
     {
 	for(j=0; j<M; j++)
 	{
-	    // biharmpsi[ind(i,j)] = biharmpsi[ind(i,j)] + scratch2[ind(i,j)];
+	    // biharmpsi[ind(i,j)] = biharmpsi[ind(i,j)] + scr.scratch2[ind(i,j)];
 
-	    biharmpsi[ind(i,j)] = d4xpsi[ind(i,j)] + 2.*d2xd2ypsi[ind(i,j)];
-	    biharmpsi[ind(i,j)] = biharmpsi[ind(i,j)] + d4ypsi[ind(i,j)];
+	    scr.biharmpsi[ind(i,j)] = scr.d4xpsi[ind(i,j)] + 2.*scr.d2xd2ypsi[ind(i,j)];
+	    scr.biharmpsi[ind(i,j)] = scr.biharmpsi[ind(i,j)] + scr.d4ypsi[ind(i,j)];
 	}
     }
 
@@ -158,18 +151,17 @@ void step_sf_SI_Crank_Nicolson(
 #ifdef MYDEBUG
     if(timeStep==0)
     {
-	printf("should see some output?\n");
-	save_hdf5_state("./output/u.h5",  &u[0], params);
-	save_hdf5_state("./output/v.h5", &v[0], params);
-	save_hdf5_state("./output/lplpsi.h5", &lplpsi[0], params);
-	save_hdf5_state("./output/d2ypsi.h5", &d2ypsi[0], params);
-	save_hdf5_state("./output/d3ypsi.h5", &dyyypsi[0], params);
-	save_hdf5_state("./output/d4ypsi.h5", &d4ypsi[0], params);
-	save_hdf5_state("./output/d2xd2ypsi.h5", &d2xd2ypsi[0], params);
-	save_hdf5_state("./output/d4xpsi.h5", &d4xpsi[0], params);
-	save_hdf5_state("./output/biharmpsi.h5", &biharmpsi[0], params);
-	save_hdf5_state("./output/udxlplpsi.h5", &udxlplpsi[0], params);
-	save_hdf5_state("./output/vdylplpsi.h5", &vdylplpsi[0], params);
+	save_hdf5_state("./output/u.h5",  &scr.u[0], params);
+	save_hdf5_state("./output/v.h5", &scr.v[0], params);
+	save_hdf5_state("./output/lplpsi.h5", &scr.lplpsi[0], params);
+	save_hdf5_state("./output/d2ypsi.h5", &scr.d2ypsi[0], params);
+	save_hdf5_state("./output/d3ypsi.h5", &scr.dyyypsi[0], params);
+	save_hdf5_state("./output/d4ypsi.h5", &scr.d4ypsi[0], params);
+	save_hdf5_state("./output/d2xd2ypsi.h5", &scr.d2xd2ypsi[0], params);
+	save_hdf5_state("./output/d4xpsi.h5", &scr.d4xpsi[0], params);
+	save_hdf5_state("./output/biharmpsi.h5", &scr.biharmpsi[0], params);
+	save_hdf5_state("./output/udxlplpsi.h5", &scr.udxlplpsi[0], params);
+	save_hdf5_state("./output/vdylplpsi.h5", &scr.vdylplpsi[0], params);
     }
 #endif
 
@@ -178,18 +170,18 @@ void step_sf_SI_Crank_Nicolson(
 	for (j=0; j<M; j++)
 	{
 
-	    RHSvec[j] = 0.5*dt*oneOverRe*biharmpsi[ind(i,j)];
-	    RHSvec[j] += + lplpsi[ind(i,j)];
-	    RHSvec[j] += - dt*udxlplpsi[ind(i,j)];
-	    RHSvec[j] += - dt*vdylplpsi[ind(i,j)];
-	    RHSvec[j] += dt*forcing[ind(i,j)]; 
+	    scr.RHSvec[j] = 0.5*dt*oneOverRe*scr.biharmpsi[ind(i,j)];
+	    scr.RHSvec[j] += + scr.lplpsi[ind(i,j)];
+	    scr.RHSvec[j] += - dt*scr.udxlplpsi[ind(i,j)];
+	    scr.RHSvec[j] += - dt*scr.vdylplpsi[ind(i,j)];
+	    scr.RHSvec[j] += dt*forcing[ind(i,j)]; 
 
 	}
 
 	//impose BCs
 
-	RHSvec[M-2] = 0;
-	RHSvec[M-1] = 0;
+	scr.RHSvec[M-2] = 0;
+	scr.RHSvec[M-1] = 0;
 
 #ifdef MYDEBUG
 	if(timeStep==0)
@@ -197,7 +189,7 @@ void step_sf_SI_Crank_Nicolson(
 	    char fn[30];
 	    sprintf(fn, "./output/RHSVec%d.h5", i);
 	    printf("writing %s\n", fn);
-	    save_hdf5_arr(fn, &RHSvec[0], M);
+	    save_hdf5_arr(fn, &scr.RHSvec[0], M);
 	}
 #endif
 
@@ -208,7 +200,7 @@ void step_sf_SI_Crank_Nicolson(
 
 	    for (l=M-1; l>=0; l=l-1)
 	    {
-		psi[ind(i,j)] += opsList[(i*M + j)*M + l] * RHSvec[l];
+		psi[ind(i,j)] += opsList[(i*M + j)*M + l] * scr.RHSvec[l];
 	    }
 	}
 
@@ -225,11 +217,11 @@ void step_sf_SI_Crank_Nicolson(
     for (j=0; j<M; j++)
     {
 	//RHSvec[j] = u[ind(0,j)];
-	RHSvec[j] = dt*0.5*oneOverRe*dyyypsi[ind(0,j)] - dt*vdyypsi[ind(0,j)];
-	RHSvec[j] += u[ind(0,j)]; 
-	RHSvec[j] += dt*forcing[ind(0,j)]; 
+	scr.RHSvec[j] = dt*0.5*oneOverRe*scr.dyyypsi[ind(0,j)] - dt*scr.vdyypsi[ind(0,j)];
+	scr.RHSvec[j] += scr.u[ind(0,j)]; 
+	scr.RHSvec[j] += dt*forcing[ind(0,j)]; 
     }
-    //RHSvec[0] += 2*dt*oneOverRe;
+    //scr.RHSvec[0] += 2*dt*oneOverRe;
 
     // apply BCs
     // # dyPsi0(+-1) = 0
@@ -238,16 +230,16 @@ void step_sf_SI_Crank_Nicolson(
     // # Psi0(-1) = 0
     // RHSVec[N*M + M-1] = 0
 
-    RHSvec[M-3] = params.U0; 
-    RHSvec[M-2] = -params.U0; 
-    RHSvec[M-1] = 0; 
+    scr.RHSvec[M-3] = params.U0; 
+    scr.RHSvec[M-2] = -params.U0; 
+    scr.RHSvec[M-1] = 0; 
 
 #ifdef MYDEBUG
     if(timeStep==0)
     {
 	char fn[30];
 	sprintf(fn, "./output/RHSVec%d.h5", 0);
-	save_hdf5_arr(fn, &RHSvec[0], M);
+	save_hdf5_arr(fn, &scr.RHSvec[0], M);
     }
 #endif
 
@@ -261,22 +253,17 @@ void step_sf_SI_Crank_Nicolson(
 	//for (l=M-1; l>=0; l=l-1)
 	for (l=0; l<M; l++)
 	{
-	    psi[ind(0,j)] += opsList[j*M + l] * RHSvec[l];
+	    psi[ind(0,j)] += creal(opsList[j*M + l] * scr.RHSvec[l]);
 
 	}
     }
 
 }
 
+
 void step_conformation_Crank_Nicolson(
-	complex *psi, complex *cij, complex *cijNL, double dt, flow_params params,
-	complex *u, complex *v, complex *dxu, complex *dyu, complex *dxv,
-	complex *dyv, complex *cxxdxu, complex *cxydyu, complex *vgradcxx,
-	complex *cxydxv, complex *cyydyv, complex *vgradcyy, complex *cxxdxv,
-	complex *cyydyu, complex *vgradcxy, complex *scratch, complex
-	*scratch2, fftw_plan *phys_plan, fftw_plan *spec_plan, complex
-	*scratchin, complex *scratchout, double *scratchp1, double *scratchp2 
-	)
+	complex *psi, complex *cij, complex *cijNL, double dt, flow_scratch
+	scr, flow_params params)
 {
     int N = params.N;
     int M = params.M;
@@ -286,91 +273,79 @@ void step_conformation_Crank_Nicolson(
 
     // Nonlinear terms ----------------------------------------------------
     // dxU, dyU, dxV, dyV
-    dy(psi, u, params);
-    dx(psi, v, params);
+    dy(psi, scr.u, params);
+    dx(psi, scr.v, params);
 
     for (i =0; i<M*(N+1); i++)
     {
-	v[i] = -v[i];
+	scr.v[i] = -scr.v[i];
     }
 
-    dx(u, dxu, params);
-    dy(u, dyu, params);
-    dx(v, dxv, params);
-    dy(v, dyv, params);
+    dx(scr.u, scr.dxu, params);
+    dy(scr.u, scr.dyu, params);
+    dx(scr.v, scr.dxv, params);
+    dy(scr.v, scr.dyv, params);
     
     // Cxx*dxU 
-    fft_convolve_r(&cijNL[0], dxu, cxxdxu, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    fft_convolve_r(&cijNL[0], scr.dxu, scr.cxxdxu, scr, params);
 
     // Cxy*dyU 
-    fft_convolve_r(&cijNL[2*(N+1)*M], dyu, cxydyu, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    fft_convolve_r(&cijNL[2*(N+1)*M], scr.dyu, scr.cxydyu, scr, params);
 
     // VGrad*Cxx
-    dx(&cijNL[0], scratch, params);
-    fft_convolve_r(u, scratch, scratch, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    dx(&cijNL[0], scr.scratch, params);
+    fft_convolve_r(scr.u, scr.scratch, scr.scratch, scr, params);
 
-    dy(&cijNL[0], scratch2, params);
-    fft_convolve_r(v, scratch2, scratch2, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    dy(&cijNL[0], scr.scratch2, params);
+    fft_convolve_r(scr.v, scr.scratch2, scr.scratch2, scr, params);
 
     for (i=0; i<N+1; i++)
     {
 	for (j=0; j<M; j++)
 	{
-	    vgradcxx[ind(i,j)] = scratch[ind(i,j)] + scratch2[ind(i,j)];
+	    scr.vgradcxx[ind(i,j)] = scr.scratch[ind(i,j)] + scr.scratch2[ind(i,j)];
 	}
     }
     
     // Cxy*dxV
-    fft_convolve_r(&cijNL[2*(N+1)*M], dxv, cxydxv, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    fft_convolve_r(&cijNL[2*(N+1)*M], scr.dxv, scr.cxydxv, scr, params);
 
     // Cyy*dyV
-    fft_convolve_r(&cijNL[(N+1)*M], dyv, cyydyv, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    fft_convolve_r(&cijNL[(N+1)*M], scr.dyv, scr.cyydyv, scr, params);
 
     // vgrad*Cyy
-    dx(&cijNL[(N+1)*M], scratch, params);
-    fft_convolve_r(u, scratch, scratch, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    dx(&cijNL[(N+1)*M], scr.scratch, params);
+    fft_convolve_r(scr.u, scr.scratch, scr.scratch, scr, params);
 
-    dy(&cijNL[(N+1)*M], scratch2, params);
-    fft_convolve_r(v, scratch2, scratch2, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    dy(&cijNL[(N+1)*M], scr.scratch2, params);
+    fft_convolve_r(scr.v, scr.scratch2, scr.scratch2, scr, params);
 
     for (i=0; i<N+1; i++)
     {
 	for (j=0; j<M; j++)
 	{
-	    vgradcyy[ind(i,j)] = scratch[ind(i,j)] + scratch2[ind(i,j)];
+	    scr.vgradcyy[ind(i,j)] = scr.scratch[ind(i,j)] + scr.scratch2[ind(i,j)];
 	}
     }
     
     // Cxx*dxV
-    fft_convolve_r(&cijNL[0], dxv, cxxdxv, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    fft_convolve_r(&cijNL[0], scr.dxv, scr.cxxdxv, scr, params);
 
     // CyydyU
-    fft_convolve_r(&cijNL[(N+1)*M], dyu, cyydyu, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    fft_convolve_r(&cijNL[(N+1)*M], scr.dyu, scr.cyydyu, scr, params);
 
     // Vgrad*Cxy
-    dx(&cijNL[2*(N+1)*M], scratch, params);
-    fft_convolve_r(u, scratch, scratch, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    dx(&cijNL[2*(N+1)*M], scr.scratch, params);
+    fft_convolve_r(scr.u, scr.scratch, scr.scratch, scr, params);
 
-    dy(&cijNL[2*(N+1)*M], scratch2, params);
-    fft_convolve_r(v, scratch2, scratch2, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    dy(&cijNL[2*(N+1)*M], scr.scratch2, params);
+    fft_convolve_r(scr.v, scr.scratch2, scr.scratch2, scr, params);
 
     for (i=0; i<N+1; i++)
     {
 	for (j=0; j<M; j++)
 	{
-	    vgradcxy[ind(i,j)] = scratch[ind(i,j)] + scratch2[ind(i,j)];
+	    scr.vgradcxy[ind(i,j)] = scr.scratch[ind(i,j)] + scr.scratch2[ind(i,j)];
 	}
     }
 
@@ -394,22 +369,22 @@ void step_conformation_Crank_Nicolson(
     {
 	for (j=0; j<M; j++)
 	{
-	    cij[ind(i,j)] = dt*2.*cxxdxu[ind(i,j)] + dt*2.*cxydyu[ind(i,j)];
-	    cij[ind(i,j)] += - dt*vgradcxx[ind(i,j)];
+	    cij[ind(i,j)] = dt*2.*scr.cxxdxu[ind(i,j)] + dt*2.*scr.cxydyu[ind(i,j)];
+	    cij[ind(i,j)] += - dt*scr.vgradcxx[ind(i,j)];
 	    cij[ind(i,j)] += - 0.5*dt*oneOverWi*cij[ind(i,j)];
 	    cij[ind(i,j)] += cij[ind(i,j)];
 
 	    cij[ind(i,j)] *= 1./(1.+0.5*oneOverWi);
 
-	    cij[(N+1)*M + ind(i,j)] = dt*2.*cxydxv[ind(i,j)] + dt*2.*cyydyv[ind(i,j)];
-	    cij[(N+1)*M + ind(i,j)] += - dt*vgradcyy[ind(i,j)];
+	    cij[(N+1)*M + ind(i,j)] = dt*2.*scr.cxydxv[ind(i,j)] + dt*2.*scr.cyydyv[ind(i,j)];
+	    cij[(N+1)*M + ind(i,j)] += - dt*scr.vgradcyy[ind(i,j)];
 	    cij[(N+1)*M + ind(i,j)] += 0.5*dt*oneOverWi*cij[(N+1)*M + ind(i,j)];
 	    cij[(N+1)*M + ind(i,j)] += cij[(N+1)*M + ind(i,j)];
 
 	    cij[(N+1)*M + ind(i,j)] *= 1./(1.+0.5*oneOverWi);
 
-	    cij[2*(N+1)*M + ind(i,j)] = dt*cxxdxv[ind(i,j)] + dt*cyydyu[ind(i,j)];
-	    cij[2*(N+1)*M + ind(i,j)] += - dt*vgradcxy[ind(i,j)];
+	    cij[2*(N+1)*M + ind(i,j)] = dt*scr.cxxdxv[ind(i,j)] + dt*scr.cyydyu[ind(i,j)];
+	    cij[2*(N+1)*M + ind(i,j)] += - dt*scr.vgradcxy[ind(i,j)];
 	    cij[2*(N+1)*M + ind(i,j)] += 0.5*dt*oneOverWi*cij[2*(N+1)*M + ind(i,j)];
 	    cij[2*(N+1)*M + ind(i,j)] += cij[2*(N+1)*M + ind(i,j)];
 
@@ -422,16 +397,8 @@ void step_conformation_Crank_Nicolson(
 
 void step_sf_SI_Crank_Nicolson_visco(
 	complex *psi, complex *psiNL, complex *cij, complex *cijNL, complex
-	*forcing, double dt, int timeStep, flow_params
-	params, complex *scratch, complex *scratch2, complex *u, complex *v,
-	complex *lplpsi, complex *biharmpsi, complex *d2ypsi, complex *dyyypsi,
-	complex *d4ypsi, complex *d2xd2ypsi, complex *d4xpsi, complex
-	*udxlplpsi, complex *vdylplpsi, complex *vdyypsi, complex *d2ycxy,
-	complex *d2xcxy, complex *dxycyy_cxx, complex *dycxy, complex
-	*d2ycxyNL, complex *d2xcxyNL, complex *dxycyy_cxxNL, complex *dycxyNL,
-	complex *RHSvec, complex *opsList, fftw_plan *phys_plan, fftw_plan
-	*spec_plan, complex *scratchin, complex *scratchout, double *scratchp1,
-	double *scratchp2 )
+	*forcing, double dt, int timeStep,  complex *opsList, flow_scratch
+	scr, flow_params params)
 {
     int i, j, l;
     int N = params.N;
@@ -443,140 +410,137 @@ void step_sf_SI_Crank_Nicolson_visco(
     // -----------Nonlinear Terms --------------
     //
     // 
-    dy(psiNL, u, params);
+    dy(psiNL, scr.u, params);
 
     // v
-    dx(psiNL, v, params);
+    dx(psiNL, scr.v, params);
     for(i=0; i<N+1; i++)
     {
 	for(j=0; j<M; j++)
 	{
-	    v[ind(i,j)] = -v[ind(i,j)];
+	    scr.v[ind(i,j)] = -scr.v[ind(i,j)];
 	}
     }
 
 
     // lplpsi dyy(psi) + dxx(psi)
 
-    d2x(psiNL, scratch, params);
-    dy(u, lplpsi, params);
+    d2x(psiNL, scr.scratch, params);
+    dy(scr.u, scr.lplpsi, params);
     for(i=0; i<N+1; i++)
     {
 	for(j=0; j<M; j++)
 	{
-	    lplpsi[ind(i,j)] = lplpsi[ind(i,j)] + scratch[ind(i,j)];
+	    scr.lplpsi[ind(i,j)] = scr.lplpsi[ind(i,j)] + scr.scratch[ind(i,j)];
 	}
     }
 
 
     // udxlplpsi 
-    dx(lplpsi, udxlplpsi, params);
+    dx(scr.lplpsi, scr.udxlplpsi, params);
     #ifdef MYDEBUG
     if(timeStep==0)
     {
-	save_hdf5_state("./output/dxlplpsi.h5", &udxlplpsi[0], params);
+	save_hdf5_state("./output/dxlplpsi.h5", &scr.udxlplpsi[0], params);
     }
     #endif
 
 
-    fft_convolve_r(udxlplpsi, u, udxlplpsi, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    fft_convolve_r(scr.udxlplpsi, scr.u, scr.udxlplpsi, scr, params);
 
     // vdylplpsi 
-    dy(lplpsi, vdylplpsi, params);
+    dy(scr.lplpsi, scr.vdylplpsi, params);
 
     #ifdef MYDEBUG
     if(timeStep==0)
     {
-	save_hdf5_state("./output/dylplpsi.h5", &vdylplpsi[0], params);
+	save_hdf5_state("./output/dylplpsi.h5", &scr.vdylplpsi[0], params);
     }
     #endif
 
 
-    fft_convolve_r(vdylplpsi, v, vdylplpsi, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    fft_convolve_r(scr.vdylplpsi, scr.v, scr.vdylplpsi, scr, params);
 
     //vdyypsi = vdyu
-    dy(u, d2ypsi, params);
+    dy(scr.u, scr.d2ypsi, params);
 
-    fft_convolve_r(d2ypsi, v, vdyypsi, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    fft_convolve_r(scr.d2ypsi, scr.v, scr.vdyypsi, scr, params);
 
 #ifdef MYDEBUG
     if(timeStep==0)
     {
-	save_hdf5_state("./output/vdyypsi.h5", &vdyypsi[0], params);
+	save_hdf5_state("./output/vdyypsi.h5", &scr.vdyypsi[0], params);
     }
 #endif
 
     // d2x cxy
-    d2x(&cijNL[2*(N+1)*M], d2xcxyNL, params);
+    d2x(&cijNL[2*(N+1)*M], scr.d2xcxyNL, params);
     
     // d2y cxy
-    dy(&cijNL[2*(N+1)*M], scratch, params);
-    dy(scratch, d2ycxyNL, params);
+    dy(&cijNL[2*(N+1)*M], scr.scratch, params);
+    dy(scr.scratch, scr.d2ycxyNL, params);
 
     // dxy cyy-cxx
     for (i=0; i<N+1; i++)
     {
 	for (j=0; j<M; j++)
 	{
-	    scratch[ind(i,j)] = cijNL[(N+1)*M + ind(i,j)] - cijNL[ind(i,j)];
+	    scr.scratch[ind(i,j)] = cijNL[(N+1)*M + ind(i,j)] - cijNL[ind(i,j)];
 	}
     }
 
-    dx(scratch, scratch2, params);
-    dy(scratch2, dxycyy_cxxNL, params);
+    dx(scr.scratch, scr.scratch2, params);
+    dy(scr.scratch2, scr.dxycyy_cxxNL, params);
     
     //dycxy
-    dy(&cijNL[2*(N+1)*M], dycxyNL, params);
+    dy(&cijNL[2*(N+1)*M], scr.dycxyNL, params);
     
 
     // ----------- linear Terms --------------
     
     // lplpsi dyy(psi) + dxx(psi)
 
-    d2x(psi, scratch, params);
-    dy(psi, u, params);
-    dy(u, lplpsi, params);
+    d2x(psi, scr.scratch, params);
+    dy(psi, scr.u, params);
+    dy(scr.u, scr.lplpsi, params);
 
     for(i=0; i<N+1; i++)
     {
 	for(j=0; j<M; j++)
 	{
-	    lplpsi[ind(i,j)] = lplpsi[ind(i,j)] + scratch[ind(i,j)];
+	    scr.lplpsi[ind(i,j)] = scr.lplpsi[ind(i,j)] + scr.scratch[ind(i,j)];
 	}
     }
 
     // biharmpsi (dyy + dxx)lplpsi
 
-    dy(u, d2ypsi, params);
-    dy(d2ypsi, dyyypsi, params);
-    dy(dyyypsi, d4ypsi, params);
+    dy(scr.u, scr.d2ypsi, params);
+    dy(scr.d2ypsi, scr.dyyypsi, params);
+    dy(scr.dyyypsi, scr.d4ypsi, params);
 
-    d2x(psi, scratch, params);
+    d2x(psi, scr.scratch, params);
 
 #ifdef MYDEBUG
     if(timeStep==0)
     {
-	save_hdf5_state("./output/d2xpsi.h5", &scratch[0], params);
+	save_hdf5_state("./output/d2xpsi.h5", &scr.scratch[0], params);
     }
 #endif
 
-    dy(scratch, scratch2, params);
-    dy(scratch2, d2xd2ypsi, params);
+    dy(scr.scratch, scr.scratch2, params);
+    dy(scr.scratch2, scr.d2xd2ypsi, params);
 
 
-    d4x(psi, d4xpsi, params);
+    d4x(psi, scr.d4xpsi, params);
 
     for(i=0; i<N+1; i++)
     {
 	for(j=0; j<M; j++)
 	{
-	    // biharmpsi[ind(i,j)] = biharmpsi[ind(i,j)] + scratch2[ind(i,j)];
+	    // biharmpsi[ind(i,j)] = biharmpsi[ind(i,j)] + scr.scratch2[ind(i,j)];
 
-	    biharmpsi[ind(i,j)] = d4xpsi[ind(i,j)] + 2.*d2xd2ypsi[ind(i,j)];
-	    biharmpsi[ind(i,j)] = biharmpsi[ind(i,j)] + d4ypsi[ind(i,j)];
+	    scr.biharmpsi[ind(i,j)] = scr.d4xpsi[ind(i,j)] + 2.*scr.d2xd2ypsi[ind(i,j)];
+	    scr.biharmpsi[ind(i,j)] = scr.biharmpsi[ind(i,j)] + scr.d4ypsi[ind(i,j)];
 	}
     }
 
@@ -589,42 +553,42 @@ void step_sf_SI_Crank_Nicolson_visco(
     if(timeStep==0)
     {
 	printf("should see some output?\n");
-	save_hdf5_state("./output/u.h5",  &u[0], params);
-	save_hdf5_state("./output/v.h5", &v[0], params);
-	save_hdf5_state("./output/lplpsi.h5", &lplpsi[0], params);
-	save_hdf5_state("./output/d2ypsi.h5", &d2ypsi[0], params);
-	save_hdf5_state("./output/d3ypsi.h5", &dyyypsi[0], params);
-	save_hdf5_state("./output/d4ypsi.h5", &d4ypsi[0], params);
-	save_hdf5_state("./output/d2xd2ypsi.h5", &d2xd2ypsi[0], params);
-	save_hdf5_state("./output/d4xpsi.h5", &d4xpsi[0], params);
-	save_hdf5_state("./output/biharmpsi.h5", &biharmpsi[0], params);
-	save_hdf5_state("./output/udxlplpsi.h5", &udxlplpsi[0], params);
-	save_hdf5_state("./output/vdylplpsi.h5", &vdylplpsi[0], params);
+	save_hdf5_state("./output/u.h5",  &scr.u[0], params);
+	save_hdf5_state("./output/v.h5", &scr.v[0], params);
+	save_hdf5_state("./output/lplpsi.h5", &scr.lplpsi[0], params);
+	save_hdf5_state("./output/d2ypsi.h5", &scr.d2ypsi[0], params);
+	save_hdf5_state("./output/d3ypsi.h5", &scr.dyyypsi[0], params);
+	save_hdf5_state("./output/d4ypsi.h5", &scr.d4ypsi[0], params);
+	save_hdf5_state("./output/d2xd2ypsi.h5", &scr.d2xd2ypsi[0], params);
+	save_hdf5_state("./output/d4xpsi.h5", &scr.d4xpsi[0], params);
+	save_hdf5_state("./output/biharmpsi.h5", &scr.biharmpsi[0], params);
+	save_hdf5_state("./output/udxlplpsi.h5", &scr.udxlplpsi[0], params);
+	save_hdf5_state("./output/vdylplpsi.h5", &scr.vdylplpsi[0], params);
     }
 #endif
 
     // stresses
 
     // d2x cxy
-    d2x(&cij[2*(N+1)*M], d2xcxy, params);
+    d2x(&cij[2*(N+1)*M], scr.d2xcxy, params);
     
     // d2y cxy
-    dy(&cij[2*(N+1)*M], scratch, params);
-    dy(scratch, d2ycxy, params);
+    dy(&cij[2*(N+1)*M], scr.scratch, params);
+    dy(scr.scratch, scr.d2ycxy, params);
 
     for (i=0; i<N+1; i++)
     {
 	for (j=0; j<M; j++)
 	{
-	    scratch[ind(i,j)] = cij[(N+1)*M + ind(i,j)] - cij[ind(i,j)];
+	    scr.scratch[ind(i,j)] = cij[(N+1)*M + ind(i,j)] - cij[ind(i,j)];
 	}
     }
 
-    dx(scratch, scratch2, params);
-    dy(scratch2, dxycyy_cxx, params);
+    dx(scr.scratch, scr.scratch2, params);
+    dy(scr.scratch2, scr.dxycyy_cxx, params);
     
     //dycxy
-    dy(&cij[2*(N+1)*M], dycxy, params);
+    dy(&cij[2*(N+1)*M], scr.dycxy, params);
     
 
     // RHSVec = dt*0.5*oneOverRe*BIHARMPSI 
@@ -640,27 +604,27 @@ void step_sf_SI_Crank_Nicolson_visco(
 	for (j=0; j<M; j++)
 	{
 
-	    RHSvec[j] = 0.5*dt*oneOverRe*biharmpsi[ind(i,j)];
-	    RHSvec[j] += - dt*udxlplpsi[ind(i,j)];
-	    RHSvec[j] += - dt*vdylplpsi[ind(i,j)];
-	    RHSvec[j] += + 0.5*dt*(1.-beta)*oneOverRe*oneOverWi*( 
-			                 d2xcxy[ind(i,j)] 
-				       + dxycyy_cxx[ind(i,j)] 
-				       - d2ycxy[ind(i,j)]);
-	    RHSvec[j] += + 0.5*dt*(1.-beta)*oneOverRe*oneOverWi*( 
-			                 d2xcxyNL[ind(i,j)] 
-				       + dxycyy_cxxNL[ind(i,j)] 
-				       - d2ycxyNL[ind(i,j)]);
-	    RHSvec[j] += dt*forcing[ind(i,j)];
-	    RHSvec[j] += + lplpsi[ind(i,j)];
+	    scr.RHSvec[j] = 0.5*dt*oneOverRe*scr.biharmpsi[ind(i,j)];
+	    scr.RHSvec[j] += - dt*scr.udxlplpsi[ind(i,j)];
+	    scr.RHSvec[j] += - dt*scr.vdylplpsi[ind(i,j)];
+	    scr.RHSvec[j] += + 0.5*dt*(1.-beta)*oneOverRe*oneOverWi*( 
+			                 scr.d2xcxy[ind(i,j)] 
+				       + scr.dxycyy_cxx[ind(i,j)] 
+				       - scr.d2ycxy[ind(i,j)]);
+	    scr.RHSvec[j] += + 0.5*dt*(1.-beta)*oneOverRe*oneOverWi*( 
+			                 scr.d2xcxyNL[ind(i,j)] 
+				       + scr.dxycyy_cxxNL[ind(i,j)] 
+				       - scr.d2ycxyNL[ind(i,j)]);
+	    scr.RHSvec[j] += dt*forcing[ind(i,j)];
+	    scr.RHSvec[j] += + scr.lplpsi[ind(i,j)];
 
 
 	}
 
 	//impose BCs
 
-	RHSvec[M-2] = 0;
-	RHSvec[M-1] = 0;
+	scr.RHSvec[M-2] = 0;
+	scr.RHSvec[M-1] = 0;
 
 	#ifdef MYDEBUG
 	if(timeStep==0)
@@ -668,7 +632,7 @@ void step_sf_SI_Crank_Nicolson_visco(
 	    char fn[30];
 	    sprintf(fn, "./output/RHSVec%d.h5", i);
 	    printf("writing %s\n", fn);
-	    save_hdf5_arr(fn, &RHSvec[0], M);
+	    save_hdf5_arr(fn, &scr.RHSvec[0], M);
 	}
 	#endif
 
@@ -679,7 +643,7 @@ void step_sf_SI_Crank_Nicolson_visco(
 
 	    for (l=M-1; l>=0; l=l-1)
 	    {
-		psi[ind(i,j)] += opsList[(i*M + j)*M + l] * RHSvec[l];
+		psi[ind(i,j)] += opsList[(i*M + j)*M + l] * scr.RHSvec[l];
 	    }
 	}
 
@@ -697,12 +661,12 @@ void step_sf_SI_Crank_Nicolson_visco(
     for (j=0; j<M; j++)
     {
 	//RHSvec[j] = u[ind(0,j)];
-	RHSvec[j] = dt*0.5*oneOverRe*creal(dyyypsi[ind(0,j)]);
-	RHSvec[j] += - dt*creal(vdyypsi[ind(0,j)]);
-	RHSvec[j] += dt*0.5*(1.-beta)*oneOverRe*creal(dycxy[ind(0,j)]); 
-	RHSvec[j] += dt*0.5*(1.-beta)*oneOverRe*creal(dycxyNL[ind(0,j)]); 
-	RHSvec[j] += dt*creal(forcing[ind(0,j)]);
-	RHSvec[j] += creal(u[ind(0,j)]); 
+	scr.RHSvec[j] = dt*0.5*oneOverRe*creal(scr.dyyypsi[ind(0,j)]);
+	scr.RHSvec[j] += - dt*creal(scr.vdyypsi[ind(0,j)]);
+	scr.RHSvec[j] += dt*0.5*(1.-beta)*oneOverRe*creal(scr.dycxy[ind(0,j)]); 
+	scr.RHSvec[j] += dt*0.5*(1.-beta)*oneOverRe*creal(scr.dycxyNL[ind(0,j)]); 
+	scr.RHSvec[j] += dt*creal(forcing[ind(0,j)]);
+	scr.RHSvec[j] += creal(scr.u[ind(0,j)]); 
     }
     // RHSvec[0] += 2*dt*oneOverRe;
 
@@ -713,16 +677,16 @@ void step_sf_SI_Crank_Nicolson_visco(
     // # Psi0(-1) = 0
     // RHSVec[N*M + M-1] = 0
 
-    RHSvec[M-3] = 0; 
-    RHSvec[M-2] = 0; 
-    RHSvec[M-1] = 0; 
+    scr.RHSvec[M-3] = 0; 
+    scr.RHSvec[M-2] = 0; 
+    scr.RHSvec[M-1] = 0; 
 
 #ifdef MYDEBUG
     if(timeStep==0)
     {
 	char fn[30];
 	sprintf(fn, "./output/RHSVec%d.h5", 0);
-	save_hdf5_arr(fn, &RHSvec[0], M);
+	save_hdf5_arr(fn, &scr.RHSvec[0], M);
     }
 #endif
 
@@ -736,7 +700,7 @@ void step_sf_SI_Crank_Nicolson_visco(
 	//for (l=M-1; l>=0; l=l-1)
 	for (l=0; l<M; l++)
 	{
-	    psi[ind(0,j)] += opsList[j*M + l] * RHSvec[l];
+	    psi[ind(0,j)] += opsList[j*M + l] * scr.RHSvec[l];
 
 	}
     }
@@ -747,107 +711,90 @@ void step_sf_SI_Crank_Nicolson_visco(
 
 void stress_time_derivative(
 	complex *psi, complex *cxx, complex *cyy, complex *cxy, complex *fxx,
-	complex *fyy, complex *fxy, double oneOverWi, flow_params params,
-	complex *u, complex *v, complex *dxu, complex *dyu, complex *dxv,
-	complex *dyv, complex *txx, complex *tyy, complex *txy, complex
-	*cxxdxu, complex *cxydyu, complex *vgradcxx, complex *cxydxv, complex
-	*cyydyv, complex *vgradcyy, complex *cxxdxv, complex *cyydyu, complex
-	*vgradcxy, complex *scratch, complex *scratch2, fftw_plan *phys_plan,
-	fftw_plan *spec_plan, complex *scratchin, complex *scratchout, double
-	*scratchp1, double *scratchp2 
+	complex *fyy, complex *fxy, complex *txx, complex *tyy, complex *txy,
+	flow_scratch scr, flow_params params
 	)
 {
     // Calculate f({psi, cxx, cyy, cxy}, dt)
     int N = params.N;
     int M = params.M;
     int i,j;
+    double oneOverWi = 1./params.Wi;
     
     // dxU, dyU, dxV, dyV
-    dy(psi, u, params);
-    dx(psi, v, params);
+    dy(psi, scr.u, params);
+    dx(psi, scr.v, params);
 
     for (i =0; i<M*(N+1); i++)
     {
-	v[i] = -v[i];
+	scr.v[i] = -scr.v[i];
     }
 
-    dx(u, dxu, params);
-    dy(u, dyu, params);
-    dx(v, dxv, params);
-    dy(v, dyv, params);
+    dx(scr.u, scr.dxu, params);
+    dy(scr.u, scr.dyu, params);
+    dx(scr.v, scr.dxv, params);
+    dy(scr.v, scr.dyv, params);
     
     // Cxx*dxU 
-    fft_convolve_r(cxx, dxu, cxxdxu, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    fft_convolve_r(cxx, scr.dxu, scr.cxxdxu, scr, params);
 
     // Cxy*dyU 
-    fft_convolve_r(cxy, dyu, cxydyu, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    fft_convolve_r(cxy, scr.dyu, scr.cxydyu, scr, params);
 
     // VGrad*Cxx
-    dx(cxx, scratch, params);
-    fft_convolve_r(u, scratch, scratch, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    dx(cxx, scr.scratch, params);
+    fft_convolve_r(scr.u, scr.scratch, scr.scratch, scr, params);
 
-    dy(cxx, scratch2, params);
-    fft_convolve_r(v, scratch2, scratch2, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    dy(cxx, scr.scratch2, params);
+    fft_convolve_r(scr.v, scr.scratch2, scr.scratch2, scr, params);
 
     for (i=0; i<N+1; i++)
     {
 	for (j=0; j<M; j++)
 	{
-	    vgradcxx[ind(i,j)] = scratch[ind(i,j)] + scratch2[ind(i,j)];
+	    scr.vgradcxx[ind(i,j)] = scr.scratch[ind(i,j)] + scr.scratch2[ind(i,j)];
 	}
     }
     
     // Cxy*dxV
-    fft_convolve_r(cxy, dxv, cxydxv, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    fft_convolve_r(cxy, scr.dxv, scr.cxydxv, scr, params);
 
     // Cyy*dyV
-    fft_convolve_r(cyy, dyv, cyydyv, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    fft_convolve_r(cyy, scr.dyv, scr.cyydyv, scr, params);
 
     // vgrad*Cyy
-    dx(cyy, scratch, params);
-    fft_convolve_r(u, scratch, scratch, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    dx(cyy, scr.scratch, params);
+    fft_convolve_r(scr.u, scr.scratch, scr.scratch, scr, params);
 
-    dy(cyy, scratch2, params);
-    fft_convolve_r(v, scratch2, scratch2, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    dy(cyy, scr.scratch2, params);
+    fft_convolve_r(scr.v, scr.scratch2, scr.scratch2, scr, params);
 
     for (i=0; i<N+1; i++)
     {
 	for (j=0; j<M; j++)
 	{
-	    vgradcyy[ind(i,j)] = scratch[ind(i,j)] + scratch2[ind(i,j)];
+	    scr.vgradcyy[ind(i,j)] = scr.scratch[ind(i,j)] + scr.scratch2[ind(i,j)];
 	}
     }
     
     // Cxx*dxV
-    fft_convolve_r(cxx, dxv, cxxdxv, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    fft_convolve_r(cxx, scr.dxv, scr.cxxdxv, scr, params);
 
     // CyydyU
-    fft_convolve_r(cyy, dyu, cyydyu, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    fft_convolve_r(cyy, scr.dyu, scr.cyydyu, scr, params);
 
     // Vgrad*Cxy
-    dx(cxy, scratch, params);
-    fft_convolve_r(u, scratch, scratch, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    dx(cxy, scr.scratch, params);
+    fft_convolve_r(scr.u, scr.scratch, scr.scratch, scr, params);
 
-    dy(cxy, scratch2, params);
-    fft_convolve_r(v, scratch2, scratch2, scratchp1, scratchp2, scratchin,
-	    scratchout, phys_plan, spec_plan, params);
+    dy(cxy, scr.scratch2, params);
+    fft_convolve_r(scr.v, scr.scratch2, scr.scratch2, scr, params);
 
     for (i=0; i<N+1; i++)
     {
 	for (j=0; j<M; j++)
 	{
-	    vgradcxy[ind(i,j)] = scratch[ind(i,j)] + scratch2[ind(i,j)];
+	    scr.vgradcxy[ind(i,j)] = scr.scratch[ind(i,j)] + scr.scratch2[ind(i,j)];
 	}
     }
     
@@ -886,32 +833,21 @@ void stress_time_derivative(
     {
 	for (j=0; j<M; j++)
 	{
-	    fxx[ind(i,j)] = 2*cxxdxu[ind(i,j)] + 2*cxydyu[ind(i,j)];
-	    fxx[ind(i,j)] += - vgradcxx[ind(i,j)] - txx[ind(i,j)];
+	    fxx[ind(i,j)] = 2*scr.cxxdxu[ind(i,j)] + 2*scr.cxydyu[ind(i,j)];
+	    fxx[ind(i,j)] += - scr.vgradcxx[ind(i,j)] - txx[ind(i,j)];
 
-	    fyy[ind(i,j)] = 2*cxydxv[ind(i,j)] + 2*cyydyv[ind(i,j)];
-	    fyy[ind(i,j)] += - vgradcyy[ind(i,j)] - tyy[ind(i,j)];
+	    fyy[ind(i,j)] = 2*scr.cxydxv[ind(i,j)] + 2*scr.cyydyv[ind(i,j)];
+	    fyy[ind(i,j)] += - scr.vgradcyy[ind(i,j)] - tyy[ind(i,j)];
 
-	    fxy[ind(i,j)] = cxxdxv[ind(i,j)] + cyydyu[ind(i,j)];
-	    fxy[ind(i,j)] += - vgradcxy[ind(i,j)] - txy[ind(i,j)];
+	    fxy[ind(i,j)] = scr.cxxdxv[ind(i,j)] + scr.cyydyu[ind(i,j)];
+	    fxy[ind(i,j)] += - scr.vgradcxy[ind(i,j)] - txy[ind(i,j)];
 	}
     }
 }
 
 void equilibriate_stress(
 	complex *psi, complex *psi2, complex *psi_lam, complex *cij, complex
-	*cijNL, double dt, flow_params params, complex *scratch,
-	complex *scratch2, complex *u, complex *v, complex *lplpsi, complex
-	*biharmpsi, complex *d2ypsi, complex *dyyypsi, complex *d4ypsi, complex
-	*d2xd2ypsi, complex *d4xpsi, complex *udxlplpsi, complex *vdylplpsi,
-	complex * cyydyu, complex *dxu, complex *dyu, complex * dxv, complex *
-	dyv, complex *cxxdxu, complex *cxydyu, complex *vgradcxx, complex
-	*cxydxv, complex *cyydyv, complex *vgradcyy, complex * cxxdxv, complex
-	* vgradcxy, complex *vdyypsi, complex *d2ycxy, complex *d2xcxy, complex
-	*dxycyy_cxx, complex *dycxy, complex *d2ycxyNL, complex *d2xcxyNL,
-	complex *dxycyy_cxxNL, complex *dycxyNL, complex *RHSvec, complex
-	*opsList, fftw_plan *phys_plan, fftw_plan *spec_plan, complex
-	*scratchin, complex *scratchout, double *scratchp1, double *scratchp2,
+	*cijNL, double dt,flow_scratch scr, flow_params params,
 	hid_t *file_id, hid_t *filetype_id, hid_t *datatype_id
 	)
 
@@ -929,6 +865,7 @@ void equilibriate_stress(
     double EE_tot = 0.0;
     double EE_xdepend = 0.0;
 #endif
+
 
     // Time step for approximately 2 the elastic timescale, 2*Wi.
     // Do homotopy between laminar flow and the initial streamfunction.
@@ -961,35 +898,27 @@ void equilibriate_stress(
 
 	// step the stress to t star
 
-	step_conformation_Crank_Nicolson(
-		psi_tmp, cijNL, cij, 0.5*dt, params, u, v, dxu, dyu, dxv, dyv,
-		cxxdxu, cxydyu, vgradcxx, cxydxv, cyydyv, vgradcyy, cxxdxv, cyydyu,
-		vgradcxy, scratch, scratch2, phys_plan, 
-		spec_plan, scratchin, scratchout, scratchp1, scratchp2 
-		);
+	step_conformation_Crank_Nicolson( psi_tmp, cijNL, cij, 0.5*dt, scr,
+		params);
 
 	// assume psi star = psi_tmp
 	// TODO: Account for a time dependent forcing, psi star will be different?
 
 	// step the stress to t + h
 
-	step_conformation_Crank_Nicolson(
-		psi_tmp, cij, cijNL, dt, params, u, v, dxu, dyu, dxv, dyv,
-		cxxdxu, cxydyu, vgradcxx, cxydxv, cyydyv, vgradcyy, cxxdxv, cyydyu,
-		vgradcxy, scratch, scratch2, phys_plan, 
-		spec_plan, scratchin, scratchout, scratchp1, scratchp2 
-		);
+	step_conformation_Crank_Nicolson( psi_tmp, cij, cijNL, dt, scr,
+		params);
 
 #ifdef MYDEBUG
 	// output some trajectories to check everything is going ok! 
 	if ((timeStep % (numSteps / 100)) == 0 )
 	{
-	    trC_tensor(cij, trC, scratchp1, scratchp2, scratchin, scratchout,
-		    phys_plan, spec_plan, cnsts);
+	    trC_tensor(cij, trC, scr.scratchp1, scr.scratchp2, scr.scratchin, scr.scratchout,
+		    scr.phys_plan, scr.spec_plan, cnsts);
 
 	//    diagonalised_C(complex *cij, complex *ecij, double *rcij, double
-	//	    *scratchp1, double *scratchp2, fftw_complex *scratchin, fftw_complex
-	//	    *scratchout, fftw_plan *phys_plan, fftw_plan
+	//	    *scr.scratchp1, double *scr.scratchp2, fftw_complex *scr.scratchin, fftw_complex
+	//	    *scr.scratchout, fftw_plan *phys_plan, fftw_plan
 	//	    *spec_plan, flow_params cnsts)
 
 	    calc_EE_mode(&trC[0], 0, params);

@@ -1,13 +1,13 @@
 /* -------------------------------------------------------------------------- *
  *									      *
- *  DNS_2D_Newt.c							      *
+ *  DNS_2D_Visco.c							      *
  *                                                                            *
  *  Time stepping DNS program for 2D Newtonian fluid.			      *
  *                                                                            *
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Tue  5 May 11:24:00 2015
+// Last modified: Mon 11 May 18:57:31 2015
 
 /* Program Description:
  *
@@ -70,6 +70,8 @@ int main(int argc, char **argv)
     int numTimeSteps = 0;
     int timeStep = 0;
     double dt = 0;
+    double time = 0;
+
     double KE0 = 1.0;
     double KE1 = 0.0;
     double KE2 = 0.0;
@@ -209,27 +211,15 @@ int main(int argc, char **argv)
     hdf5fp = H5Fcreate(traj_fn, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 
     // field arrays are declared as pointers and then I malloc.
-    complex *scratch, *scratch2, *scratch3, *scratch4, *scratch5, *tmpop;
-    complex *u, *v, *udxlplpsi, *vdylplpsi, *biharmpsi, *lplpsi;
-    complex *psi, *psiNL, *psi_lam, *dyyypsi, *dypsi, *vdyypsi;
-    complex *d2ypsi, *d4ypsi, *d4xpsi, *d2xd2ypsi;
-    complex *dxu, *dyu, *dxv, *dyv;
-    complex *d2ycxy, *d2xcxy, *dxycyy_cxx, *dycxy;
-    complex *d2ycxyNL, *d2xcxyNL, *dxycyy_cxxNL, *dycxyNL;
-    complex *cxxdxu, *cxydyu, *vgradcxx, *cxydxv, *cyydyv;
-    complex *vgradcyy, *cxxdxv, *cyydyu, *vgradcxy;
-    complex *forcing;
 
+    complex *psi, *psi2, *psiNL, *psi_lam;
+    complex *forcing;
     complex *cij, *cijNL;
     complex *trC;
+    complex *tmpop;
+    complex *opsList, *hopsList;
 
-    fftw_complex *scratchin, *scratchout;
-    double *scratchp1, *scratchp2;
-
-    fftw_complex *RHSvec;
-    double time = 0;
-    
-    fftw_complex *opsList, *hopsList;
+    flow_scratch scr;
 
     fftw_plan phys_plan, spec_plan;
 
@@ -245,72 +235,82 @@ int main(int argc, char **argv)
     opsList = (complex*) fftw_malloc((N+1)*M*M * sizeof(complex));
     hopsList = (complex*) fftw_malloc((N+1)*M*M * sizeof(complex));
 
-    scratch = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scratch2 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scratch3 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scratch4 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scratch5 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-
     psi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    psi2 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     psiNL = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     psi_lam = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     forcing = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    u = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    v = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    udxlplpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    vdylplpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    lplpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    biharmpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    d2ypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    dyyypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    d4ypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    d4xpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    d2xd2ypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    dypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    vdyypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+
+    // temporary Newtonian variables
+
+    scr.u = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.v = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.udxlplpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.vdylplpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.lplpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.biharmpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.d2ypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.dyyypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.d4ypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.d4xpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.d2xd2ypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.dypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.vdyypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+
+    scr.scratch = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.scratch2 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.scratch3 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.scratch4 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.scratch5 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
 
     // Viscoelastic variables
 
-    dxu = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    dyu = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    dxv = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    dyv = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    cxxdxu = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    cxydyu = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    vgradcxx = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    cxydxv = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    cyydyv = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    vgradcyy = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    cxxdxv = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    cyydyu = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    vgradcxy = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    d2ycxy = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    d2xcxy = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    dxycyy_cxx = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    dycxy = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    d2ycxyNL = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    d2xcxyNL = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    dxycyy_cxxNL = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    dycxyNL = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     trC = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
 
     cij = (complex*) fftw_malloc(3*(N+1)*M * sizeof(complex));
     cijNL = (complex*) fftw_malloc(3*(N+1)*M * sizeof(complex));
 
-    scratchin = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
-    scratchout = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
+    // temporary Viscoelastic variables
 
-    scratchp1 = (double*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(double));
-    scratchp2 = (double*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(double));
+    scr.dxu = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.dyu = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.dxv = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.dyv = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.cxxdxu = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.cxydyu = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.vgradcxx = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.cxydxv = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.cyydyv = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.vgradcyy = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.cxxdxv = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.cyydyu = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.vgradcxy = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.d2ycxy = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.d2xcxy = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.dxycyy_cxx = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.dycxy = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.d2ycxyNL = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.d2xcxyNL = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.dxycyy_cxxNL = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.dycxyNL = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
 
-    RHSvec = (complex*) fftw_malloc(M * sizeof(complex));
+    scr.scratchin = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
+    scr.scratchout = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
+
+    scr.scratchp1 = (double*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(double));
+    scr.scratchp2 = (double*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(double));
+
+    scr.RHSvec = (complex*) fftw_malloc(M * sizeof(complex));
 
     // Set up some dft plans
     printf("\n------\nSetting up fftw3 plans\n------\n");
-    phys_plan = fftw_plan_dft_2d(2*Nf+1, 2*Mf-2,  scratchin, scratchout,
-			 FFTW_BACKWARD, fftwFlag);
-    spec_plan = fftw_plan_dft_2d(2*Nf+1, 2*Mf-2,  scratchin, scratchout,
+    phys_plan = fftw_plan_dft_2d(2*Nf+1, 2*Mf-2,  scr.scratchin, scr.scratchout,
+        		 FFTW_BACKWARD, fftwFlag);
+    spec_plan = fftw_plan_dft_2d(2*Nf+1, 2*Mf-2,  scr.scratchin, scr.scratchout,
 			 FFTW_FORWARD, fftwFlag);
+    
+    scr.phys_plan = &phys_plan;
+    scr.spec_plan = &spec_plan;
 
     printf("\n------\nLoading initial streamfunction and operators\n------\n");
 
@@ -378,15 +378,8 @@ int main(int argc, char **argv)
     printf("\nTime\t\tIntegrated TrC");
 #endif
 
-equilibriate_stress(
-	psi, psiNL, psi_lam, cij, cijNL, dt, params, scratch, scratch2, u, v,
-	lplpsi, biharmpsi, d2ypsi, dyyypsi, d4ypsi, d2xd2ypsi, d4xpsi,
-	udxlplpsi, vdylplpsi, cyydyu, dxu, dyu, dxv, dyv, cxxdxu, cxydyu,
-	vgradcxx, cxydxv, cyydyv, vgradcyy, cxxdxv, vgradcxy, vdyypsi, d2ycxy,
-	d2xcxy, dxycyy_cxx, dycxy, d2ycxyNL, d2xcxyNL, dxycyy_cxxNL, dycxyNL,
-	RHSvec, opsList, &phys_plan, &spec_plan, scratchin, scratchout,
-	scratchp1, scratchp2, &hdf5fp, &filetype_id, &datatype_id
-	);
+    equilibriate_stress( psi, psi2, psi_lam, cij, cijNL, dt, scr, params,
+			&hdf5fp, &filetype_id, &datatype_id);
 
     // perform the time iteration
     printf("\n------\nperforming the time iteration\n------\n");
@@ -424,21 +417,10 @@ equilibriate_stress(
 	forcing[ind(0,0)] = cos(params.Omega*time) / params.Re;
 	#endif
 
-        step_conformation_Crank_Nicolson(
-        psi, cijNL, cij, 0.5*dt, params, u, v, dxu, dyu, dxv, dyv,
-        cxxdxu, cxydyu, vgradcxx, cxydxv, cyydyv, vgradcyy, cxxdxv, cyydyu,
-        vgradcxy, scratch, scratch2, &phys_plan, 
-        &spec_plan, scratchin, scratchout, scratchp1, scratchp2 
-        );
+        step_conformation_Crank_Nicolson(psi, cijNL, cij, 0.5*dt, scr, params);
         
-        step_sf_SI_Crank_Nicolson_visco(
-        psiNL, psi, cij, cijNL, forcing, 0.5*dt, 
-        timeStep, params, scratch, scratch2, u, v, lplpsi,
-        biharmpsi, d2ypsi, dyyypsi, d4ypsi, d2xd2ypsi, d4xpsi, 
-        udxlplpsi, vdylplpsi, vdyypsi, d2ycxy, d2xcxy, dxycyy_cxx, dycxy,
-        d2ycxyNL, d2xcxyNL, dxycyy_cxxNL, dycxyNL, RHSvec, hopsList,
-        &phys_plan, &spec_plan, scratchin, scratchout,
-        scratchp1, scratchp2 );
+	step_sf_SI_Crank_Nicolson_visco( psiNL, psi, cij, cijNL, forcing,
+				0.5*dt, timeStep, hopsList, scr, params);
 
 	// calculate forcing on the half step
 	#ifdef OSCIL_FLOW
@@ -446,43 +428,32 @@ equilibriate_stress(
 	#endif
 
         // use the old values plus the values on the half step for the NL terms
-        step_conformation_Crank_Nicolson(
-        psiNL, cij, cijNL, dt, params, u, v, dxu, dyu, dxv, dyv,
-        cxxdxu, cxydyu, vgradcxx, cxydxv, cyydyv, vgradcyy, cxxdxv, cyydyu,
-        vgradcxy, scratch, scratch2, &phys_plan, 
-        &spec_plan, scratchin, scratchout, scratchp1, scratchp2 
-        );
+	step_conformation_Crank_Nicolson(psiNL, cij, cijNL, dt, scr, params);
 
-        step_sf_SI_Crank_Nicolson_visco(
-        psi, psiNL, cij, cijNL, forcing, dt, 
-        timeStep, params, scratch, scratch2, u, v, lplpsi,
-        biharmpsi, d2ypsi, dyyypsi, d4ypsi, d2xd2ypsi, d4xpsi, 
-        udxlplpsi, vdylplpsi, vdyypsi, d2ycxy, d2xcxy, dxycyy_cxx, dycxy,
-        d2ycxyNL, d2xcxyNL, dxycyy_cxxNL, dycxyNL, RHSvec, opsList,
-        &phys_plan, &spec_plan, scratchin, scratchout,
-        scratchp1, scratchp2 );
+	step_sf_SI_Crank_Nicolson_visco( psi, psiNL, cij, cijNL, forcing, dt,
+				timeStep, opsList, scr, params);
 
         #ifdef MYDEBUG
         if (timeStep==0)
         {
 
-            save_hdf5_state("./output/u.h5",  &u[0], params);
-            save_hdf5_state("./output/v.h5", &v[0], params);
-            save_hdf5_state("./output/lplpsi.h5", &lplpsi[0], params);
-            save_hdf5_state("./output/d2ypsi.h5", &d2ypsi[0], params);
-            save_hdf5_state("./output/d3ypsi.h5", &dyyypsi[0], params);
-            save_hdf5_state("./output/d4ypsi.h5", &d4ypsi[0], params);
-            save_hdf5_state("./output/d2xd2ypsi.h5", &d2xd2ypsi[0], params);
-            save_hdf5_state("./output/d4xpsi.h5", &d4xpsi[0], params);
-            save_hdf5_state("./output/biharmpsi.h5", &biharmpsi[0], params);
-            save_hdf5_state("./output/udxlplpsi.h5", &udxlplpsi[0], params);
-            save_hdf5_state("./output/vdylplpsi.h5", &vdylplpsi[0], params);
-            save_hdf5_state("./output/vdyypsi.h5", &vdyypsi[0], params);
+            save_hdf5_state("./output/u.h5",  &scr.u[0], params);
+            save_hdf5_state("./output/v.h5", &scr.v[0], params);
+            save_hdf5_state("./output/lplpsi.h5", &scr.lplpsi[0], params);
+            save_hdf5_state("./output/d2ypsi.h5", &scr.d2ypsi[0], params);
+            save_hdf5_state("./output/d3ypsi.h5", &scr.dyyypsi[0], params);
+            save_hdf5_state("./output/d4ypsi.h5", &scr.d4ypsi[0], params);
+            save_hdf5_state("./output/d2xd2ypsi.h5", &scr.d2xd2ypsi[0], params);
+            save_hdf5_state("./output/d4xpsi.h5", &scr.d4xpsi[0], params);
+            save_hdf5_state("./output/biharmpsi.h5", &scr.biharmpsi[0], params);
+            save_hdf5_state("./output/udxlplpsi.h5", &scr.udxlplpsi[0], params);
+            save_hdf5_state("./output/vdylplpsi.h5", &scr.vdylplpsi[0], params);
+            save_hdf5_state("./output/vdyypsi.h5", &scr.vdyypsi[0], params);
 
-            save_hdf5_state("./output/d2xcxy.h5", &d2xcxy[0], params);
-            save_hdf5_state("./output/d2ycxy.h5", &d2ycxy[0], params);
-            save_hdf5_state("./output/dxycyy_cxx.h5", &dxycyy_cxx[0], params);
-            save_hdf5_state("./output/dycxy.h5", &dycxy[0], params);
+            save_hdf5_state("./output/d2xcxy.h5", &scr.d2xcxy[0], params);
+            save_hdf5_state("./output/d2ycxy.h5", &scr.d2ycxy[0], params);
+            save_hdf5_state("./output/dxycyy_cxx.h5", &scr.dxycyy_cxx[0], params);
+            save_hdf5_state("./output/dycxy.h5", &scr.dycxy[0], params);
         }
         #endif
 
@@ -494,21 +465,21 @@ equilibriate_stress(
             save_hdf5_state("./output/cyy.h5", &cij[(N+1)*M], params);
             save_hdf5_state("./output/cxy.h5", &cij[2*(N+1)*M], params);
 
-            save_hdf5_state("./output/dxu.h5", &dxu[0], params);
-            save_hdf5_state("./output/dyu.h5", &dyu[0], params);
-            save_hdf5_state("./output/dxv.h5", &dxv[0], params);
-            save_hdf5_state("./output/dyv.h5", &dyv[0], params);
+            save_hdf5_state("./output/dxu.h5", &scr.dxu[0], params);
+            save_hdf5_state("./output/dyu.h5", &scr.dyu[0], params);
+            save_hdf5_state("./output/dxv.h5", &scr.dxv[0], params);
+            save_hdf5_state("./output/dyv.h5", &scr.dyv[0], params);
 
-            save_hdf5_state("./output/cxxdxu.h5", &cxxdxu[0], params);
-            save_hdf5_state("./output/cxydyu.h5", &cxydyu[0], params);
-            save_hdf5_state("./output/cxydxv.h5", &cxydxv[0], params);
-            save_hdf5_state("./output/cyydyv.h5", &cyydyv[0], params);
-            save_hdf5_state("./output/cxxdxv.h5", &cxxdxv[0], params);
-            save_hdf5_state("./output/cyydyu.h5", &cyydyu[0], params);
+            save_hdf5_state("./output/cxxdxu.h5", &scr.cxxdxu[0], params);
+            save_hdf5_state("./output/cxydyu.h5", &scr.cxydyu[0], params);
+            save_hdf5_state("./output/cxydxv.h5", &scr.cxydxv[0], params);
+            save_hdf5_state("./output/cyydyv.h5", &scr.cyydyv[0], params);
+            save_hdf5_state("./output/cxxdxv.h5", &scr.cxxdxv[0], params);
+            save_hdf5_state("./output/cyydyu.h5", &scr.cyydyu[0], params);
 
-            save_hdf5_state("./output/vgradcxx.h5", &vgradcxx[0], params);
-            save_hdf5_state("./output/vgradcyy.h5", &vgradcyy[0], params);
-            save_hdf5_state("./output/vgradcxy.h5", &vgradcxy[0], params);
+            save_hdf5_state("./output/vgradcxx.h5", &scr.vgradcxx[0], params);
+            save_hdf5_state("./output/vgradcyy.h5", &scr.vgradcyy[0], params);
+            save_hdf5_state("./output/vgradcxy.h5", &scr.vgradcxy[0], params);
 
         }
         #endif
@@ -537,21 +508,21 @@ equilibriate_stress(
             {
         	for (j=0; j<M; j++)
         	{
-        	    scratch[ind(i,j)] = u[ind(i,j)];
+        	    scr.scratch[ind(i,j)] = scr.u[ind(i,j)];
         	}
             }
-            scratch[ind(0,0)] -= 0.5;
-            scratch[ind(0,2)] += 0.5;
+            scr.scratch[ind(0,0)] -= 0.5;
+            scr.scratch[ind(0,2)] += 0.5;
             fprintf(trace1mode, "%e\t%e\t%e\t%e\t%e\t%e\t%e\n", 
-        	    time, creal(scratch[ind(0,3)]), cimag(scratch[ind(0,3)]),
-        	     creal(scratch[ind(1,3)]), cimag(scratch[ind(1,3)]),
-        	      creal(scratch[ind(2,3)]), cimag(scratch[ind(2,3)]));
+        	    time, creal(scr.scratch[ind(0,3)]), cimag(scr.scratch[ind(0,3)]),
+        	     creal(scr.scratch[ind(1,3)]), cimag(scr.scratch[ind(1,3)]),
+        	      creal(scr.scratch[ind(2,3)]), cimag(scr.scratch[ind(2,3)]));
 
             for (j=M-1; j>=0; j=j-1)
             {
-        	normU0 += creal(scratch[ind(0,j)]*scratch[ind(0,j)]); 
-        	normU1 += creal(u[ind(1,j)]*conj(u[ind(1,j)])); 
-        	normU2 += creal(u[ind(2,j)]*conj(u[ind(2,j)])); 
+        	normU0 += creal(scr.scratch[ind(0,j)]*scr.scratch[ind(0,j)]); 
+        	normU1 += creal(scr.u[ind(1,j)]*conj(scr.u[ind(1,j)])); 
+        	normU2 += creal(scr.u[ind(2,j)]*conj(scr.u[ind(2,j)])); 
             }
             normU0 = normU0;//-(1./sqrt(2.));
             normU1 = normU1;
@@ -559,18 +530,18 @@ equilibriate_stress(
 
             fprintf(traceU, "%e\t%e\t%e\t%e\t\n", time, normU0, normU1, normU2);
 
-            KE0 = calc_KE_mode(u, v, 0, params) * (15.0/ 8.0);
-            KE1 = calc_KE_mode(u, v, 1, params) * (15.0/ 8.0);
-            KE2 = calc_KE_mode(u, v, 2, params) * (15.0/ 8.0);
+            KE0 = calc_KE_mode(scr.u, scr.v, 0, params) * (15.0/ 8.0);
+            KE1 = calc_KE_mode(scr.u, scr.v, 1, params) * (15.0/ 8.0);
+            KE2 = calc_KE_mode(scr.u, scr.v, 2, params) * (15.0/ 8.0);
             KE_xdepend = KE1 + KE2; 
             for (i=3; i<N+1; i++)
             {
-        	KE_xdepend += calc_KE_mode(u, v, i, params) * (15.0/ 8.0);
+        	KE_xdepend += calc_KE_mode(scr.u, scr.v, i, params) * (15.0/ 8.0);
             }
     
             KE_tot = KE0 + KE_xdepend;
 
-	    trC_tensor(cij, trC, scratchp1, scratchp2, scratchin, scratchout,
+	    trC_tensor(cij, trC, scr.scratchp1, scr.scratchp2, scr.scratchin, scr.scratchout,
 		    &phys_plan, &spec_plan, params);
 
 	    calc_EE_mode(&trC[0], 0, params);
@@ -632,57 +603,58 @@ equilibriate_stress(
     fftw_free(tmpop);
     fftw_free(opsList);
     fftw_free(hopsList);
-    fftw_free(scratch);
-    fftw_free(scratch2);
-    fftw_free(scratch3);
-    fftw_free(scratch4);
-    fftw_free(scratch5);
     fftw_free(psi);
     fftw_free(psiNL);
     fftw_free(psi_lam);
     fftw_free(cij);
     fftw_free(cijNL);
-    fftw_free(forcing);
-    fftw_free(u);
-    fftw_free(v);
-    fftw_free(udxlplpsi);
-    fftw_free(vdylplpsi);
-    fftw_free(lplpsi);
-    fftw_free(biharmpsi);
-    fftw_free(scratchin);
-    fftw_free(scratchout);
-    fftw_free(scratchp1);
-    fftw_free(scratchp2);
-    fftw_free(d2ypsi);
-    fftw_free(dyyypsi);
-    fftw_free(d4ypsi);
-    fftw_free(d4xpsi);
-    fftw_free(d2xd2ypsi);
-    fftw_free(dypsi);
-    fftw_free(vdyypsi);
-    fftw_free(RHSvec);
-    fftw_free(dxu);
-    fftw_free(dyu);
-    fftw_free(dxv);
-    fftw_free(dyv);
-    fftw_free(cxxdxu);
-    fftw_free(cxydyu);
-    fftw_free(vgradcxx );
-    fftw_free(cxydxv);
-    fftw_free(cyydyv);
-    fftw_free(vgradcyy );
-    fftw_free(cxxdxv);
-    fftw_free(cyydyu);
-    fftw_free(vgradcxy );
-    fftw_free(d2ycxy);
-    fftw_free(d2xcxy);
-    fftw_free(dxycyy_cxx);
-    fftw_free(dycxy);
-    fftw_free(d2ycxyNL);
-    fftw_free(d2xcxyNL);
-    fftw_free(dxycyy_cxxNL);
-    fftw_free(dycxyNL);
     fftw_free(trC);
+    fftw_free(forcing);
+
+    fftw_free(scr.scratch);
+    fftw_free(scr.scratch2);
+    fftw_free(scr.scratch3);
+    fftw_free(scr.scratch4);
+    fftw_free(scr.scratch5);
+    fftw_free(scr.u);
+    fftw_free(scr.v);
+    fftw_free(scr.udxlplpsi);
+    fftw_free(scr.vdylplpsi);
+    fftw_free(scr.lplpsi);
+    fftw_free(scr.biharmpsi);
+    fftw_free(scr.scratchin);
+    fftw_free(scr.scratchout);
+    fftw_free(scr.scratchp1);
+    fftw_free(scr.scratchp2);
+    fftw_free(scr.d2ypsi);
+    fftw_free(scr.dyyypsi);
+    fftw_free(scr.d4ypsi);
+    fftw_free(scr.d4xpsi);
+    fftw_free(scr.d2xd2ypsi);
+    fftw_free(scr.dypsi);
+    fftw_free(scr.vdyypsi);
+    fftw_free(scr.RHSvec);
+    fftw_free(scr.dxu);
+    fftw_free(scr.dyu);
+    fftw_free(scr.dxv);
+    fftw_free(scr.dyv);
+    fftw_free(scr.cxxdxu);
+    fftw_free(scr.cxydyu);
+    fftw_free(scr.vgradcxx );
+    fftw_free(scr.cxydxv);
+    fftw_free(scr.cyydyv);
+    fftw_free(scr.vgradcyy );
+    fftw_free(scr.cxxdxv);
+    fftw_free(scr.cyydyu);
+    fftw_free(scr.vgradcxy );
+    fftw_free(scr.d2ycxy);
+    fftw_free(scr.d2xcxy);
+    fftw_free(scr.dxycyy_cxx);
+    fftw_free(scr.dycxy);
+    fftw_free(scr.d2ycxyNL);
+    fftw_free(scr.d2xcxyNL);
+    fftw_free(scr.dxycyy_cxxNL);
+    fftw_free(scr.dycxyNL);
 
     printf("quitting c program\n");
 

@@ -42,9 +42,10 @@ obj/fields_2D.o : src/fields_2D.c include/fields_2D.h
 obj/time_steppers.o : src/time_steppers.c include/time_steppers.h
 	$(CC) -c src/time_steppers.c -o obj/time_steppers.o $(CFLAGS) -O3 
 
-all : obj/fields_2D.o obj/time_steppers.o obj/DNS_2D_Newt.o obj/DNS_2D_Visco.o obj/test_fields.o  
+all : obj/fields_2D.o obj/time_steppers.o obj/DNS_2D_Newt.o obj/DNS_2D_Visco.o 
+	#obj/test_fields.o  
 	#obj/test_fields_1.o obj/test_fields_2.o
-	$(CC) -o test_fields obj/test_fields.o obj/fields_2D.o $(CFLAGS) -lhdf5 -lhdf5_hl -lfftw3 -lm -O3
+	#$(CC) -o test_fields obj/test_fields.o obj/fields_2D.o $(CFLAGS) -lhdf5 -lhdf5_hl -lfftw3 -lm -O3
 #	$(CC) -o test_fields_1 obj/test_fields_1.o obj/fields_2D.o $(CFLAGS) -lhdf5 -lhdf5_hl -lfftw3 -lm
 #	$(CC) -o test_fields_2 obj/test_fields_2.o obj/fields_2D.o $(CFLAGS) -lhdf5 -lhdf5_hl -lfftw3 -lm
 	$(CC) -o DNS_2D_Newt obj/DNS_2D_Newt.o obj/time_steppers.o obj/fields_2D.o $(CFLAGS) -lhdf5 -lhdf5_hl -lfftw3 -lm -O3
