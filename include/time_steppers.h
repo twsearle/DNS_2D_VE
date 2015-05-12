@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu 19 Mar 13:04:32 2015
+// Last modified: Tue  5 May 15:52:25 2015
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -22,14 +22,7 @@
 
 void step_sf_SI_Crank_Nicolson(
 	complex *psi, complex *psi2, double dt, int timeStep, complex
-	*forcing, double oneOverRe, flow_params params, complex *scratch,
-	complex *scratch2, complex *u, complex *v, complex *lplpsi, complex
-	*biharmpsi, complex *d2ypsi, complex *dyyypsi, complex *d4ypsi,
-	complex *d2xd2ypsi, complex *d4xpsi, complex *udxlplpsi, complex
-	*vdylplpsi, complex *vdyypsi, complex *RHSvec, complex *opsList,
-	fftw_plan *phys_plan, fftw_plan *spec_plan, complex *scratchin,
-	complex *scratchout, double *scratchp1, double *scratchp2 
-	);
+	*forcing, complex *opsList, flow_scratch scr, flow_params params);
 
 #endif // FIELDS_2D_C_H
 

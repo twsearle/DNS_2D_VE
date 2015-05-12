@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Thu 23 Apr 15:10:59 2015
+#   Last modified: Thu  7 May 14:31:07 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -74,6 +74,7 @@ dt = config.getfloat('Time Iteration', 'dt')
 totTime = config.getfloat('Time Iteration', 'totTime')
 numFrames = config.getint('Time Iteration', 'numFrames')
 dealiasing = config.getboolean('Time Iteration', 'Dealiasing')
+shear_layer_flag = config.getboolean('Time Iteration', 'Shear Layer')
 
 fp.close()
 
@@ -501,9 +502,9 @@ PSI = zeros((2*N+1)*M,dtype='complex')
 
 # --------------- POISEUILLE -----------------
 
-#
+
 #plugAmp = 0.02 #* (M/32.0)
-#
+
 #PSI[N*M]   += (1.-plugAmp) * 2.0/3.0
 #PSI[N*M+1] += (1.-plugAmp) * 3.0/4.0
 #PSI[N*M+2] += (1.-plugAmp) * 0.0
@@ -529,12 +530,17 @@ PSI = zeros((2*N+1)*M,dtype='complex')
 #
 #forcing = zeros((M,2*N+1), dtype='complex')
 #forcing[0,0] = 2.0/Re
-
+#
 
 # --------------- SHEAR LAYER -----------------
-#
-#y_points = cos(pi*arange(Mf)/(Mf-1))
-#delta = 0.1
+
+#if not shear_layer_flag:
+#    y_points = cos(pi*arange(Mf)/(Mf-1))
+#    delta = 0.1
+#else:
+#    slscale = 10.0
+#    delta = 0.1
+#    y_points = slscale * arctanh(cos(pi*arange(Mf)/(Mf-1)))
 #
 ## Set initial streamfunction
 #PSI = zeros((Mf, 2*Nf+1), dtype='d')
@@ -599,9 +605,8 @@ PsiOpInvListHalf = form_operators(dt/2.0)
 for i in range(N+1):
     # operator order in list is 0->N
     n = i
-    print n
     opFn = "./operators/op{0}.h5".format(n)
-    print "writing ", opFn
+    #print "writing ", opFn
     f = h5py.File(opFn, "w")
     dset = f.create_dataset("op", (M*M,), dtype='complex')
     dset[...] = PsiOpInvList[i].flatten()
@@ -613,9 +618,8 @@ del i
 for i in range(N+1):
     # operator order in list is 0->N
     n = i
-    print n
     opFn = "./operators/hOp{0}.h5".format(n)
-    print "writing ", opFn
+    #print "writing ", opFn
     f = h5py.File(opFn, "w")
     dset = f.create_dataset("op", (M*M,), dtype='complex')
     dset[...] = PsiOpInvListHalf[i].flatten()
@@ -630,7 +634,7 @@ PSI = PSI.reshape(2*N+1, M).T
 # put PSI into FFT ordering.
 PSI = ifftshift(PSI, axes=1)
 
-print "writing initial state to initial.h5"
+#print "writing initial state to initial.h5"
 
 f = h5py.File("initial.h5", "w")
 dset = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
@@ -664,6 +668,27 @@ if dealiasing:
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
              "{0:d}".format(numTimeSteps), "-d"
 
+    if shear_layer_flag:
+        cargs = ["./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M",
+                 "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
+                 "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
+                 "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
+                 "{0:e}".format(CNSTS["beta"]), "-w",
+                 "{0:e}".format(CNSTS["Omega"]),
+                 "-t", "{0:e}".format(CNSTS["dt"]),
+                 "-s", "{0:d}".format(stepsPerFrame), "-T",
+                 "{0:d}".format(numTimeSteps), "-d", "-n"]
+
+        print "./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
+                 "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
+                 "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
+                 "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
+                 "{0:e}".format(CNSTS["beta"]), "-w", "{0:e}".format(CNSTS["Omega"]),\
+                 "-t", "{0:e}".format(CNSTS["dt"]),\
+                 "-s", "{0:d}".format(stepsPerFrame), "-T",\
+                 "{0:d}".format(numTimeSteps), "-d", "-n"
+
+
 else:
     cargs = ["./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M",
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
@@ -684,6 +709,10 @@ else:
              "-t", "{0:e}".format(CNSTS["dt"]),\
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
              "{0:d}".format(numTimeSteps)
+
+    if shear_layer_flag:
+        print "turn on dealiasing first!"
+        exit(1)
 
 subprocess.call(cargs)
 

@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 22 Apr 14:21:14 2015
+// Last modified: Wed  6 May 12:09:51 2015
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -29,6 +29,7 @@
 
 typedef struct flow_params flow_params;
 typedef struct complex_hdf complex_hdf;
+typedef struct flow_scratch flow_scratch;
 
 void dx(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts);
 
@@ -36,7 +37,7 @@ void d2x(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts);
 
 void d4x(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts);
 
-void dy(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts);
+void dy(fftw_complex *arrin, fftw_complex *arrout,  flow_scratch scr, flow_params cnsts);
 
 void matdy(fftw_complex *matarr, flow_params cnsts);
 
@@ -46,13 +47,8 @@ void to_physical_1(fftw_complex *arrin, fftw_complex *arrout,
 		 fftw_plan *phys_fou_plan, fftw_plan *phys_cheb_plan,
 		 flow_params cnsts);
 
-void to_physical_r(complex *arrin, double *arrout,
-	fftw_complex *scratchin, fftw_complex *scratchout,
-	fftw_plan *phys_plan,  flow_params cnsts);
-
-void to_physical(fftw_complex *arrin, fftw_complex *arrout,
-		 fftw_complex *scratchin, fftw_complex *scratchout,
-		 fftw_plan *phys_plan,  flow_params cnsts);
+void to_physical_r(complex *arrin, double *arrout, flow_scratch scr,
+	flow_params cnsts);
 
 void to_spectral_1(fftw_complex *arrin, fftw_complex *arrout, fftw_complex *scratch,
 		 fftw_complex *scratchFin, fftw_complex *scratchFout,
@@ -61,22 +57,10 @@ void to_spectral_1(fftw_complex *arrin, fftw_complex *arrout, fftw_complex *scra
 		 flow_params cnsts);
 
 void to_spectral_r(double *arrin, complex *arrout,
-	fftw_complex *scratchin, fftw_complex *scratchout,
-	fftw_plan *spec_plan,  flow_params cnsts);
-
-void to_spectral(fftw_complex *arrin, fftw_complex *arrout,
-		 fftw_complex *scratchin, fftw_complex *scratchout,
-		 fftw_plan *spec_plan,  flow_params cnsts);
-
-void fft_convolve(fftw_complex *arr1, fftw_complex *arr2, fftw_complex *arrout,
-	fftw_complex *scratchp1, fftw_complex *scratchp2, fftw_complex
-	*scratchin, fftw_complex *scratchout, fftw_plan *physplan, fftw_plan
-	*spec_plan, flow_params cnsts);
+	flow_scratch scr,  flow_params cnsts);
 
 void fft_convolve_r(complex *arr1, complex *arr2, complex *arrout,
-	double *scratchp1, double *scratchp2, fftw_complex
-	*scratchin, fftw_complex *scratchout, fftw_plan *phys_plan, fftw_plan
-	*spec_plan, flow_params cnsts);
+		    flow_scratch scr, flow_params cnsts);
 
 void save_hdf5_state(char *filename, fftw_complex *arr, flow_params cnsts);
 
@@ -85,9 +69,17 @@ void save_hdf5_arr(char *filename, fftw_complex *arr, int size);
 void save_hdf5_snapshot(hid_t *file_id, hid_t *filetype_id, hid_t *datatype_id,
 	fftw_complex *arr, double time, flow_params cnsts);
 
+void save_hdf5_snapshot_visco(hid_t *file_id, hid_t *filetype_id, hid_t *datatype_id,
+	complex *psi, complex *cxx, complex *cyy, complex *cxy, double time, flow_params cnsts);
+
 void save_state(FILE *fp, fftw_complex *arr, flow_params cnsts);
 
+void save_hdf5_state_visco(hid_t *file_id, hid_t *filetype_id, hid_t *datatype_id,
+	complex *psi, complex *cxx, complex *cyy, complex *cxy, flow_params cnsts);
+
 void load_hdf5_state(char *filename, fftw_complex *arr, flow_params cnsts);
+
+void load_hdf5_state_visco(char *filename, complex *psi, complex *cxx, complex *cyy, complex *cxy, flow_params cnsts);
 
 void load_state(FILE *fp, fftw_complex *arr, flow_params cnsts);
 
@@ -97,10 +89,20 @@ void load_hdf5_operator(char *filename, fftw_complex *arr, flow_params cnsts);
 
 double calc_KE_mode(fftw_complex *u, fftw_complex *v, int n, flow_params cnsts);
 
+void trC_tensor(complex *cij, complex *trC, double *scratchp1, double
+	*scratchp2, fftw_complex *scratchin, fftw_complex *scratchout,
+	fftw_plan *phys_plan, fftw_plan *spec_plan, flow_params cnsts);
+
+void diagonalised_C(complex *cij, complex *ecij, double *rcij,
+	flow_scratch scr, flow_params cnsts);
+
+double calc_EE_mode(complex *trC, int n, flow_params cnsts);
+
 struct flow_params {
     int N;
     int M;
     int dealiasing;
+    int shear_layer_flag;
     int Nf;
     int Mf;
     double kx;
@@ -110,6 +112,31 @@ struct flow_params {
     double beta;
     double Omega;
 };
+
+struct flow_scratch {
+    complex *scratch, *scratch2, *scratch3, *scratch4, *scratch5;
+    complex *u, *v, *udxlplpsi, *vdylplpsi, *biharmpsi, *lplpsi;
+    complex *dyyypsi, *dypsi, *vdyypsi;
+    complex *d2ypsi, *d4ypsi, *d4xpsi, *d2xd2ypsi;
+    complex *dxu, *dyu, *dxv, *dyv;
+    complex *d2ycxy, *d2xcxy, *dxycyy_cxx, *dycxy;
+    complex *d2ycxyNL, *d2xcxyNL, *dxycyy_cxxNL, *dycxyNL;
+    complex *cxxdxu, *cxydyu, *vgradcxx, *cxydxv, *cyydyv;
+    complex *vgradcyy, *cxxdxv, *cyydyu, *vgradcxy;
+
+    fftw_complex *scratchin, *scratchout;
+
+    double *scratchp1, *scratchp2;
+
+    fftw_complex *RHSvec;
+    
+    fftw_complex *opsList, *hopsList, *tmpop;
+
+    fftw_plan *phys_plan, *spec_plan;
+
+    complex *ytransform;
+};
+
 
 struct complex_hdf {
     double r;
