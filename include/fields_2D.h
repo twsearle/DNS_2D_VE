@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Tue  5 May 15:24:37 2015
+// Last modified: Sat 16 May 19:38:05 2015
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -115,11 +115,14 @@ struct flow_params {
 struct flow_scratch {
     complex *scratch, *scratch2, *scratch3, *scratch4, *scratch5;
     complex *u, *v, *udxlplpsi, *vdylplpsi, *biharmpsi, *lplpsi;
+    complex *d2ypsi;
     complex *dyyypsi, *dypsi, *vdyypsi;
-    complex *d2ypsi, *d4ypsi, *d4xpsi, *d2xd2ypsi;
+    complex *d4ypsi, *d4xpsi, *d2xd2ypsi;
     complex *dxu, *dyu, *dxv, *dyv;
+
     complex *d2ycxy, *d2xcxy, *dxycyy_cxx, *dycxy;
-    complex *d2ycxyNL, *d2xcxyNL, *dxycyy_cxxNL, *dycxyNL;
+    complex *d2ycxyN, *d2xcxyN, *dxycyy_cxxN, *dycxyN;
+
     complex *cxxdxu, *cxydyu, *vgradcxx, *cxydxv, *cyydyv;
     complex *vgradcyy, *cxxdxv, *cyydyu, *vgradcxy;
 

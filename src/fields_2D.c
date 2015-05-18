@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Tue  5 May 15:24:01 2015
+// Last modified: Sat 16 May 19:20:16 2015
 
 #include"fields_2D.h"
 
@@ -1390,11 +1390,18 @@ double calc_EE_mode(complex *trC, int n, flow_params cnsts)
 
     complex EE=0;
 
+
     for (j=0; j<M; j+=2)
     {
+	// subtract tr(I) to get something proportional to stress?
+	if (n==0 && j==0)
+	{
+	    EE += (2. / (1.-j*j)) * (trC[ind(n,0)] - 3.0);
 
-	EE += (2. / (1.-j*j)) * trC[ind(n,j)];
+	}else{
 
+	    EE += (2. / (1.-j*j)) * (trC[ind(n,0)]);
+	}
     }
 
     if (n == 0)

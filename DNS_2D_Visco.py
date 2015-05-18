@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Mon 11 May 18:29:53 2015
+#   Last modified: Fri 15 May 21:29:56 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -192,7 +192,7 @@ def form_operators(dt):
 
     # zeroth mode
     Psi0thOp = zeros((M,M), dtype='complex')
-    Psi0thOp = SMDY - 0.5*dt*oneOverRe*SMDYYY + 0j
+    Psi0thOp = SMDY - 0.5*dt*oneOverRe*beta*SMDYYY + 0j
 
     # Apply BCs
 
@@ -211,7 +211,7 @@ def form_operators(dt):
         SLAPLAC = -n*n*kx*kx*SII + SMDYY
 
         PSIOP[0:M, 0:M] = 0
-        PSIOP[0:M, M:2*M] = SII - 0.5*oneOverRe*dt*SLAPLAC
+        PSIOP[0:M, M:2*M] = SII - 0.5*oneOverRe*beta*dt*SLAPLAC
 
         PSIOP[M:2*M, 0:M] = SLAPLAC
         PSIOP[M:2*M, M:2*M] = -SII
@@ -558,16 +558,16 @@ Cxy = zeros((2*N+1)*M,dtype='complex')
 
 # --------------- POISEUILLE -----------------
 
-#plugAmp = 0.02 #* (M/32.0)
-#
-#PSI[N*M]   += (1.-plugAmp) * 2.0/3.0
-#PSI[N*M+1] += (1.-plugAmp) * 3.0/4.0
-#PSI[N*M+2] += (1.-plugAmp) * 0.0
-#PSI[N*M+3] += (1.-plugAmp) * -1.0/12.0
-#
+plugAmp = 0.00 #* (M/32.0)
+
+PSI[N*M]   += (1.-plugAmp) * 2.0/3.0
+PSI[N*M+1] += (1.-plugAmp) * 3.0/4.0
+PSI[N*M+2] += (1.-plugAmp) * 0.0
+PSI[N*M+3] += (1.-plugAmp) * -1.0/12.0
+
 ## set initial stress guess based on laminar flow
-#Cxx, Cyy, Cxy = x_independent_profile(PSI)
-#psiLam = copy(PSI)
+Cxx, Cyy, Cxy = x_independent_profile(PSI)
+psiLam = copy(PSI)
 #
 ## --- PLUG  ---
 #
@@ -587,8 +587,8 @@ Cxy = zeros((2*N+1)*M,dtype='complex')
 #PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
 #
 #
-#forcing = zeros((M,2*N+1), dtype='complex')
-#forcing[0,0] = 2.0/Re
+forcing = zeros((M,2*N+1), dtype='complex')
+forcing[0,0] = 2.0/Re
 
 #KE = 0
 #SMDY =  mk_single_diffy()
@@ -624,58 +624,57 @@ Cxy = zeros((2*N+1)*M,dtype='complex')
 
 
 
-# --------------- SHEAR LAYER -----------------
+## --------------- SHEAR LAYER -----------------
+##
+#y_points = cos(pi*arange(Mf)/(Mf-1))
+#delta = 0.1
+##
+## Set initial streamfunction
+#PSI = zeros((Mf, 2*Nf+1), dtype='d')
 #
-y_points = cos(pi*arange(Mf)/(Mf-1))
-delta = 0.1
+#for i in range(Mf):
+#    y =y_points[i]
+#    for j in range(2*Nf+1):
+#        PSI[i,j] = delta * (1./tanh(1./delta)) * log(cosh(y/delta))
 #
-# Set initial streamfunction
-PSI = zeros((Mf, 2*Nf+1), dtype='d')
-
-for i in range(Mf):
-    y =y_points[i]
-    for j in range(2*Nf+1):
-        PSI[i,j] = delta * (1./tanh(1./delta)) * log(cosh(y/delta))
-
-del y, i, j
-
-PSI = f2d.to_spectral(PSI, CNSTS)
-
-
-#test = f2d.dy(PSI, CNSTS) 
-#test = f2d.to_physical(test, CNSTS)
-#savetxt('U.dat', vstack((y_points,test[:,0])).T)
-#PSI = f2d.to_physical(PSI, CNSTS)
-#savetxt('PSI.dat', vstack((y_points,PSI[:,0])).T)
-#exit(1)
-
-PSI = fftshift(PSI, axes=1)
-PSI = PSI.T.flatten()
-psiLam = copy(PSI)
-
-perKEestimate = 0.0001
-totEnergy = 0.4
-sigma = 0.1
-gam = 2
-
-PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
-
-
-# set forcing
-forcing = zeros((Mf, 2*Nf+1), dtype='d')
-#test = zeros((Mf, 2*Nf+1), dtype='d')
-
-for i in range(Mf):
-    y =y_points[i]
-    for j in range(2*Nf+1):
-        forcing[i,j] = ( 2.0/tanh(1.0/delta)) * (1.0/cosh(y/delta)**2) * tanh(y/delta)
-        forcing[i,j] *= 1.0/(Re * delta**2) 
-
-del y, i, j
-forcing = f2d.to_spectral(forcing, CNSTS)
-forcing[:, 1:] = 0
-# set BC
-CNSTS['U0'] = 1.0
+#del y, i, j
+#
+#PSI = f2d.to_spectral(PSI, CNSTS)
+#
+#
+##test = f2d.dy(PSI, CNSTS) 
+##test = f2d.to_physical(test, CNSTS)
+##savetxt('U.dat', vstack((y_points,test[:,0])).T)
+##PSI = f2d.to_physical(PSI, CNSTS)
+##savetxt('PSI.dat', vstack((y_points,PSI[:,0])).T)
+##exit(1)
+#
+#PSI = fftshift(PSI, axes=1)
+#PSI = PSI.T.flatten()
+#psiLam = copy(PSI)
+#
+#perKEestimate = 0.0001
+#totEnergy = 0.4
+#sigma = 0.1
+#gam = 2
+#
+#PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
+#
+## set forcing
+#forcing = zeros((Mf, 2*Nf+1), dtype='d')
+##test = zeros((Mf, 2*Nf+1), dtype='d')
+#
+#for i in range(Mf):
+#    y =y_points[i]
+#    for j in range(2*Nf+1):
+#        forcing[i,j] = ( 2.0/tanh(1.0/delta)) * (1.0/cosh(y/delta)**2) * tanh(y/delta)
+#        forcing[i,j] *= 1.0/(Re * delta**2) 
+#
+#del y, i, j
+#forcing = f2d.to_spectral(forcing, CNSTS)
+#forcing[:, 1:] = 0
+## set BC
+#CNSTS['U0'] = 1.0
 
 # --------------- OSCILLATORY FLOW -----------------
 #

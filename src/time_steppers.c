@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Tue  5 May 22:35:47 2015
+// Last modified: Mon 18 May 12:41:46 2015
 
 #include"fields_2D.h"
 
@@ -83,9 +83,9 @@ void step_sf_SI_Crank_Nicolson(
 	    scr, params);
 
     //vdyypsi = vdyu
-    dy(scr.u, scr.d2ypsi, params);
+    dy(scr.u, scr.dyu, params);
 
-    fft_convolve_r(scr.d2ypsi, scr.v, scr.vdyypsi, 
+    fft_convolve_r(scr.dyu, scr.v, scr.vdyypsi, 
 	    scr, params);
 
 #ifdef MYDEBUG
@@ -113,8 +113,8 @@ void step_sf_SI_Crank_Nicolson(
 
     // biharmpsi (dyy + dxx)lplpsi
 
-    dy(scr.u, scr.d2ypsi, params);
-    dy(scr.d2ypsi, scr.dyyypsi, params);
+    dy(scr.u, scr.dyu, params);
+    dy(scr.dyu, scr.dyyypsi, params);
     dy(scr.dyyypsi, scr.d4ypsi, params);
 
     d2x(psi, scr.scratch, params);
@@ -154,7 +154,7 @@ void step_sf_SI_Crank_Nicolson(
 	save_hdf5_state("./output/u.h5",  &scr.u[0], params);
 	save_hdf5_state("./output/v.h5", &scr.v[0], params);
 	save_hdf5_state("./output/lplpsi.h5", &scr.lplpsi[0], params);
-	save_hdf5_state("./output/d2ypsi.h5", &scr.d2ypsi[0], params);
+	save_hdf5_state("./output/d2ypsi.h5", &scr.dyu[0], params);
 	save_hdf5_state("./output/d3ypsi.h5", &scr.dyyypsi[0], params);
 	save_hdf5_state("./output/d4ypsi.h5", &scr.d4ypsi[0], params);
 	save_hdf5_state("./output/d2xd2ypsi.h5", &scr.d2xd2ypsi[0], params);
@@ -262,8 +262,8 @@ void step_sf_SI_Crank_Nicolson(
 
 
 void step_conformation_Crank_Nicolson(
-	complex *psi, complex *cij, complex *cijNL, double dt, flow_scratch
-	scr, flow_params params)
+	 complex *cijOld, complex *cij, complex *psi, complex *cijNL, double
+	 dt, flow_scratch scr, flow_params params)
 {
     int N = params.N;
     int M = params.M;
@@ -273,6 +273,7 @@ void step_conformation_Crank_Nicolson(
 
     // Nonlinear terms ----------------------------------------------------
     // dxU, dyU, dxV, dyV
+    
     dy(psi, scr.u, params);
     dx(psi, scr.v, params);
 
@@ -367,38 +368,44 @@ void step_conformation_Crank_Nicolson(
     
     for (i=0; i<N+1; i++)
     {
-	for (j=0; j<M; j++)
-	{
-	    cij[ind(i,j)] = dt*2.*scr.cxxdxu[ind(i,j)] + dt*2.*scr.cxydyu[ind(i,j)];
-	    cij[ind(i,j)] += - dt*scr.vgradcxx[ind(i,j)];
-	    cij[ind(i,j)] += - 0.5*dt*oneOverWi*cij[ind(i,j)];
-	    cij[ind(i,j)] += cij[ind(i,j)];
+        for (j=0; j<M; j++)
+        {
+            cij[ind(i,j)] = cijOld[ind(i,j)];
+            cij[ind(i,j)] += - 0.5*dt*oneOverWi*cijOld[ind(i,j)];
+            cij[ind(i,j)] += dt*2.*scr.cxxdxu[ind(i,j)] + dt*2.*scr.cxydyu[ind(i,j)];
+            cij[ind(i,j)] += - dt*scr.vgradcxx[ind(i,j)];
 
-	    cij[ind(i,j)] *= 1./(1.+0.5*oneOverWi);
+            cij[ind(i,j)] *= params.Wi/(params.Wi+dt*0.5);
+            
 
-	    cij[(N+1)*M + ind(i,j)] = dt*2.*scr.cxydxv[ind(i,j)] + dt*2.*scr.cyydyv[ind(i,j)];
-	    cij[(N+1)*M + ind(i,j)] += - dt*scr.vgradcyy[ind(i,j)];
-	    cij[(N+1)*M + ind(i,j)] += 0.5*dt*oneOverWi*cij[(N+1)*M + ind(i,j)];
-	    cij[(N+1)*M + ind(i,j)] += cij[(N+1)*M + ind(i,j)];
+            cij[(N+1)*M + ind(i,j)] = cijOld[(N+1)*M + ind(i,j)];
+            cij[(N+1)*M + ind(i,j)] += - 0.5*dt*oneOverWi*cijOld[(N+1)*M + ind(i,j)];
+            cij[(N+1)*M + ind(i,j)] += dt*2.*scr.cxydxv[ind(i,j)] + dt*2.*scr.cyydyv[ind(i,j)];
+            cij[(N+1)*M + ind(i,j)] += - dt*scr.vgradcyy[ind(i,j)];
 
-	    cij[(N+1)*M + ind(i,j)] *= 1./(1.+0.5*oneOverWi);
+            cij[(N+1)*M + ind(i,j)] *= params.Wi/(params.Wi+dt*0.5);
+            
 
-	    cij[2*(N+1)*M + ind(i,j)] = dt*scr.cxxdxv[ind(i,j)] + dt*scr.cyydyu[ind(i,j)];
-	    cij[2*(N+1)*M + ind(i,j)] += - dt*scr.vgradcxy[ind(i,j)];
-	    cij[2*(N+1)*M + ind(i,j)] += 0.5*dt*oneOverWi*cij[2*(N+1)*M + ind(i,j)];
-	    cij[2*(N+1)*M + ind(i,j)] += cij[2*(N+1)*M + ind(i,j)];
+            cij[2*(N+1)*M + ind(i,j)] = cijOld[2*(N+1)*M + ind(i,j)];
+            cij[2*(N+1)*M + ind(i,j)] += -0.5*dt*oneOverWi*cijOld[2*(N+1)*M + ind(i,j)];
+            cij[2*(N+1)*M + ind(i,j)] += dt*scr.cxxdxv[ind(i,j)];
+	    cij[2*(N+1)*M + ind(i,j)] += dt*scr.cyydyu[ind(i,j)];
+            cij[2*(N+1)*M + ind(i,j)] += -dt*scr.vgradcxy[ind(i,j)];
 
-	    cij[2*(N+1)*M + ind(i,j)] *= 1./(1.+0.5*oneOverWi);
-	}
+            cij[2*(N+1)*M + ind(i,j)] *= params.Wi/(params.Wi+dt*0.5);
+
+        }
     }
-    cij[0] += oneOverWi;
-    cij[(N+1)*M] += oneOverWi;
+
+    cij[0] += dt/(params.Wi+dt*0.5);
+    cij[(N+1)*M] += dt/(params.Wi+dt*0.5);
+
 }
 
 void step_sf_SI_Crank_Nicolson_visco(
-	complex *psi, complex *psiNL, complex *cij, complex *cijNL, complex
-	*forcing, double dt, int timeStep,  complex *opsList, flow_scratch
-	scr, flow_params params)
+	complex *psiOld, complex *psi, complex *cijOld, complex *cij, complex
+	*psiNL, complex *forcing, complex *forcingN, double dt, int timeStep,
+	complex *opsList, flow_scratch scr, flow_params params)
 {
     int i, j, l;
     int N = params.N;
@@ -462,9 +469,9 @@ void step_sf_SI_Crank_Nicolson_visco(
     fft_convolve_r(scr.vdylplpsi, scr.v, scr.vdylplpsi, scr, params);
 
     //vdyypsi = vdyu
-    dy(scr.u, scr.d2ypsi, params);
+    dy(scr.u, scr.dyu, params);
 
-    fft_convolve_r(scr.d2ypsi, scr.v, scr.vdyypsi, scr, params);
+    fft_convolve_r(scr.dyu, scr.v, scr.vdyypsi, scr, params);
 
 #ifdef MYDEBUG
     if(timeStep==0)
@@ -473,65 +480,41 @@ void step_sf_SI_Crank_Nicolson_visco(
     }
 #endif
 
-    // d2x cxy
-    d2x(&cijNL[2*(N+1)*M], scr.d2xcxyNL, params);
-    
-    // d2y cxy
-    dy(&cijNL[2*(N+1)*M], scr.scratch, params);
-    dy(scr.scratch, scr.d2ycxyNL, params);
-
-    // dxy cyy-cxx
-    for (i=0; i<N+1; i++)
-    {
-	for (j=0; j<M; j++)
-	{
-	    scr.scratch[ind(i,j)] = cijNL[(N+1)*M + ind(i,j)] - cijNL[ind(i,j)];
-	}
-    }
-
-    dx(scr.scratch, scr.scratch2, params);
-    dy(scr.scratch2, scr.dxycyy_cxxNL, params);
-    
-    //dycxy
-    dy(&cijNL[2*(N+1)*M], scr.dycxyNL, params);
-    
-
     // ----------- linear Terms --------------
+    
     
     // lplpsi dyy(psi) + dxx(psi)
 
-    d2x(psi, scr.scratch, params);
-    dy(psi, scr.u, params);
-    dy(scr.u, scr.lplpsi, params);
+    d2x(psiOld, scr.scratch, params);
+
+    #ifdef MYDEBUG
+    if(timeStep==0)
+    {
+	save_hdf5_state("./output/d2xpsi.h5", &scr.scratch[0], params);
+    }
+    #endif
+
+    dy(psiOld, scr.u, params);
+    dy(scr.u, scr.dyu, params);
 
     for(i=0; i<N+1; i++)
     {
 	for(j=0; j<M; j++)
 	{
-	    scr.lplpsi[ind(i,j)] = scr.lplpsi[ind(i,j)] + scr.scratch[ind(i,j)];
+	    scr.lplpsi[ind(i,j)] = scr.dyu[ind(i,j)] + scr.scratch[ind(i,j)];
 	}
     }
 
     // biharmpsi (dyy + dxx)lplpsi
 
-    dy(scr.u, scr.d2ypsi, params);
-    dy(scr.d2ypsi, scr.dyyypsi, params);
+    dy(scr.dyu, scr.dyyypsi, params);
     dy(scr.dyyypsi, scr.d4ypsi, params);
-
-    d2x(psi, scr.scratch, params);
-
-#ifdef MYDEBUG
-    if(timeStep==0)
-    {
-	save_hdf5_state("./output/d2xpsi.h5", &scr.scratch[0], params);
-    }
-#endif
 
     dy(scr.scratch, scr.scratch2, params);
     dy(scr.scratch2, scr.d2xd2ypsi, params);
 
 
-    d4x(psi, scr.d4xpsi, params);
+    d4x(psiOld, scr.d4xpsi, params);
 
     for(i=0; i<N+1; i++)
     {
@@ -556,7 +539,7 @@ void step_sf_SI_Crank_Nicolson_visco(
 	save_hdf5_state("./output/u.h5",  &scr.u[0], params);
 	save_hdf5_state("./output/v.h5", &scr.v[0], params);
 	save_hdf5_state("./output/lplpsi.h5", &scr.lplpsi[0], params);
-	save_hdf5_state("./output/d2ypsi.h5", &scr.d2ypsi[0], params);
+	save_hdf5_state("./output/d2ypsi.h5", &scr.dyu[0], params);
 	save_hdf5_state("./output/d3ypsi.h5", &scr.dyyypsi[0], params);
 	save_hdf5_state("./output/d4ypsi.h5", &scr.d4ypsi[0], params);
 	save_hdf5_state("./output/d2xd2ypsi.h5", &scr.d2xd2ypsi[0], params);
@@ -569,13 +552,19 @@ void step_sf_SI_Crank_Nicolson_visco(
 
     // stresses
 
+    // AT FUTURE STEP
+    
+    //dycxy
+    dy(&cij[2*(N+1)*M], scr.dycxyN, params);
+    
     // d2x cxy
-    d2x(&cij[2*(N+1)*M], scr.d2xcxy, params);
+    d2x(&cij[2*(N+1)*M], scr.d2xcxyN, params);
     
     // d2y cxy
     dy(&cij[2*(N+1)*M], scr.scratch, params);
-    dy(scr.scratch, scr.d2ycxy, params);
+    dy(scr.scratch, scr.d2ycxyN, params);
 
+    // dxy cyy-cxx
     for (i=0; i<N+1; i++)
     {
 	for (j=0; j<M; j++)
@@ -583,13 +572,34 @@ void step_sf_SI_Crank_Nicolson_visco(
 	    scr.scratch[ind(i,j)] = cij[(N+1)*M + ind(i,j)] - cij[ind(i,j)];
 	}
     }
+    dx(scr.scratch, scr.scratch2, params);
+    dy(scr.scratch2, scr.dxycyy_cxxN, params);
+
+    // AT PREVIOUS STEP
+    
+    //dycxy
+    dy(&cijOld[2*(N+1)*M], scr.dycxy, params);
+    
+    // d2x cxy
+    d2x(&cijOld[2*(N+1)*M], scr.d2xcxy, params);
+    
+    // d2y cxy
+    dy(&cijOld[2*(N+1)*M], scr.scratch, params);
+    dy(scr.scratch, scr.d2ycxy, params);
+
+    // dxy cyy-cxx
+    for (i=0; i<N+1; i++)
+    {
+	for (j=0; j<M; j++)
+	{
+	    scr.scratch[ind(i,j)] = cijOld[(N+1)*M + ind(i,j)] - cijOld[ind(i,j)];
+	}
+    }
 
     dx(scr.scratch, scr.scratch2, params);
     dy(scr.scratch2, scr.dxycyy_cxx, params);
     
-    //dycxy
-    dy(&cij[2*(N+1)*M], scr.dycxy, params);
-    
+    // Streamfunction equation:
 
     // RHSVec = dt*0.5*oneOverRe*BIHARMPSI 
     // 	+ LPLPSI 
@@ -604,18 +614,19 @@ void step_sf_SI_Crank_Nicolson_visco(
 	for (j=0; j<M; j++)
 	{
 
-	    scr.RHSvec[j] = 0.5*dt*oneOverRe*scr.biharmpsi[ind(i,j)];
-	    scr.RHSvec[j] += - dt*scr.udxlplpsi[ind(i,j)];
-	    scr.RHSvec[j] += - dt*scr.vdylplpsi[ind(i,j)];
+	    scr.RHSvec[j] = 0.5*dt*oneOverRe*beta*scr.biharmpsi[ind(i,j)];
 	    scr.RHSvec[j] += + 0.5*dt*(1.-beta)*oneOverRe*oneOverWi*( 
 			                 scr.d2xcxy[ind(i,j)] 
-				       + scr.dxycyy_cxx[ind(i,j)] 
-				       - scr.d2ycxy[ind(i,j)]);
+				       - scr.d2ycxy[ind(i,j)]
+				       + scr.dxycyy_cxx[ind(i,j)]);
 	    scr.RHSvec[j] += + 0.5*dt*(1.-beta)*oneOverRe*oneOverWi*( 
-			                 scr.d2xcxyNL[ind(i,j)] 
-				       + scr.dxycyy_cxxNL[ind(i,j)] 
-				       - scr.d2ycxyNL[ind(i,j)]);
-	    scr.RHSvec[j] += dt*forcing[ind(i,j)];
+			                 scr.d2xcxyN[ind(i,j)] 
+				       - scr.d2ycxyN[ind(i,j)]
+				       + scr.dxycyy_cxxN[ind(i,j)]); 
+	    scr.RHSvec[j] += 0.5*dt*forcing[ind(i,j)];
+	    scr.RHSvec[j] += 0.5*dt*forcingN[ind(i,j)];
+	    scr.RHSvec[j] += - dt*scr.udxlplpsi[ind(i,j)];
+	    scr.RHSvec[j] += - dt*scr.vdylplpsi[ind(i,j)];
 	    scr.RHSvec[j] += + scr.lplpsi[ind(i,j)];
 
 
@@ -650,7 +661,7 @@ void step_sf_SI_Crank_Nicolson_visco(
     }
 
 
-    // # Zeroth mode
+    // # Zeroth mode, U equatioj
     // RHSVec[N*M:(N+1)*M] = 0
     // RHSVec[N*M:(N+1)*M] = dt*0.5*oneOverRe*dot(MDYYY, PSI)[N*M:(N+1)*M] 
     // 	+ dot(MDY, PSI)[N*M:(N+1)*M] 
@@ -658,16 +669,18 @@ void step_sf_SI_Crank_Nicolson_visco(
     //  + _dt*(1.-beta)*oneOverRe*dot(MDY, Txy)[N*M:(N+1)*M]
     // RHSVec[N*M] += dt*2*oneOverRe
 
+
     for (j=0; j<M; j++)
     {
-	//RHSvec[j] = u[ind(0,j)];
-	scr.RHSvec[j] = dt*0.5*oneOverRe*creal(scr.dyyypsi[ind(0,j)]);
+	scr.RHSvec[j]  = dt*0.5*beta*oneOverRe*creal(scr.dyyypsi[ind(0,j)]);
+	scr.RHSvec[j] += dt*0.5*(1.-beta)*oneOverRe*oneOverWi*creal(scr.dycxy[ind(0,j)]); 
+	scr.RHSvec[j] += dt*0.5*(1.-beta)*oneOverRe*oneOverWi*creal(scr.dycxyN[ind(0,j)]); 
+	scr.RHSvec[j] += dt*0.5*creal(forcing[ind(0,j)]);
+	scr.RHSvec[j] += dt*0.5*creal(forcingN[ind(0,j)]);
 	scr.RHSvec[j] += - dt*creal(scr.vdyypsi[ind(0,j)]);
-	scr.RHSvec[j] += dt*0.5*(1.-beta)*oneOverRe*creal(scr.dycxy[ind(0,j)]); 
-	scr.RHSvec[j] += dt*0.5*(1.-beta)*oneOverRe*creal(scr.dycxyNL[ind(0,j)]); 
-	scr.RHSvec[j] += dt*creal(forcing[ind(0,j)]);
 	scr.RHSvec[j] += creal(scr.u[ind(0,j)]); 
     }
+
     // RHSvec[0] += 2*dt*oneOverRe;
 
     // apply BCs
@@ -846,9 +859,9 @@ void stress_time_derivative(
 }
 
 void equilibriate_stress(
-	complex *psi, complex *psi2, complex *psi_lam, complex *cij, complex
-	*cijNL, double dt,flow_scratch scr, flow_params params,
-	hid_t *file_id, hid_t *filetype_id, hid_t *datatype_id
+	complex *psiOld, complex *psi_lam, complex *cijOld, complex *cij,
+	complex *cijNL, double dt,flow_scratch scr, flow_params params, hid_t
+	*file_id, hid_t *filetype_id, hid_t *datatype_id
 	)
 
 {
@@ -892,13 +905,13 @@ void equilibriate_stress(
 	time = timeStep * dt;
 	for (i=0; i<M*(N+1); i++)
 	{
-	    psi_tmp[i] = 0.5*(1.-cos(time * M_PI/(2.0*Wi))) * psi[i];
+	    psi_tmp[i] = 0.5*(1.-cos(time * M_PI/(2.0*Wi))) * psiOld[i];
 	    psi_tmp[i] += 0.5*(1.+cos(time * M_PI/(2.0*Wi))) * psi_lam[i];
 	}
 
 	// step the stress to t star
 
-	step_conformation_Crank_Nicolson( psi_tmp, cijNL, cij, 0.5*dt, scr,
+	step_conformation_Crank_Nicolson( psi_tmp, cijOld, cijNL, cij, 0.5*dt, scr,
 		params);
 
 	// assume psi star = psi_tmp
@@ -906,7 +919,7 @@ void equilibriate_stress(
 
 	// step the stress to t + h
 
-	step_conformation_Crank_Nicolson( psi_tmp, cij, cijNL, dt, scr,
+	step_conformation_Crank_Nicolson( psi_tmp, cijOld, cij, cijNL, dt, scr,
 		params);
 
 #ifdef MYDEBUG
@@ -914,7 +927,7 @@ void equilibriate_stress(
 	if ((timeStep % (numSteps / 100)) == 0 )
 	{
 	    trC_tensor(cij, trC, scr.scratchp1, scr.scratchp2, scr.scratchin, scr.scratchout,
-		    scr.phys_plan, scr.spec_plan, cnsts);
+		    scr.phys_plan, scr.spec_plan, params);
 
 	//    diagonalised_C(complex *cij, complex *ecij, double *rcij, double
 	//	    *scr.scratchp1, double *scr.scratchp2, fftw_complex *scr.scratchin, fftw_complex

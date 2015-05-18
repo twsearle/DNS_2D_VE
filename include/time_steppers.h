@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Tue  5 May 22:36:37 2015
+// Last modified: Mon 18 May 12:19:24 2015
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -25,13 +25,13 @@ void step_sf_SI_Crank_Nicolson(
 	*forcing, complex *opsList, flow_scratch scr, flow_params params);
 
 void step_sf_SI_Crank_Nicolson_visco(
-	complex *psi, complex *psiNL, complex *cij, complex *cijNL, complex
-	*forcing, double dt, int timeStep,  complex *opsList, flow_scratch
-	scr, flow_params params);
+	complex *psiOld, complex *psi, complex *cijOld, complex *cij, complex
+	*psiNL, complex *forcing, complex *forcingN, double dt, int timeStep,
+	complex *opsList, flow_scratch scr, flow_params params);
 
 void step_conformation_Crank_Nicolson(
-	complex *psi, complex *cij, complex *cijNL, double dt, flow_scratch
-	scr, flow_params params);
+	 complex *cijOld, complex *cij, complex *psi, complex *cijNL, double
+	 dt, flow_scratch scr, flow_params params);
 
 void stress_time_derivative(
 	complex *psi, complex *cxx, complex *cyy, complex *cxy, complex *fxx,
@@ -40,9 +40,9 @@ void stress_time_derivative(
 	);
 
 void equilibriate_stress(
-	complex *psi, complex *psi2, complex *psi_lam, complex *cij, complex
-	*cijNL, double dt,flow_scratch scr, flow_params params,
-	hid_t *file_id, hid_t *filetype_id, hid_t *datatype_id
+	complex *psiOld, complex *psi_lam, complex *cijOld, complex *cij,
+	complex *cijNL, double dt,flow_scratch scr, flow_params params, hid_t
+	*file_id, hid_t *filetype_id, hid_t *datatype_id
 	);
 
 #endif // FIELDS_2D_C_H

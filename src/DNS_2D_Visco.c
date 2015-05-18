@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 11 May 18:57:31 2015
+// Last modified: Mon 18 May 12:26:52 2015
 
 /* Program Description:
  *
@@ -212,9 +212,9 @@ int main(int argc, char **argv)
 
     // field arrays are declared as pointers and then I malloc.
 
-    complex *psi, *psi2, *psiNL, *psi_lam;
-    complex *forcing;
-    complex *cij, *cijNL;
+    complex *psi, *psiOld, *psiNL, *psi_lam;
+    complex *forcing, *forcingN;
+    complex *cijOld, *cij, *cijNL;
     complex *trC;
     complex *tmpop;
     complex *opsList, *hopsList;
@@ -235,11 +235,12 @@ int main(int argc, char **argv)
     opsList = (complex*) fftw_malloc((N+1)*M*M * sizeof(complex));
     hopsList = (complex*) fftw_malloc((N+1)*M*M * sizeof(complex));
 
+    psiOld = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     psi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    psi2 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     psiNL = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     psi_lam = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     forcing = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    forcingN = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
 
     // temporary Newtonian variables
 
@@ -249,7 +250,6 @@ int main(int argc, char **argv)
     scr.vdylplpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     scr.lplpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     scr.biharmpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.d2ypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     scr.dyyypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     scr.d4ypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     scr.d4xpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
@@ -267,6 +267,7 @@ int main(int argc, char **argv)
 
     trC = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
 
+    cijOld = (complex*) fftw_malloc(3*(N+1)*M * sizeof(complex));
     cij = (complex*) fftw_malloc(3*(N+1)*M * sizeof(complex));
     cijNL = (complex*) fftw_malloc(3*(N+1)*M * sizeof(complex));
 
@@ -289,10 +290,10 @@ int main(int argc, char **argv)
     scr.d2xcxy = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     scr.dxycyy_cxx = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     scr.dycxy = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.d2ycxyNL = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.d2xcxyNL = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.dxycyy_cxxNL = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.dycxyNL = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.d2ycxyN = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.d2xcxyN = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.dxycyy_cxxN = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.dycxyN = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
 
     scr.scratchin = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
     scr.scratchout = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
@@ -315,11 +316,16 @@ int main(int argc, char **argv)
     printf("\n------\nLoading initial streamfunction and operators\n------\n");
 
     // load the initial field from scipy
-    // load_hdf5_state("initial_cxx.h5", cxx, params);
-    // load_hdf5_state("initial_cyy.h5", cyy, params);
-    // load_hdf5_state("initial_cxy.h5", cxy, params);
-    load_hdf5_state_visco("initial_visco.h5", psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], params);
+    load_hdf5_state_visco("initial_visco.h5", psi, &cij[0], &cij[(N+1)*M],
+				&cij[2*(N+1)*M], params);
+
     load_hdf5_state("forcing.h5", forcing, params);
+
+        for (i=0; i<(N+1)*M; i++)
+        {
+	    forcingN[i] = forcing[i];
+	}
+
     load_hdf5_state("laminar.h5", psi_lam, params);
 
     // load the operators from scipy 
@@ -374,28 +380,63 @@ int main(int argc, char **argv)
     
     // set the test.
     printf("\n------\nperforming the stress equilibration\n------\n");
-#ifdef MYDEBUG   
+    #ifdef MYDEBUG   
     printf("\nTime\t\tIntegrated TrC");
-#endif
+    #endif
 
-    equilibriate_stress( psi, psi2, psi_lam, cij, cijNL, dt, scr, params,
-			&hdf5fp, &filetype_id, &datatype_id);
+    #ifndef MYDEBUG
+    //equilibriate_stress( psiOld, psi_lam, cij, cijNL, dt, scr, params,
+    //	    		&hdf5fp, &filetype_id, &datatype_id);
+    #endif
 
+    save_hdf5_snapshot_visco(&hdf5fp, &filetype_id, &datatype_id,
+	 psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], 0.0, params);
+
+
+    // FORCE POSIEUILLE STRESS TEST =====================================
+    dy(psi, scr.u, params);
+    dy(scr.u, scr.dyu, params);
+    fft_convolve_r(scr.dyu, scr.dyu, scr.cxydyu, scr, params);
+
+    for (i=0; i<N+1; i++)
+    {
+	for (j=0; j<M; j++)
+	{
+
+	    cij[ind(0,j)] = 2.*params.Wi*params.Wi*scr.cxydyu[ind(0,j)];
+	    cij[(N+1)*M + ind(0,j)] = 0;
+	    cij[2*(N+1)*M + ind(0,j)] = params.Wi * scr.dyu[ind(0,j)];
+
+	    cijNL[ind(0,j)] = cijNL[ind(0,j)]; 
+	    cijNL[(N+1)*M + ind(0,j)] = cij[(N+1)*M + ind(0,j)];
+	    cijNL[2*(N+1)*M + ind(0,j)] = cij[2*(N+1)*M + ind(0,j)];
+	}
+    }
+
+    cij[0] += 1.0;
+    cij[(N+1)*M] = 1.0;	
+    // FORCE POSIEUILLE STRESS TEST =====================================
+	
     // perform the time iteration
     printf("\n------\nperforming the time iteration\n------\n");
     printf("\nTime\t\tKE_tot\t\t KE0\t\t KE1\t\t EE0\n");
 
-    for (timeStep=1; timeStep<=numTimeSteps; timeStep++)
+    for (timeStep=0; timeStep<numTimeSteps; timeStep++)
     {
 
-	time = timeStep*dt;
+	time = (timeStep)*dt;
         
         #ifdef MYDEBUG
         if (timeStep==0)
         {
-            d2x(psi, scratch, params);
-            save_hdf5_state("./output/d2xpsi.h5", &scratch[0], params);
+            d2x(psi, scr.scratch, params);
+            save_hdf5_state("./output/d2xpsi.h5", &scr.scratch[0], params);
             save_hdf5_state("./output/psi.h5", &psi[0], params);
+
+            save_hdf5_state("./output/cxx.h5", &cij[0], params);
+            save_hdf5_state("./output/cyy.h5", &cij[(N+1)*M], params);
+            save_hdf5_state("./output/cxy.h5", &cij[2*(N+1)*M], params);
+
         }
         #endif
         // Step the stresses using 2nd order pc CN method
@@ -405,66 +446,27 @@ int main(int argc, char **argv)
 
         for (i=0; i<3*(N+1)*M; i++)
         {
+            cijOld[i] = cij[i];
             cijNL[i] = cij[i];
         }
         for (i=0; i<(N+1)*M; i++)
         {
+            psiOld[i] = psi[i];
             psiNL[i] = psi[i];
         }
 
 	// calculate forcing 
 	#ifdef OSCIL_FLOW
-	forcing[ind(0,0)] = cos(params.Omega*time) / params.Re;
+	forcing[ind(0,0)] = cos(params.Omega*(timeStep)*dt) / params.Re;
+	forcingN[ind(0,0)] = cos(params.Omega*(timeStep+0.5)*dt) / params.Re;
 	#endif
 
-        step_conformation_Crank_Nicolson(psi, cijNL, cij, 0.5*dt, scr, params);
-        
-	step_sf_SI_Crank_Nicolson_visco( psiNL, psi, cij, cijNL, forcing,
-				0.5*dt, timeStep, hopsList, scr, params);
-
-	// calculate forcing on the half step
-	#ifdef OSCIL_FLOW
-	forcing[ind(0,0)] = cos(params.Omega*(time + dt/2.0)) / params.Re;
-	#endif
-
-        // use the old values plus the values on the half step for the NL terms
-	step_conformation_Crank_Nicolson(psiNL, cij, cijNL, dt, scr, params);
-
-	step_sf_SI_Crank_Nicolson_visco( psi, psiNL, cij, cijNL, forcing, dt,
-				timeStep, opsList, scr, params);
-
-        #ifdef MYDEBUG
-        if (timeStep==0)
-        {
-
-            save_hdf5_state("./output/u.h5",  &scr.u[0], params);
-            save_hdf5_state("./output/v.h5", &scr.v[0], params);
-            save_hdf5_state("./output/lplpsi.h5", &scr.lplpsi[0], params);
-            save_hdf5_state("./output/d2ypsi.h5", &scr.d2ypsi[0], params);
-            save_hdf5_state("./output/d3ypsi.h5", &scr.dyyypsi[0], params);
-            save_hdf5_state("./output/d4ypsi.h5", &scr.d4ypsi[0], params);
-            save_hdf5_state("./output/d2xd2ypsi.h5", &scr.d2xd2ypsi[0], params);
-            save_hdf5_state("./output/d4xpsi.h5", &scr.d4xpsi[0], params);
-            save_hdf5_state("./output/biharmpsi.h5", &scr.biharmpsi[0], params);
-            save_hdf5_state("./output/udxlplpsi.h5", &scr.udxlplpsi[0], params);
-            save_hdf5_state("./output/vdylplpsi.h5", &scr.vdylplpsi[0], params);
-            save_hdf5_state("./output/vdyypsi.h5", &scr.vdyypsi[0], params);
-
-            save_hdf5_state("./output/d2xcxy.h5", &scr.d2xcxy[0], params);
-            save_hdf5_state("./output/d2ycxy.h5", &scr.d2ycxy[0], params);
-            save_hdf5_state("./output/dxycyy_cxx.h5", &scr.dxycyy_cxx[0], params);
-            save_hdf5_state("./output/dycxy.h5", &scr.dycxy[0], params);
-        }
-        #endif
-
+	step_conformation_Crank_Nicolson(cijOld, cijNL, psiOld, cijOld,
+					    0.5*dt, scr, params);
         
         #ifdef MYDEBUG
         if(timeStep==0)
         {
-            save_hdf5_state("./output/cxx.h5", &cij[0], params);
-            save_hdf5_state("./output/cyy.h5", &cij[(N+1)*M], params);
-            save_hdf5_state("./output/cxy.h5", &cij[2*(N+1)*M], params);
-
             save_hdf5_state("./output/dxu.h5", &scr.dxu[0], params);
             save_hdf5_state("./output/dyu.h5", &scr.dyu[0], params);
             save_hdf5_state("./output/dxv.h5", &scr.dxv[0], params);
@@ -484,6 +486,46 @@ int main(int argc, char **argv)
         }
         #endif
 
+	step_sf_SI_Crank_Nicolson_visco(psiOld, psiNL, cijOld, cijNL, psiOld,
+			forcing, forcingN, 0.5*dt, timeStep, hopsList, scr, params);
+
+	// calculate forcing on the half step
+	#ifdef OSCIL_FLOW
+	forcing[ind(0,0)] = cos(params.Omega*(timeStep)*dt) / params.Re;
+	forcingN[ind(0,0)] = cos(params.Omega*(timeStep+1.0)*dt) / params.Re;
+	#endif
+
+        // use the old values plus the values on the half step for the NL terms
+	step_conformation_Crank_Nicolson(cijOld, cij, psiNL, cijNL, dt, scr, params);
+
+	step_sf_SI_Crank_Nicolson_visco(psiOld, psi, cijOld, cij, psiNL,
+			    forcing, forcingN, dt, timeStep, opsList, scr, params);
+
+        #ifdef MYDEBUG
+        if (timeStep==0)
+        {
+
+            save_hdf5_state("./output/u.h5",  &scr.u[0], params);
+            save_hdf5_state("./output/v.h5", &scr.v[0], params);
+            save_hdf5_state("./output/lplpsi.h5", &scr.lplpsi[0], params);
+            save_hdf5_state("./output/d2ypsi.h5", &scr.dyu[0], params);
+            save_hdf5_state("./output/d3ypsi.h5", &scr.dyyypsi[0], params);
+            save_hdf5_state("./output/d4ypsi.h5", &scr.d4ypsi[0], params);
+            save_hdf5_state("./output/d2xd2ypsi.h5", &scr.d2xd2ypsi[0], params);
+            save_hdf5_state("./output/d4xpsi.h5", &scr.d4xpsi[0], params);
+            save_hdf5_state("./output/biharmpsi.h5", &scr.biharmpsi[0], params);
+            save_hdf5_state("./output/udxlplpsi.h5", &scr.udxlplpsi[0], params);
+            save_hdf5_state("./output/vdylplpsi.h5", &scr.vdylplpsi[0], params);
+            save_hdf5_state("./output/vdyypsi.h5", &scr.vdyypsi[0], params);
+
+            save_hdf5_state("./output/d2xcxy.h5", &scr.d2xcxy[0], params);
+            save_hdf5_state("./output/d2ycxy.h5", &scr.d2ycxy[0], params);
+            save_hdf5_state("./output/dxycyy_cxx.h5", &scr.dxycyy_cxx[0], params);
+            save_hdf5_state("./output/dycxy.h5", &scr.dycxy[0], params);
+        }
+        #endif
+
+
         #ifdef MYDEBUG
         if (timeStep==0)
         {
@@ -496,9 +538,10 @@ int main(int argc, char **argv)
 
 
         // output some information at every frame
-        if ((timeStep % stepsPerFrame) == 0 )
+        if (((timeStep+1) % stepsPerFrame) == 0 )
         {
-            time = timeStep*dt;
+
+	    time = (timeStep + 1)*dt;
 
             double normU1 = 0;
             double normU2 = 0;
@@ -603,13 +646,17 @@ int main(int argc, char **argv)
     fftw_free(tmpop);
     fftw_free(opsList);
     fftw_free(hopsList);
+    fftw_free(forcing);
+    fftw_free(forcingN);
+
+    fftw_free(psiOld);
     fftw_free(psi);
     fftw_free(psiNL);
     fftw_free(psi_lam);
+    fftw_free(cijOld);
     fftw_free(cij);
     fftw_free(cijNL);
     fftw_free(trC);
-    fftw_free(forcing);
 
     fftw_free(scr.scratch);
     fftw_free(scr.scratch2);
@@ -626,7 +673,6 @@ int main(int argc, char **argv)
     fftw_free(scr.scratchout);
     fftw_free(scr.scratchp1);
     fftw_free(scr.scratchp2);
-    fftw_free(scr.d2ypsi);
     fftw_free(scr.dyyypsi);
     fftw_free(scr.d4ypsi);
     fftw_free(scr.d4xpsi);
@@ -651,10 +697,10 @@ int main(int argc, char **argv)
     fftw_free(scr.d2xcxy);
     fftw_free(scr.dxycyy_cxx);
     fftw_free(scr.dycxy);
-    fftw_free(scr.d2ycxyNL);
-    fftw_free(scr.d2xcxyNL);
-    fftw_free(scr.dxycyy_cxxNL);
-    fftw_free(scr.dycxyNL);
+    fftw_free(scr.d2ycxyN);
+    fftw_free(scr.d2xcxyN);
+    fftw_free(scr.dxycyy_cxxN);
+    fftw_free(scr.dycxyN);
 
     printf("quitting c program\n");
 
