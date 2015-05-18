@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 18 May 12:41:46 2015
+// Last modified: Mon 18 May 13:40:10 2015
 
 #include"fields_2D.h"
 
@@ -911,7 +911,7 @@ void equilibriate_stress(
 
 	// step the stress to t star
 
-	step_conformation_Crank_Nicolson( psi_tmp, cijOld, cijNL, cij, 0.5*dt, scr,
+	step_conformation_Crank_Nicolson( cijOld, cijNL, psi_tmp, cijOld, 0.5*dt, scr,
 		params);
 
 	// assume psi star = psi_tmp
@@ -919,7 +919,7 @@ void equilibriate_stress(
 
 	// step the stress to t + h
 
-	step_conformation_Crank_Nicolson( psi_tmp, cijOld, cij, cijNL, dt, scr,
+	step_conformation_Crank_Nicolson( cijOld, cij, psi_tmp, cijNL, dt, scr,
 		params);
 
 #ifdef MYDEBUG

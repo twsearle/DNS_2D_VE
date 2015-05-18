@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Sat 16 May 19:20:16 2015
+// Last modified: Mon 18 May 15:46:15 2015
 
 #include"fields_2D.h"
 
@@ -1387,6 +1387,7 @@ double calc_EE_mode(complex *trC, int n, flow_params cnsts)
     
     int j=0;
     int M=cnsts.M;
+    double Wi = cnsts.Wi;
 
     complex EE=0;
 
@@ -1412,5 +1413,5 @@ double calc_EE_mode(complex *trC, int n, flow_params cnsts)
     }
 
 
-    return EE;
+    return EE/Wi;
 }

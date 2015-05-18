@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 18 May 12:26:52 2015
+// Last modified: Mon 18 May 14:24:40 2015
 
 /* Program Description:
  *
@@ -318,6 +318,14 @@ int main(int argc, char **argv)
     // load the initial field from scipy
     load_hdf5_state_visco("initial_visco.h5", psi, &cij[0], &cij[(N+1)*M],
 				&cij[2*(N+1)*M], params);
+        for (i=0; i<3*(N+1)*M; i++)
+	{
+	    cijOld[i] = cij[i];
+	}
+        for (i=0; i<(N+1)*M; i++)
+	{
+	    psiOld[i] = psi[i];
+	}
 
     load_hdf5_state("forcing.h5", forcing, params);
 
@@ -385,7 +393,7 @@ int main(int argc, char **argv)
     #endif
 
     #ifndef MYDEBUG
-    //equilibriate_stress( psiOld, psi_lam, cij, cijNL, dt, scr, params,
+    //equilibriate_stress( psiOld, psi_lam, cijOld, cij, cijNL, dt, scr, params,
     //	    		&hdf5fp, &filetype_id, &datatype_id);
     #endif
 
@@ -393,30 +401,6 @@ int main(int argc, char **argv)
 	 psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], 0.0, params);
 
 
-    // FORCE POSIEUILLE STRESS TEST =====================================
-    dy(psi, scr.u, params);
-    dy(scr.u, scr.dyu, params);
-    fft_convolve_r(scr.dyu, scr.dyu, scr.cxydyu, scr, params);
-
-    for (i=0; i<N+1; i++)
-    {
-	for (j=0; j<M; j++)
-	{
-
-	    cij[ind(0,j)] = 2.*params.Wi*params.Wi*scr.cxydyu[ind(0,j)];
-	    cij[(N+1)*M + ind(0,j)] = 0;
-	    cij[2*(N+1)*M + ind(0,j)] = params.Wi * scr.dyu[ind(0,j)];
-
-	    cijNL[ind(0,j)] = cijNL[ind(0,j)]; 
-	    cijNL[(N+1)*M + ind(0,j)] = cij[(N+1)*M + ind(0,j)];
-	    cijNL[2*(N+1)*M + ind(0,j)] = cij[2*(N+1)*M + ind(0,j)];
-	}
-    }
-
-    cij[0] += 1.0;
-    cij[(N+1)*M] = 1.0;	
-    // FORCE POSIEUILLE STRESS TEST =====================================
-	
     // perform the time iteration
     printf("\n------\nperforming the time iteration\n------\n");
     printf("\nTime\t\tKE_tot\t\t KE0\t\t KE1\t\t EE0\n");
