@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 18 May 15:46:15 2015
+// Last modified: Tue 19 May 13:37:54 2015
 
 #include"fields_2D.h"
 
@@ -1394,20 +1394,14 @@ double calc_EE_mode(complex *trC, int n, flow_params cnsts)
 
     for (j=0; j<M; j+=2)
     {
-	// subtract tr(I) to get something proportional to stress?
-	if (n==0 && j==0)
-	{
-	    EE += (2. / (1.-j*j)) * (trC[ind(n,0)] - 3.0);
 
-	}else{
-
-	    EE += (2. / (1.-j*j)) * (trC[ind(n,0)]);
-	}
+	EE += (2. / (1.-j*j)) * (trC[ind(n,0)]);
     }
 
     if (n == 0)
     {
-	return 0.5*creal(EE);
+	// subtract the trace of identity matrix integrated over the domain
+	return 0.5*creal(EE-4.0);
     } else {
 	return creal(EE);
     }

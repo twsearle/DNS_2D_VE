@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 18 May 13:40:10 2015
+// Last modified: Tue 19 May 12:31:39 2015
 
 #include"fields_2D.h"
 
@@ -372,7 +372,8 @@ void step_conformation_Crank_Nicolson(
         {
             cij[ind(i,j)] = cijOld[ind(i,j)];
             cij[ind(i,j)] += - 0.5*dt*oneOverWi*cijOld[ind(i,j)];
-            cij[ind(i,j)] += dt*2.*scr.cxxdxu[ind(i,j)] + dt*2.*scr.cxydyu[ind(i,j)];
+	    cij[ind(i,j)] += dt*2.*scr.cxydyu[ind(i,j)];
+            cij[ind(i,j)] += dt*2.*scr.cxxdxu[ind(i,j)];
             cij[ind(i,j)] += - dt*scr.vgradcxx[ind(i,j)];
 
             cij[ind(i,j)] *= params.Wi/(params.Wi+dt*0.5);
@@ -380,17 +381,18 @@ void step_conformation_Crank_Nicolson(
 
             cij[(N+1)*M + ind(i,j)] = cijOld[(N+1)*M + ind(i,j)];
             cij[(N+1)*M + ind(i,j)] += - 0.5*dt*oneOverWi*cijOld[(N+1)*M + ind(i,j)];
-            cij[(N+1)*M + ind(i,j)] += dt*2.*scr.cxydxv[ind(i,j)] + dt*2.*scr.cyydyv[ind(i,j)];
+            cij[(N+1)*M + ind(i,j)] += dt*2.*scr.cxydxv[ind(i,j)]; 
+	    cij[(N+1)*M + ind(i,j)] += dt*2.*scr.cyydyv[ind(i,j)];
             cij[(N+1)*M + ind(i,j)] += - dt*scr.vgradcyy[ind(i,j)];
 
             cij[(N+1)*M + ind(i,j)] *= params.Wi/(params.Wi+dt*0.5);
             
 
             cij[2*(N+1)*M + ind(i,j)] = cijOld[2*(N+1)*M + ind(i,j)];
-            cij[2*(N+1)*M + ind(i,j)] += -0.5*dt*oneOverWi*cijOld[2*(N+1)*M + ind(i,j)];
+            cij[2*(N+1)*M + ind(i,j)] += - 0.5*dt*oneOverWi*cijOld[2*(N+1)*M + ind(i,j)];
             cij[2*(N+1)*M + ind(i,j)] += dt*scr.cxxdxv[ind(i,j)];
 	    cij[2*(N+1)*M + ind(i,j)] += dt*scr.cyydyu[ind(i,j)];
-            cij[2*(N+1)*M + ind(i,j)] += -dt*scr.vgradcxy[ind(i,j)];
+            cij[2*(N+1)*M + ind(i,j)] += - dt*scr.vgradcxy[ind(i,j)];
 
             cij[2*(N+1)*M + ind(i,j)] *= params.Wi/(params.Wi+dt*0.5);
 
@@ -399,6 +401,15 @@ void step_conformation_Crank_Nicolson(
 
     cij[0] += dt/(params.Wi+dt*0.5);
     cij[(N+1)*M] += dt/(params.Wi+dt*0.5);
+    
+    // Zero off the imaginary part of the zeroth mode of the stresses
+
+    for (j=0; j<M; j++)
+    {
+        cij[ind(0,j)] = creal(cij[ind(0,j)]);
+        cij[(N+1)*M + ind(0,j)] = creal(cij[(N+1)*M + ind(0,j)]);
+        cij[2*(N+1)*M + ind(0,j)] = creal(cij[2*(N+1)*M + ind(0,j)]);
+    }
 
 }
 

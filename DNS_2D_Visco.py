@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Mon 18 May 14:02:15 2015
+#   Last modified: Tue 19 May 13:40:34 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -425,15 +425,16 @@ def x_independent_profile(PSI):
      profile.
     """
 
+    dyu = dot(SMDYY, PSI[N*M:(N+1)*M])
     Cyy = zeros(vecLen, dtype='complex')
     Cyy[N*M] += 1.0
     Cxy = zeros(vecLen, dtype='complex')
-    Cxy[N*M:(N+1)*M] = Wi*dot(SMDYY, PSI[N*M:(N+1)*M])
+    Cxy[N*M:(N+1)*M] = Wi*dyu
     Cxx = zeros(vecLen, dtype='complex')
-    Cxx = 2*Wi*Wi*Cxy*Cxy
+    Cxx[N*M:(N+1)*M] = 2*Wi*Wi*dot(cheb_prod_mat(dyu), dyu)
     Cxx[N*M] += 1.0
 
-    return (Cxx, Cxy, Cyy)
+    return (Cxx, Cyy, Cxy)
 
 def cheb_prod_mat(velA):
     """Function to return a matrix for left-multiplying two Chebychev vectors"""
@@ -508,14 +509,14 @@ Cyy = zeros((2*N+1)*M,dtype='complex')
 Cxy = zeros((2*N+1)*M,dtype='complex')
 
 
-# Read in stream function from file
-(PSI, Cxx, Cyy, Cxy, Nu) = pickle.load(open(inFileName,'r'))
-PSI = decide_resolution(PSI, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
-Cxx = decide_resolution(Cxx, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
-Cyy = decide_resolution(Cyy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
-Cxy = decide_resolution(Cxy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
-psiLam = copy(PSI)
-print inFileName
+## Read in stream function from file
+#(PSI, Cxx, Cyy, Cxy, Nu) = pickle.load(open(inFileName,'r'))
+#PSI = decide_resolution(PSI, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+#Cxx = decide_resolution(Cxx, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+#Cyy = decide_resolution(Cyy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+#Cxy = decide_resolution(Cxy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+#psiLam = copy(PSI)
+#print inFileName
 
 #f = h5py.File("final.h5","r")
 #
@@ -560,16 +561,16 @@ print inFileName
 
 # --------------- POISEUILLE -----------------
 
-#plugAmp = 0.00 #* (M/32.0)
-#
-#PSI[N*M]   += (1.-plugAmp) * 2.0/3.0
-#PSI[N*M+1] += (1.-plugAmp) * 3.0/4.0
-#PSI[N*M+2] += (1.-plugAmp) * 0.0
-#PSI[N*M+3] += (1.-plugAmp) * -1.0/12.0
-#
-### set initial stress guess based on laminar flow
-#Cxx, Cyy, Cxy = x_independent_profile(PSI)
-#psiLam = copy(PSI)
+plugAmp = 0.00 #* (M/32.0)
+
+PSI[N*M]   += (1.-plugAmp) * 2.0/3.0
+PSI[N*M+1] += (1.-plugAmp) * 3.0/4.0
+PSI[N*M+2] += (1.-plugAmp) * 0.0
+PSI[N*M+3] += (1.-plugAmp) * -1.0/12.0
+
+## set initial stress guess based on laminar flow
+Cxx, Cyy, Cxy = x_independent_profile(PSI)
+psiLam = copy(PSI)
 #
 ## --- PLUG  ---
 #
@@ -581,12 +582,12 @@ print inFileName
 ##PSI[N*M:] = 0
 ##PSI[:(N+1)*M] = 0
 #
-#perKEestimate = 0.1
-#totEnergy = 0.9
-#sigma = 0.1
-#gam = 2
-#
-#PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
+perKEestimate = 0.1
+totEnergy = 0.9
+sigma = 0.1
+gam = 2
+
+PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
 #
 #
 forcing = zeros((M,2*N+1), dtype='complex')
