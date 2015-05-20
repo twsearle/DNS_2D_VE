@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Wed 20 May 11:25:42 2015
+#   Last modified: Wed 20 May 15:52:49 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -93,8 +93,8 @@ numTimeSteps = int(totTime / dt)
 assert (totTime / dt) - float(numTimeSteps) == 0, "Non-integer number of timesteps"
 assert Wi != 0.0, "cannot have Wi = 0!"
 
-NOld = 3 
-MOld = 40
+NOld = N 
+MOld = M
 kwargs = {'NOld': NOld, 'MOld': MOld, 'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0,
           'Re': Re, 'Wi': Wi, 'beta': beta, 'Omega':Omega, 'kx': kx,'time': totTime, 'dt':dt,
           'dealiasing':dealiasing}
@@ -510,13 +510,13 @@ Cxy = zeros((2*N+1)*M,dtype='complex')
 
 
 ## Read in stream function from file
-#(PSI, Cxx, Cyy, Cxy, Nu) = pickle.load(open(inFileName,'r'))
-#PSI = decide_resolution(PSI, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
-#Cxx = decide_resolution(Cxx, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
-#Cyy = decide_resolution(Cyy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
-#Cxy = decide_resolution(Cxy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
-#psiLam = copy(PSI)
-#print inFileName
+(PSI, Cxx, Cyy, Cxy, Nu) = pickle.load(open(inFileName,'r'))
+PSI = decide_resolution(PSI, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+Cxx = decide_resolution(Cxx, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+Cyy = decide_resolution(Cyy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+Cxy = decide_resolution(Cxy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+psiLam = copy(PSI)
+print inFileName
 
 #f = h5py.File("final.h5","r")
 #
@@ -561,16 +561,16 @@ Cxy = zeros((2*N+1)*M,dtype='complex')
 
 # --------------- POISEUILLE -----------------
 
-plugAmp = 0.00 #* (M/32.0)
-
-PSI[N*M]   += (1.-plugAmp) * 2.0/3.0
-PSI[N*M+1] += (1.-plugAmp) * 3.0/4.0
-PSI[N*M+2] += (1.-plugAmp) * 0.0
-PSI[N*M+3] += (1.-plugAmp) * -1.0/12.0
-
-## set initial stress guess based on laminar flow
-Cxx, Cyy, Cxy = x_independent_profile(PSI)
-psiLam = copy(PSI)
+#plugAmp = 0.00 #* (M/32.0)
+#
+#PSI[N*M]   += (1.-plugAmp) * 2.0/3.0
+#PSI[N*M+1] += (1.-plugAmp) * 3.0/4.0
+#PSI[N*M+2] += (1.-plugAmp) * 0.0
+#PSI[N*M+3] += (1.-plugAmp) * -1.0/12.0
+#
+### set initial stress guess based on laminar flow
+#Cxx, Cyy, Cxy = x_independent_profile(PSI)
+#psiLam = copy(PSI)
 
 ## --- PLUG  ---
 #
@@ -582,12 +582,33 @@ psiLam = copy(PSI)
 ##PSI[N*M:] = 0
 ##PSI[:(N+1)*M] = 0
 
-perKEestimate = 0.1
-totEnergy = 0.9
-sigma = 0.1
-gam = 2
+#perKEestimate = 0.2
+#totEnergy = 0.8
+#sigma = 0.1
+#gam = 2
+#
+#PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
 
-PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
+#lsd = 1e-8
+#
+#PSI[(N)*M]  += lsd * (5.0/8.0) * 4.0/5.0
+#PSI[(N*M+1] += lsd * (5.0/8.0) * 7.0/8.0
+#PSI[(N*M+3] += lsd * (5.0/8.0) * -1.0/16.0
+#PSI[(N*M+5] += lsd * (5.0/8.0) * -1.0/80.0
+#
+#for n in range(1,N):
+#
+#    # Symmetric perturbation
+#    PSI[(N+n)*M]   += lsd * (1.0 + 1.j) * (5.0/8.0) * 4.0/5.0
+#    PSI[(N+n)*M+1] += lsd * (1.0 + 1.j) * (5.0/8.0) * 7.0/8.0
+#    PSI[(N+n)*M+3] += lsd * (1.0 + 1.j) * (5.0/8.0) * -1.0/16.0
+#    PSI[(N+n)*M+5] += lsd * (1.0 + 1.j) * (5.0/8.0) * -1.0/80.0
+#    # Antisymmetric perturbation
+#    PSI[(N+n)*M]   += lsd * (1.0 + 1.j) * (5.0/8.0) * -2.0
+#    PSI[(N+n)*M+3] += lsd * (1.0 + 1.j) * (5.0/8.0) * 1.0
+#    PSI[(N+n)*M+5] += lsd * (1.0 + 1.j) * (5.0/8.0) * 1.0
+#
+#    PSI[(N-n)*M] = conj(PSI[(N+n)*M])
 
 
 forcing = zeros((M,2*N+1), dtype='complex')
