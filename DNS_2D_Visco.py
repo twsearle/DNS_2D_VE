@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Tue 19 May 13:40:34 2015
+#   Last modified: Wed 20 May 11:25:42 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -571,7 +571,7 @@ PSI[N*M+3] += (1.-plugAmp) * -1.0/12.0
 ## set initial stress guess based on laminar flow
 Cxx, Cyy, Cxy = x_independent_profile(PSI)
 psiLam = copy(PSI)
-#
+
 ## --- PLUG  ---
 #
 #PSI[N*M]   += (plugAmp) * (5.0/8.0) * 4.0/5.0
@@ -581,15 +581,15 @@ psiLam = copy(PSI)
 #
 ##PSI[N*M:] = 0
 ##PSI[:(N+1)*M] = 0
-#
+
 perKEestimate = 0.1
 totEnergy = 0.9
 sigma = 0.1
 gam = 2
 
 PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
-#
-#
+
+
 forcing = zeros((M,2*N+1), dtype='complex')
 forcing[0,0] = 2.0/Re
 

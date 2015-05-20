@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Tue 19 May 12:31:39 2015
+// Last modified: Tue 19 May 19:02:53 2015
 
 #include"fields_2D.h"
 
@@ -627,13 +627,13 @@ void step_sf_SI_Crank_Nicolson_visco(
 
 	    scr.RHSvec[j] = 0.5*dt*oneOverRe*beta*scr.biharmpsi[ind(i,j)];
 	    scr.RHSvec[j] += + 0.5*dt*(1.-beta)*oneOverRe*oneOverWi*( 
-			                 scr.d2xcxy[ind(i,j)] 
-				       - scr.d2ycxy[ind(i,j)]
-				       + scr.dxycyy_cxx[ind(i,j)]);
+				         scr.d2ycxy[ind(i,j)]
+			               - scr.d2xcxy[ind(i,j)] 
+				       - scr.dxycyy_cxx[ind(i,j)]);
 	    scr.RHSvec[j] += + 0.5*dt*(1.-beta)*oneOverRe*oneOverWi*( 
-			                 scr.d2xcxyN[ind(i,j)] 
-				       - scr.d2ycxyN[ind(i,j)]
-				       + scr.dxycyy_cxxN[ind(i,j)]); 
+				         scr.d2ycxyN[ind(i,j)]
+			               - scr.d2xcxyN[ind(i,j)] 
+				       - scr.dxycyy_cxxN[ind(i,j)]); 
 	    scr.RHSvec[j] += 0.5*dt*forcing[ind(i,j)];
 	    scr.RHSvec[j] += 0.5*dt*forcingN[ind(i,j)];
 	    scr.RHSvec[j] += - dt*scr.udxlplpsi[ind(i,j)];

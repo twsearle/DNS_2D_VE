@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 18 May 14:24:40 2015
+// Last modified: Tue 19 May 16:00:29 2015
 
 /* Program Description:
  *
@@ -341,7 +341,9 @@ int main(int argc, char **argv)
     {
 	char fn[30];
 	sprintf(fn, "./operators/op%d.h5", i);
+	#ifdef MYDEBUG
 	printf("opening: %s\n", fn);
+	#endif
 	load_hdf5_operator(fn, tmpop, params);
 
 	for (j=0; j<M*M; j++)
@@ -350,7 +352,9 @@ int main(int argc, char **argv)
 	}
 
 	sprintf(fn, "./operators/hOp%d.h5", i);
+	#ifdef MYDEBUG
 	printf("opening: %s\n", fn);
+	#endif
 	load_hdf5_operator(fn, tmpop, params);
 
 	for (j=0; j<M*M; j++)
