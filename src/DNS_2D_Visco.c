@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Tue 19 May 16:00:29 2015
+// Last modified: Tue 26 May 10:46:44 2015
 
 /* Program Description:
  *
@@ -175,7 +175,7 @@ int main(int argc, char **argv)
     printf("\nNumber of Time Steps\t %d ", numTimeSteps);
     printf("\nTime Steps per frame\t %d \n", stepsPerFrame);
 
-    FILE *tracefp, *traceU, *trace1mode, *traceStressfp;
+    FILE *tracefp, *tracePSI, *trace1mode, *traceStressfp;
     char *trace_fn, *traj_fn;
     int i, j;
     int N = params.N;
@@ -188,7 +188,7 @@ int main(int argc, char **argv)
 
     tracefp = fopen(trace_fn, "w");
     traceStressfp = fopen("./output/traceStress.dat", "w");
-    traceU = fopen("./output/traceU.dat", "w");
+    tracePSI = fopen("./output/tracePSI.dat", "w");
     trace1mode = fopen("./output/traceMode.dat", "w");
 
     // Variables for HDF5 output
@@ -531,35 +531,37 @@ int main(int argc, char **argv)
 
 	    time = (timeStep + 1)*dt;
 
-            double normU1 = 0;
-            double normU2 = 0;
-            double normU0 = 0;
+            double normPSI1 = 0;
+            double normPSI2 = 0;
+            double normPSI0 = 0;
 
             for (i=0; i<N+1; i++)
             {
         	for (j=0; j<M; j++)
         	{
-        	    scr.scratch[ind(i,j)] = scr.u[ind(i,j)];
+        	    scr.scratch[ind(i,j)] = psi[ind(i,j)];
         	}
             }
-            scr.scratch[ind(0,0)] -= 0.5;
-            scr.scratch[ind(0,2)] += 0.5;
+            scr.scratch[ind(0,0)] -= 2.0/3.0;
+            scr.scratch[ind(0,1)] -= 3.0/4.0;
+            scr.scratch[ind(0,3)] += 1.0/12.0;
             fprintf(trace1mode, "%e\t%e\t%e\t%e\t%e\t%e\t%e\n", 
-        	    time, creal(scr.scratch[ind(0,3)]), cimag(scr.scratch[ind(0,3)]),
-        	     creal(scr.scratch[ind(1,3)]), cimag(scr.scratch[ind(1,3)]),
-        	      creal(scr.scratch[ind(2,3)]), cimag(scr.scratch[ind(2,3)]));
+        	    time, creal(scr.scratch[ind(0,6)]), cimag(scr.scratch[ind(0,6)]),
+        	     creal(scr.scratch[ind(1,6)]), cimag(scr.scratch[ind(1,6)]),
+        	      creal(scr.scratch[ind(2,6)]), cimag(scr.scratch[ind(2,6)]));
 
+	    // calculate norm u excluding the Poiseuille terms
             for (j=M-1; j>=0; j=j-1)
             {
-        	normU0 += creal(scr.scratch[ind(0,j)]*scr.scratch[ind(0,j)]); 
-        	normU1 += creal(scr.u[ind(1,j)]*conj(scr.u[ind(1,j)])); 
-        	normU2 += creal(scr.u[ind(2,j)]*conj(scr.u[ind(2,j)])); 
+		if (j > 3)
+		{
+		    normPSI0 += creal(psi[ind(0,j)]*psi[ind(0,j)]); 
+		}
+        	normPSI1 += creal(psi[ind(1,j)]*conj(psi[ind(1,j)])); 
+        	normPSI2 += creal(psi[ind(2,j)]*conj(psi[ind(2,j)])); 
             }
-            normU0 = normU0;//-(1./sqrt(2.));
-            normU1 = normU1;
-            normU2 = normU2;
 
-            fprintf(traceU, "%e\t%e\t%e\t%e\t\n", time, normU0, normU1, normU2);
+            fprintf(tracePSI, "%e\t%e\t%e\t%e\t\n", time, normPSI0, normPSI1, normPSI2);
 
             KE0 = calc_KE_mode(scr.u, scr.v, 0, params) * (15.0/ 8.0);
             KE1 = calc_KE_mode(scr.u, scr.v, 1, params) * (15.0/ 8.0);
@@ -601,7 +603,7 @@ int main(int argc, char **argv)
 		 psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], time, params);
              
             fprintf(tracefp, "%e\t%e\t%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1, KE2, KE_xdepend);
-            fflush(traceU);
+            fflush(tracePSI);
             fflush(trace1mode);
             fflush(tracefp);
             H5Fflush(hdf5fp, H5F_SCOPE_GLOBAL);
@@ -618,7 +620,7 @@ int main(int argc, char **argv)
 
     fclose(tracefp);
     fclose(traceStressfp);
-    fclose(traceU);
+    fclose(tracePSI);
     fclose(trace1mode);
 
     // clean up hdf5

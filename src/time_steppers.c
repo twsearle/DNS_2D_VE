@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Tue 19 May 19:02:53 2015
+// Last modified: Fri 22 May 12:28:24 2015
 
 #include"fields_2D.h"
 
@@ -960,7 +960,7 @@ void equilibriate_stress(
 	    EE_tot = EE0 + EE_xdepend;
 
 	    save_hdf5_snapshot_visco(file_id, filetype_id, datatype_id,
-		    psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], time, params);
+		    psi_tmp, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], time, params);
 
 	    fprintf(tracefp, "%e\t%e\t%e\t%e\t%e\t%e\n", time, EE_tot, EE0, EE1, EE2, EE_xdepend);
 
