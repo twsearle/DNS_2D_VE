@@ -13,7 +13,7 @@ import h5py
 
 argparser = argparse.ArgumentParser()
 
-argparser.add_argument("-p", "--path", type=str, default="./", 
+argparser.add_argument("-p", "--path", type=str, default=".", 
                 help='specify the directory containing the data')
 argparser.add_argument("-N", type=int, default=None, 
                 help='Override Number of Fourier modes given in the config file')
@@ -70,8 +70,9 @@ if args.Newt:
     inFileName = args.path + "/final.h5".format()
     twsFileName = args.path + "/pf-N{N}-M{M}-kx{kx}-Re{Re}.pickle".format(**kwargs)
 else:
-    inFileName = args.path + "/traj.h5".format()
-    #inFileName = args.path + "/final.h5".format()
+    #inFileName = args.path + "/traj.h5".format()
+    inFileName = args.path + "/final.h5".format()
+    print 'Reading from: ', inFileName
     twsFileName = args.path + "/pf-N{N}-M{M}-kx{kx}-Re{Re}-b{beta}-Wi{Wi}.pickle".format(**kwargs)
 
 
@@ -241,12 +242,12 @@ if args.Newt:
     psi_true, Nu = pickle.load(open(twsFileName, 'r'))
 
 else:
-    psi_ti, cxx_ti, cyy_ti, cxy_ti = load_hdf5_snapshot_visco(f, time)
+    #psi_ti, cxx_ti, cyy_ti, cxy_ti = load_hdf5_snapshot_visco(f, time)
 
-    #psi = array(f["/psi"])
-    #cxx_ti = array(f["/cxx"])
-    #cyy_ti = array(f["/cyy"])
-    #cxy_ti = array(f["/cxy"])
+    psi_ti = array(f["/psi"])
+    cxx_ti = array(f["/cxx"])
+    cyy_ti = array(f["/cyy"])
+    cxy_ti = array(f["/cxy"])
 
     psi_ti = psi_ti.reshape((N+1, M)).T
     psi_ti = hstack((psi_ti, conj(psi_ti[:, N:0:-1])))

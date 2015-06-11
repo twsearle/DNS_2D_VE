@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri 22 May 12:28:24 2015
+// Last modified: Thu 11 Jun 11:36:45 2015
 
 #include"fields_2D.h"
 
@@ -701,8 +701,8 @@ void step_sf_SI_Crank_Nicolson_visco(
     // # Psi0(-1) = 0
     // RHSVec[N*M + M-1] = 0
 
-    scr.RHSvec[M-3] = 0; 
-    scr.RHSvec[M-2] = 0; 
+    scr.RHSvec[M-3] = params.U0; 
+    scr.RHSvec[M-2] = -params.U0; 
     scr.RHSvec[M-1] = 0; 
 
 #ifdef MYDEBUG
