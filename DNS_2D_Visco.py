@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Tue 26 May 21:13:47 2015
+#   Last modified: Thu 11 Jun 12:28:49 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -298,14 +298,6 @@ def perturb(psi_, totEnergy, perKEestimate, sigma, gam):
 
         for n in range(1,N+1):
             if (n % 2) == 0:
-                ##------------- PURE RANDOM PERTURBATIONS -------------------
-                ## Make sure you satisfy the optimum symmetry for the
-                ## perturbation
-                #psi_[(N-n)*M + 1:(N-n)*M + M/2 :2] = (10.0**(-n+1))*perAmp*0.5*(1-rand(M/4) + 1.j*rand(M/4))
-                #psi_[(N-n)*M + 1:(N-n)*M + 6 :2] =\
-                #(10.0**((n+1)))*perAmp*0.5*(1-rand(3) + 1.j*rand(3))
-                #psi_[(N-n)*M + 1:(N-n)*M + M/2 :2] = perAmp*0.5*(rand(M/4) + 1.j*rand(M/4))
-
                 ##------------- PERTURBATIONS WHICH SATISFY BCS -------------------
                 rSpace = zeros(M, dtype='complex')
                 y = 2.0*arange(M)/(M-1.0) -1.0
@@ -317,9 +309,9 @@ def perturb(psi_, totEnergy, perKEestimate, sigma, gam):
                 #rSpace += cos(5.0 * 2.0*pi * y) * exp(-(sigma*pi*y)**2) * rn[4]
 
                 ## sinusoidal
-                rSpace = perAmp*cos(1.0 * 2.0*pi * y) * rn[n-1,0]
-                rSpace += perAmp*cos(2.0 * 2.0*pi * y) * rn[n-1,1]
-                rSpace += perAmp*cos(3.0 * 2.0*pi * y) * rn[n-1,2]
+                rSpace =  perAmp*sin(1.0 * 2.0*pi * y) * rn[n-1,0]
+                rSpace += perAmp*sin(2.0 * 2.0*pi * y) * rn[n-1,1]
+                rSpace += perAmp*sin(3.0 * 2.0*pi * y) * rn[n-1,2]
 
                 ## low order eigenfunction of biharmonic operator
                 #rSpace = (cos(pscale*y)/cos(pscale) - cosh(gam*y)/(cosh(gam))) * rn[0]
@@ -330,14 +322,6 @@ def perturb(psi_, totEnergy, perKEestimate, sigma, gam):
 
 
             else:
-                ##------------- PURE RANDOM PERTURBATIONS -------------------
-                ## Make sure you satisfy the optimum symmetry for the
-                ## perturbation
-                #psi_[(N-n)*M:(N-n)*M + M/2 - 1 :2] = (10.0**(-n+1))*perAmp*0.5*(1-rand(M/4) + 1.j*rand(M/4))
-                #psi_[(N-n)*M:(N-n)*M + 6 - 1 :2] =\
-                #(10.0**((n+1)))*perAmp*0.5*(1-rand(3) + 1.j*rand(3))
-                #psi_[(N-n)*M:(N-n)*M + M/2 - 1 :2] = perAmp*0.5*(rand(M/4) + 1.j*rand(M/4))
-
                 ##------------- PERTURBATIONS WHICH SATISFY BCS -------------------
                 rSpace = zeros(M, dtype='complex')
                 y = 2.0*arange(M)/(M-1.0) -1.0
