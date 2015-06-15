@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Tue 19 May 13:37:54 2015
+// Last modified: Mon 15 Jun 22:12:47 2015
 
 #include"fields_2D.h"
 
@@ -1313,9 +1313,7 @@ double calc_KE_mode(fftw_complex *u, fftw_complex *v, int n, flow_params cnsts)
 	}
 }
 
-void trC_tensor(complex *cij, complex *trC, double *scratchp1, double
-	*scratchp2, fftw_complex *scratchin, fftw_complex *scratchout,
-	fftw_plan *phys_plan, fftw_plan *spec_plan, flow_params cnsts)
+int trC_tensor(complex *cij, complex *trC, flow_scratch scr, flow_params cnsts)
 {
     // Calculate the trace of the conformation tensor. This is both a measure
     // of the polymer stretch and a useful thing to be able to do for a FENE
@@ -1324,17 +1322,35 @@ void trC_tensor(complex *cij, complex *trC, double *scratchp1, double
     int i=0;
     int N = cnsts.N;
     int M = cnsts.M;
+    int Nf = cnsts.Nf;
+    int Mf = cnsts.Mf;
+
+    int posdefck=1;
 
     // Form a sum of those stresses at every point in the domain
-    for(i=0;i<(N+1)*M; i++)
+    to_physical_r(&cij[0], scr.scratchp1, scr, cnsts);
+    to_physical_r(&cij[(N+1)*M], scr.scratchp2, scr, cnsts);
+
+    for(i=0;i<(2*Nf+1)*Mf; i++)
     {
-	trC[i] = cij[i] + cij[(N+1)*M + i];
+	scr.scratchp1[i] += scr.scratchp2[i];
     }
 
-    // Square this result
-    //fft_convolve_r(trC, trC, trC, scratchp1, scratchp2, 
-    //        scratchin, scratchout, phys_plan, spec_plan, cnsts);
+    // check positive definite everywhere
 
+    for (i=0; i<(2*Nf+1)*Mf; i++) 
+    {
+	if (scr.scratchp1<0) 
+	{
+	    posdefck = 0;
+	}
+    }
+
+
+    // transform trC back to spectral space
+    to_spectral_r(scr.scratchp1, trC, scr, cnsts);
+
+    return posdefck;
 
 }
 

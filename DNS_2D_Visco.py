@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Thu 11 Jun 12:28:49 2015
+#   Last modified: Mon 15 Jun 14:18:39 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -89,7 +89,7 @@ else:
     Nf = N
     Mf = M
 
-numTimeSteps = int(totTime / dt)
+numTimeSteps = int(ceil(totTime / dt))
 assert (totTime / dt) - float(numTimeSteps) == 0, "Non-integer number of timesteps"
 assert Wi != 0.0, "cannot have Wi = 0!"
 
@@ -298,6 +298,7 @@ def perturb(psi_, totEnergy, perKEestimate, sigma, gam):
 
         for n in range(1,N+1):
             if (n % 2) == 0:
+
                 ##------------- PERTURBATIONS WHICH SATISFY BCS -------------------
                 rSpace = zeros(M, dtype='complex')
                 y = 2.0*arange(M)/(M-1.0) -1.0
@@ -309,9 +310,9 @@ def perturb(psi_, totEnergy, perKEestimate, sigma, gam):
                 #rSpace += cos(5.0 * 2.0*pi * y) * exp(-(sigma*pi*y)**2) * rn[4]
 
                 ## sinusoidal
-                rSpace =  perAmp*sin(1.0 * 2.0*pi * y) * rn[n-1,0]
-                rSpace += perAmp*sin(2.0 * 2.0*pi * y) * rn[n-1,1]
-                rSpace += perAmp*sin(3.0 * 2.0*pi * y) * rn[n-1,2]
+                rSpace = perAmp*cos(1.0 * 2.0*pi * y) * rn[n-1,0]
+                rSpace += perAmp*cos(2.0 * 2.0*pi * y) * rn[n-1,1]
+                rSpace += perAmp*cos(3.0 * 2.0*pi * y) * rn[n-1,2]
 
                 ## low order eigenfunction of biharmonic operator
                 #rSpace = (cos(pscale*y)/cos(pscale) - cosh(gam*y)/(cosh(gam))) * rn[0]
@@ -322,6 +323,14 @@ def perturb(psi_, totEnergy, perKEestimate, sigma, gam):
 
 
             else:
+                ##------------- PURE RANDOM PERTURBATIONS -------------------
+                ## Make sure you satisfy the optimum symmetry for the
+                ## perturbation
+                #psi_[(N-n)*M:(N-n)*M + M/2 - 1 :2] = (10.0**(-n+1))*perAmp*0.5*(1-rand(M/4) + 1.j*rand(M/4))
+                #psi_[(N-n)*M:(N-n)*M + 6 - 1 :2] =\
+                #(10.0**((n+1)))*perAmp*0.5*(1-rand(3) + 1.j*rand(3))
+                #psi_[(N-n)*M:(N-n)*M + M/2 - 1 :2] = perAmp*0.5*(rand(M/4) + 1.j*rand(M/4))
+
                 ##------------- PERTURBATIONS WHICH SATISFY BCS -------------------
                 rSpace = zeros(M, dtype='complex')
                 y = 2.0*arange(M)/(M-1.0) -1.0
@@ -542,19 +551,21 @@ Cxy = zeros((2*N+1)*M,dtype='complex')
 #    Cxy[:, 2*N+1 - n] = conj(Cxy[:, n])
 #Cxy = fftshift(Cxy, axes=1)
 #Cxy = Cxy.T.flatten()
+#
+#psiLam = copy(PSI)
 
 # --------------- POISEUILLE -----------------
 
-plugAmp = 0.00 #* (M/32.0)
-
-PSI[N*M]   += (1.-plugAmp) * 2.0/3.0
-PSI[N*M+1] += (1.-plugAmp) * 3.0/4.0
-PSI[N*M+2] += (1.-plugAmp) * 0.0
-PSI[N*M+3] += (1.-plugAmp) * -1.0/12.0
-
-## set initial stress guess based on laminar flow
-Cxx, Cyy, Cxy = x_independent_profile(PSI)
-psiLam = copy(PSI)
+#plugAmp = 0.00 #* (M/32.0)
+#
+#PSI[N*M]   += (1.-plugAmp) * 2.0/3.0
+#PSI[N*M+1] += (1.-plugAmp) * 3.0/4.0
+#PSI[N*M+2] += (1.-plugAmp) * 0.0
+#PSI[N*M+3] += (1.-plugAmp) * -1.0/12.0
+#
+### set initial stress guess based on laminar flow
+#Cxx, Cyy, Cxy = x_independent_profile(PSI)
+#psiLam = copy(PSI)
 
 ## --- PLUG  ---
 #
@@ -585,32 +596,32 @@ lsd = 1e-8
 #PSI[(N)*M+1] += lsd *(155./64. - 4. )
 #PSI[(N)*M+0] += lsd *(1./8) 
 
-for n in range(1,2):
+#for n in range(1,2):
+#
+#    # imaginary part
+#    PSI[(N+n)*M]   += lsd * (10**-n)*(1.j) * (5.0/8.0) * 4.0/5.0
+#    PSI[(N+n)*M+1] += lsd * (10**-n)*(1.j) * (5.0/8.0) * 7.0/8.0
+#    PSI[(N+n)*M+3] += lsd * (10**-n)*(1.j) * (5.0/8.0) * -1.0/16.0
+#    PSI[(N+n)*M+5] += lsd * (10**-n)*(1.j) * (5.0/8.0) * -1.0/80.0
+#
+#    PSI[(N+n)*M]   += lsd * (10**-n)*(1.j) * (5.0/8.0) * -2.0
+#    PSI[(N+n)*M+3] += lsd * (10**-n)*(1.j) * (5.0/8.0) * 1.0
+#    PSI[(N+n)*M+5] += lsd * (10**-n)*(1.j) * (5.0/8.0) * 1.0
+#
+#    #Real part y**7 - 2y**6 + 2y**4 -4y
+#    PSI[(N+n)*M+7] += lsd *(10**-n)*(1./64.)
+#    PSI[(N+n)*M+6] += lsd *(10**-n)*(-1./16.)
+#    PSI[(N+n)*M+5] += lsd *(10**-n)*(3./16. + 7./(4*16.))
+#    PSI[(N+n)*M+4] += lsd *(10**-n)*(1./8. )
+#    PSI[(N+n)*M+3] += lsd *(10**-n)*(81./(16.*4) )
+#    PSI[(N+n)*M+2] += lsd *(10**-n)*(1./16. )
+#    PSI[(N+n)*M+1] += lsd *(10**-n)*(155./64. - 4. )
+#    PSI[(N+n)*M+0] += lsd *(10**-n)*(1./8) 
+#
+#    PSI[(N-n)*M] = conj(PSI[(N+n)*M])
 
-    # imaginary part
-    PSI[(N+n)*M]   += lsd * (10**-n)*(1.j) * (5.0/8.0) * 4.0/5.0
-    PSI[(N+n)*M+1] += lsd * (10**-n)*(1.j) * (5.0/8.0) * 7.0/8.0
-    PSI[(N+n)*M+3] += lsd * (10**-n)*(1.j) * (5.0/8.0) * -1.0/16.0
-    PSI[(N+n)*M+5] += lsd * (10**-n)*(1.j) * (5.0/8.0) * -1.0/80.0
-
-    PSI[(N+n)*M]   += lsd * (10**-n)*(1.j) * (5.0/8.0) * -2.0
-    PSI[(N+n)*M+3] += lsd * (10**-n)*(1.j) * (5.0/8.0) * 1.0
-    PSI[(N+n)*M+5] += lsd * (10**-n)*(1.j) * (5.0/8.0) * 1.0
-
-    #Real part y**7 - 2y**6 + 2y**4 -4y
-    PSI[(N+n)*M+7] += lsd *(10**-n)*(1./64.)
-    PSI[(N+n)*M+6] += lsd *(10**-n)*(-1./16.)
-    PSI[(N+n)*M+5] += lsd *(10**-n)*(3./16. + 7./(4*16.))
-    PSI[(N+n)*M+4] += lsd *(10**-n)*(1./8. )
-    PSI[(N+n)*M+3] += lsd *(10**-n)*(81./(16.*4) )
-    PSI[(N+n)*M+2] += lsd *(10**-n)*(1./16. )
-    PSI[(N+n)*M+1] += lsd *(10**-n)*(155./64. - 4. )
-    PSI[(N+n)*M+0] += lsd *(10**-n)*(1./8) 
-
-    PSI[(N-n)*M] = conj(PSI[(N+n)*M])
-
-forcing = zeros((M,2*N+1), dtype='complex')
-forcing[0,0] = 2.0/Re
+#forcing = zeros((M,2*N+1), dtype='complex')
+#forcing[0,0] = 2.0/Re
 
 #KE = 0
 #SMDY =  mk_single_diffy()
@@ -648,55 +659,62 @@ forcing[0,0] = 2.0/Re
 
 ## --------------- SHEAR LAYER -----------------
 ##
-#y_points = cos(pi*arange(Mf)/(Mf-1))
-#delta = 0.1
-##
-## Set initial streamfunction
-#PSI = zeros((Mf, 2*Nf+1), dtype='d')
-#
-#for i in range(Mf):
-#    y =y_points[i]
-#    for j in range(2*Nf+1):
-#        PSI[i,j] = delta * (1./tanh(1./delta)) * log(cosh(y/delta))
-#
-#del y, i, j
-#
-#PSI = f2d.to_spectral(PSI, CNSTS)
-#
-#
-##test = f2d.dy(PSI, CNSTS) 
-##test = f2d.to_physical(test, CNSTS)
-##savetxt('U.dat', vstack((y_points,test[:,0])).T)
-##PSI = f2d.to_physical(PSI, CNSTS)
-##savetxt('PSI.dat', vstack((y_points,PSI[:,0])).T)
-##exit(1)
-#
-#PSI = fftshift(PSI, axes=1)
-#PSI = PSI.T.flatten()
-#psiLam = copy(PSI)
-#
-#perKEestimate = 0.0001
-#totEnergy = 0.4
+y_points = cos(pi*arange(Mf)/(Mf-1))
+delta = 0.1
+
+# Set initial streamfunction
+PSI = zeros((Mf, 2*Nf+1), dtype='d')
+
+for i in range(Mf):
+    y =y_points[i]
+    for j in range(2*Nf+1):
+        PSI[i,j] = delta * (1./tanh(1./delta)) * log(cosh(y/delta))
+
+del y, i, j
+
+PSI = f2d.to_spectral(PSI, CNSTS)
+
+
+
+#test = f2d.dy(PSI, CNSTS) 
+#test = f2d.to_physical(test, CNSTS)
+#savetxt('U.dat', vstack((y_points,test[:,0])).T)
+#PSI = f2d.to_physical(PSI, CNSTS)
+#savetxt('PSI.dat', vstack((y_points,PSI[:,0])).T)
+#exit(1)
+
+PSI = fftshift(PSI, axes=1)
+PSI = PSI.T.flatten()
+psiLam = copy(PSI)
+Cxx, Cyy, Cxy = x_independent_profile(PSI)
+
+#perKEestimate = 1e-12
+#totEnergy = 1.687501 
 #sigma = 0.1
 #gam = 2
 #
+# WARNING THIS DOESN'T SATISFY THE BCS??
 #PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
-#
-## set forcing
-#forcing = zeros((Mf, 2*Nf+1), dtype='d')
-##test = zeros((Mf, 2*Nf+1), dtype='d')
-#
-#for i in range(Mf):
-#    y =y_points[i]
-#    for j in range(2*Nf+1):
-#        forcing[i,j] = ( 2.0/tanh(1.0/delta)) * (1.0/cosh(y/delta)**2) * tanh(y/delta)
-#        forcing[i,j] *= 1.0/(Re * delta**2) 
-#
-#del y, i, j
-#forcing = f2d.to_spectral(forcing, CNSTS)
-#forcing[:, 1:] = 0
-## set BC
-#CNSTS['U0'] = 1.0
+
+PSI[(N+1)*M:(N+1)*M + M/2] = 1e-12*(1*rand(M/2) + 1.j*rand(M/2))
+PSI[(N-1)*M:N*M] = conj(PSI[(N+1)*M:(N+2)*M])
+
+
+# set forcing
+forcing = zeros((Mf, 2*Nf+1), dtype='d')
+#test = zeros((Mf, 2*Nf+1), dtype='d')
+
+for i in range(Mf):
+    y =y_points[i]
+    for j in range(2*Nf+1):
+        forcing[i,j] = ( 2.0/tanh(1.0/delta)) * (1.0/cosh(y/delta)**2) * tanh(y/delta)
+        forcing[i,j] *= 1.0/(Re * delta**2) 
+
+del y, i, j
+forcing = f2d.to_spectral(forcing, CNSTS)
+forcing[:, 1:] = 0
+# set BC
+CNSTS['U0'] = 1.0
 
 # --------------- OSCILLATORY FLOW -----------------
 #

@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Tue 26 May 10:46:44 2015
+// Last modified: Mon 15 Jun 22:10:31 2015
 
 /* Program Description:
  *
@@ -69,6 +69,7 @@ int main(int argc, char **argv)
     int stepsPerFrame = 0;
     int numTimeSteps = 0;
     int timeStep = 0;
+    int posdefck = 0;
     double dt = 0;
     double time = 0;
 
@@ -545,6 +546,7 @@ int main(int argc, char **argv)
             scr.scratch[ind(0,0)] -= 2.0/3.0;
             scr.scratch[ind(0,1)] -= 3.0/4.0;
             scr.scratch[ind(0,3)] += 1.0/12.0;
+
             fprintf(trace1mode, "%e\t%e\t%e\t%e\t%e\t%e\t%e\n", 
         	    time, creal(scr.scratch[ind(0,6)]), cimag(scr.scratch[ind(0,6)]),
         	     creal(scr.scratch[ind(1,6)]), cimag(scr.scratch[ind(1,6)]),
@@ -574,8 +576,7 @@ int main(int argc, char **argv)
     
             KE_tot = KE0 + KE_xdepend;
 
-	    trC_tensor(cij, trC, scr.scratchp1, scr.scratchp2, scr.scratchin, scr.scratchout,
-		    &phys_plan, &spec_plan, params);
+	    posdefck = trC_tensor(cij, trC, scr, params);
 
 	    calc_EE_mode(&trC[0], 0, params);
 
@@ -595,7 +596,7 @@ int main(int argc, char **argv)
 	    // Elastic Kinetic energy.
 	    // I don't think the other components have a meaning yet.
 
-	    fprintf(traceStressfp, "%e\t%e\n", time, EE0);
+	    fprintf(traceStressfp, "%e\t%e\t%d\n", time, EE0, posdefck);
 
             printf("%e\t%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1, EE0);
 
