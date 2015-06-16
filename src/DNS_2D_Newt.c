@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed  6 May 16:08:49 2015
+// Last modified: Tue 16 Jun 18:02:22 2015
 
 /* Program Description:
  *
@@ -90,11 +90,10 @@ int main(int argc, char **argv)
     params.beta = 1.0;
     params.Omega = 1.0;
     params.dealiasing = 0;
-    params.shear_layer_flag = 0;
 
     // Read in parameters from cline args.
 
-    while ((shortArg = getopt (argc, argv, "ndN:M:U:k:R:W:b:w:t:s:T:")) != -1)
+    while ((shortArg = getopt (argc, argv, "dN:M:U:k:R:W:b:w:t:s:T:")) != -1)
 	switch (shortArg)
 	  {
 	  case 'N':
@@ -133,10 +132,6 @@ int main(int argc, char **argv)
 	  case 'd':
 	    params.dealiasing = 1;
 	    printf("Dealiasing on\n");
-	    break;
-	  case 'n':
-	    params.shear_layer_flag = 1;
-	    printf("shear layer tanh transformation on\n");
 	    break;
 	  case '?':
 	    fprintf (stderr, "Option -%c requires an argument.\n", optopt);
@@ -233,8 +228,6 @@ int main(int argc, char **argv)
     forcing = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     psi2 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
 
-    scr.ytransform = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-
     scr.scratch = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     scr.scratch2 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     scr.scratch3 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
@@ -252,6 +245,7 @@ int main(int argc, char **argv)
     scr.d4xpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     scr.d2xd2ypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     scr.dypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.dyu = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     scr.vdyypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
 
     scr.scratchin = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
@@ -278,32 +272,12 @@ int main(int argc, char **argv)
     load_hdf5_state("initial.h5", psi, params);
     load_hdf5_state("forcing.h5", forcing, params);
 
-    if (params.shear_layer_flag==1)
-    {
-	#ifdef MYDEBUG
-	printf("calculate shear layer transform vector");
-	#endif
-	double slscale = 10.0;
-	for (i=0; i<2*Nf+1; i++)
-	{
-	    for (j=0; j<Mf; j++)
-	    {
-		scr.ytransform[indfft(i,j)] = 
-		    ( 1.0 - pow(tanh(cos( j*M_PI/(Mf-1.0) ) / slscale), 2) ) / slscale;
-	    }
-	}
-    }
-
     // load the operators from scipy 
     for (i=0; i<N+1; i++) 
     {
 	char fn[30];
 	sprintf(fn, "./operators/op%d.h5", i);
-
-	#ifdef MYDEBUG
 	printf("opening: %s\n", fn);
-	#endif
-	
 	load_hdf5_operator(fn, tmpop, params);
 
 	for (j=0; j<M*M; j++)
@@ -312,11 +286,7 @@ int main(int argc, char **argv)
 	}
 
 	sprintf(fn, "./operators/hOp%d.h5", i);
-
-	#ifdef MYDEBUG
 	printf("opening: %s\n", fn);
-	#endif
-
 	load_hdf5_operator(fn, tmpop, params);
 
 	for (j=0; j<M*M; j++)

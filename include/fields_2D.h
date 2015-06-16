@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed  6 May 12:09:51 2015
+// Last modified: Mon 15 Jun 22:11:12 2015
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -37,7 +37,7 @@ void d2x(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts);
 
 void d4x(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts);
 
-void dy(fftw_complex *arrin, fftw_complex *arrout,  flow_scratch scr, flow_params cnsts);
+void dy(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts);
 
 void matdy(fftw_complex *matarr, flow_params cnsts);
 
@@ -89,9 +89,7 @@ void load_hdf5_operator(char *filename, fftw_complex *arr, flow_params cnsts);
 
 double calc_KE_mode(fftw_complex *u, fftw_complex *v, int n, flow_params cnsts);
 
-void trC_tensor(complex *cij, complex *trC, double *scratchp1, double
-	*scratchp2, fftw_complex *scratchin, fftw_complex *scratchout,
-	fftw_plan *phys_plan, fftw_plan *spec_plan, flow_params cnsts);
+int trC_tensor(complex *cij, complex *trC, flow_scratch scr, flow_params cnsts);
 
 void diagonalised_C(complex *cij, complex *ecij, double *rcij,
 	flow_scratch scr, flow_params cnsts);
@@ -102,7 +100,6 @@ struct flow_params {
     int N;
     int M;
     int dealiasing;
-    int shear_layer_flag;
     int Nf;
     int Mf;
     double kx;
@@ -116,11 +113,14 @@ struct flow_params {
 struct flow_scratch {
     complex *scratch, *scratch2, *scratch3, *scratch4, *scratch5;
     complex *u, *v, *udxlplpsi, *vdylplpsi, *biharmpsi, *lplpsi;
+    complex *d2ypsi;
     complex *dyyypsi, *dypsi, *vdyypsi;
-    complex *d2ypsi, *d4ypsi, *d4xpsi, *d2xd2ypsi;
+    complex *d4ypsi, *d4xpsi, *d2xd2ypsi;
     complex *dxu, *dyu, *dxv, *dyv;
+
     complex *d2ycxy, *d2xcxy, *dxycyy_cxx, *dycxy;
-    complex *d2ycxyNL, *d2xcxyNL, *dxycyy_cxxNL, *dycxyNL;
+    complex *d2ycxyN, *d2xcxyN, *dxycyy_cxxN, *dycxyN;
+
     complex *cxxdxu, *cxydyu, *vgradcxx, *cxydxv, *cyydyv;
     complex *vgradcyy, *cxxdxv, *cyydyu, *vgradcxy;
 
@@ -133,8 +133,6 @@ struct flow_scratch {
     fftw_complex *opsList, *hopsList, *tmpop;
 
     fftw_plan *phys_plan, *spec_plan;
-
-    complex *ytransform;
 };
 
 

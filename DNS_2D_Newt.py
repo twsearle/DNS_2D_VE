@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Thu  7 May 14:31:07 2015
+#   Last modified: Tue 16 Jun 17:40:32 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -68,13 +68,10 @@ Wi = config.getfloat('General', 'Wi')
 beta = config.getfloat('General', 'beta')
 kx = config.getfloat('General', 'kx')
 
-Omega = config.getfloat('Oscillatory Flow', 'Omega')
-
 dt = config.getfloat('Time Iteration', 'dt')
 totTime = config.getfloat('Time Iteration', 'totTime')
 numFrames = config.getint('Time Iteration', 'numFrames')
 dealiasing = config.getboolean('Time Iteration', 'Dealiasing')
-shear_layer_flag = config.getboolean('Time Iteration', 'Shear Layer')
 
 fp.close()
 
@@ -92,7 +89,7 @@ assert Wi != 0.0, "cannot have Wi = 0!"
 NOld = N 
 MOld = M
 kwargs = {'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0, 'Re': Re, 'Wi': Wi, 'beta': beta,
-          'kx': kx, 'Omega':Omega, 'time': totTime, 'dt':dt, 'dealiasing':dealiasing}
+          'kx': kx,'time': totTime, 'dt':dt, 'dealiasing':dealiasing}
 baseFileName  = "-N{N}-M{M}-kx{kx}-Re{Re}.pickle".format(**kwargs)
 outFileName  = "pf{0}".format(baseFileName)
 outFileNameTrace = "trace{0}.dat".format(baseFileName[:-7])
@@ -502,25 +499,25 @@ PSI = zeros((2*N+1)*M,dtype='complex')
 
 # --------------- POISEUILLE -----------------
 
-
+#
 #plugAmp = 0.02 #* (M/32.0)
-
+#
 #PSI[N*M]   += (1.-plugAmp) * 2.0/3.0
 #PSI[N*M+1] += (1.-plugAmp) * 3.0/4.0
 #PSI[N*M+2] += (1.-plugAmp) * 0.0
 #PSI[N*M+3] += (1.-plugAmp) * -1.0/12.0
 #
-#
-## --------------- PLUG  -----------------
-#
+
+# --------------- PLUG  -----------------
+
 #PSI[N*M]   += (plugAmp) * (5.0/8.0) * 4.0/5.0
 #PSI[N*M+1] += (plugAmp) * (5.0/8.0) * 7.0/8.0
 #PSI[N*M+3] += (plugAmp) * (5.0/8.0) * -1.0/16.0
 #PSI[N*M+5] += (plugAmp) * (5.0/8.0) * -1.0/80.0
-#
-##PSI[N*M:] = 0
-##PSI[:(N+1)*M] = 0
-#
+
+#PSI[N*M:] = 0
+#PSI[:(N+1)*M] = 0
+
 #perKEestimate = 0.2
 #totEnergy = 0.8
 #sigma = 0.1
@@ -530,63 +527,50 @@ PSI = zeros((2*N+1)*M,dtype='complex')
 #
 #forcing = zeros((M,2*N+1), dtype='complex')
 #forcing[0,0] = 2.0/Re
-#
+
 
 # --------------- SHEAR LAYER -----------------
+#
+y_points = cos(pi*arange(Mf)/(Mf-1))
+delta = 0.1
 
-#if not shear_layer_flag:
-#    y_points = cos(pi*arange(Mf)/(Mf-1))
-#    delta = 0.1
-#else:
-#    slscale = 10.0
-#    delta = 0.1
-#    y_points = slscale * arctanh(cos(pi*arange(Mf)/(Mf-1)))
-#
-## Set initial streamfunction
-#PSI = zeros((Mf, 2*Nf+1), dtype='d')
-#
-#for i in range(Mf):
-#    y =y_points[i]
-#    for j in range(2*Nf+1):
-#        PSI[i,j] = delta * (1./tanh(1./delta)) * log(cosh(y/delta))
-#
-#del y, i, j
-#
-#PSI = f2d.to_spectral(PSI, CNSTS)
-#
-##test = f2d.dy(PSI, CNSTS) 
-##test = f2d.to_physical(test, CNSTS)
-##savetxt('U.dat', vstack((y_points,test[:,0])).T)
-##PSI = f2d.to_physical(PSI, CNSTS)
-##savetxt('PSI.dat', vstack((y_points,PSI[:,0])).T)
-##exit(1)
-#
-#PSI = fftshift(PSI, axes=1)
-#PSI = PSI.T.flatten()
-#
-## set forcing
-#forcing = zeros((Mf, 2*Nf+1), dtype='d')
-#test = zeros((Mf, 2*Nf+1), dtype='d')
-#
-#for i in range(Mf):
-#    y =y_points[i]
-#    for j in range(2*Nf+1):
-#        forcing[i,j] = ( 2.0/tanh(1.0/delta)) * (1.0/cosh(y/delta)**2) * tanh(y/delta)
-#        forcing[i,j] *= 1.0/(Re * delta**2) 
-#
-#del y, i, j
-#forcing = f2d.to_spectral(forcing, CNSTS)
-#
-## set BC
-#CNSTS['U0'] = 1.0
+# Set initial streamfunction
+PSI = zeros((Mf, 2*Nf+1), dtype='d')
 
-# --------------- OSCILLATORY FLOW -----------------
-#
+for i in range(Mf):
+    y =y_points[i]
+    for j in range(2*Nf+1):
+        PSI[i,j] = delta * (1./tanh(1./delta)) * log(cosh(y/delta))
 
-# PSI
+del y, i, j
 
-forcing = zeros((M,2*N+1), dtype='complex')
-forcing[0,0] = Omega / Re
+PSI = f2d.to_spectral(PSI, CNSTS)
+
+#test = f2d.dy(PSI, CNSTS) 
+#test = f2d.to_physical(test, CNSTS)
+#savetxt('U.dat', vstack((y_points,test[:,0])).T)
+#PSI = f2d.to_physical(PSI, CNSTS)
+#savetxt('PSI.dat', vstack((y_points,PSI[:,0])).T)
+#exit(1)
+
+PSI = fftshift(PSI, axes=1)
+PSI = PSI.T.flatten()
+
+# set forcing
+forcing = zeros((Mf, 2*Nf+1), dtype='d')
+test = zeros((Mf, 2*Nf+1), dtype='d')
+
+for i in range(Mf):
+    y =y_points[i]
+    for j in range(2*Nf+1):
+        forcing[i,j] = ( 2.0/tanh(1.0/delta)) * (1.0/cosh(y/delta)**2) * tanh(y/delta)
+        forcing[i,j] *= 1.0/(Re * delta**2) 
+
+del y, i, j
+forcing = f2d.to_spectral(forcing, CNSTS)
+
+# set BC
+CNSTS['U0'] = 1.0
 
 # ----------------------------------------------------------------------------
 
@@ -605,8 +589,9 @@ PsiOpInvListHalf = form_operators(dt/2.0)
 for i in range(N+1):
     # operator order in list is 0->N
     n = i
+    print n
     opFn = "./operators/op{0}.h5".format(n)
-    #print "writing ", opFn
+    print "writing ", opFn
     f = h5py.File(opFn, "w")
     dset = f.create_dataset("op", (M*M,), dtype='complex')
     dset[...] = PsiOpInvList[i].flatten()
@@ -618,8 +603,9 @@ del i
 for i in range(N+1):
     # operator order in list is 0->N
     n = i
+    print n
     opFn = "./operators/hOp{0}.h5".format(n)
-    #print "writing ", opFn
+    print "writing ", opFn
     f = h5py.File(opFn, "w")
     dset = f.create_dataset("op", (M*M,), dtype='complex')
     dset[...] = PsiOpInvListHalf[i].flatten()
@@ -634,7 +620,7 @@ PSI = PSI.reshape(2*N+1, M).T
 # put PSI into FFT ordering.
 PSI = ifftshift(PSI, axes=1)
 
-#print "writing initial state to initial.h5"
+print "writing initial state to initial.h5"
 
 f = h5py.File("initial.h5", "w")
 dset = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
@@ -653,66 +639,32 @@ if dealiasing:
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-w",
-             "{0:e}".format(CNSTS["Omega"]),
-             "-t", "{0:e}".format(CNSTS["dt"]),
+             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),
              "-s", "{0:d}".format(stepsPerFrame), "-T",
              "{0:d}".format(numTimeSteps), "-d"]
-
-    print "./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
+    print "./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M", \
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
-             "{0:e}".format(CNSTS["beta"]), "-w", "{0:e}".format(CNSTS["Omega"]),\
-             "-t", "{0:e}".format(CNSTS["dt"]),\
+             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),\
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
              "{0:d}".format(numTimeSteps), "-d"
-
-    if shear_layer_flag:
-        cargs = ["./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M",
-                 "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
-                 "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
-                 "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-                 "{0:e}".format(CNSTS["beta"]), "-w",
-                 "{0:e}".format(CNSTS["Omega"]),
-                 "-t", "{0:e}".format(CNSTS["dt"]),
-                 "-s", "{0:d}".format(stepsPerFrame), "-T",
-                 "{0:d}".format(numTimeSteps), "-d", "-n"]
-
-        print "./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
-                 "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
-                 "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
-                 "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
-                 "{0:e}".format(CNSTS["beta"]), "-w", "{0:e}".format(CNSTS["Omega"]),\
-                 "-t", "{0:e}".format(CNSTS["dt"]),\
-                 "-s", "{0:d}".format(stepsPerFrame), "-T",\
-                 "{0:d}".format(numTimeSteps), "-d", "-n"
-
 
 else:
     cargs = ["./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M",
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-w",
-             "{0:e}".format(CNSTS["Omega"]),
-             "-t", "{0:e}".format(CNSTS["dt"]),
+             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),
              "-s", "{0:d}".format(stepsPerFrame), "-T",
              "{0:d}".format(numTimeSteps)]
-
-    print "./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
+    print "./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M", \
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
-             "{0:e}".format(CNSTS["beta"]), "-w",\
-    "{0:e}".format(CNSTS["Omega"]),\
-             "-t", "{0:e}".format(CNSTS["dt"]),\
+             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),\
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
              "{0:d}".format(numTimeSteps)
-
-    if shear_layer_flag:
-        print "turn on dealiasing first!"
-        exit(1)
 
 subprocess.call(cargs)
 

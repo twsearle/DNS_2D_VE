@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed  6 May 12:46:58 2015
+// Last modified: Mon 15 Jun 22:12:47 2015
 
 #include"fields_2D.h"
 
@@ -769,12 +769,10 @@ void d4x(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
     }
 }
 
-void dy(fftw_complex *arrin, fftw_complex *arrout, flow_scratch scr, flow_params cnsts)
+void dy(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
 {
     int N = cnsts.N;
     int M = cnsts.M;
-    int Nf = cnsts.Nf;
-    int Mf = cnsts.Mf;
     int i, j;
 
     // For all Fourier modes
@@ -793,24 +791,6 @@ void dy(fftw_complex *arrin, fftw_complex *arrout, flow_scratch scr, flow_params
 	// Zeroth mode
 	arrout[ind(i, 0)] = arrin[ind(i, 1)] + 0.5*arrout[ind(i, 2)];
     }
-
-    if (cnsts.shear_layer_flag==1)
-    {
-
-	to_physical_r(arrout, scr.scratchp1, scr, cnsts);
-
-	for (i=0; i<(2*Nf+1); i++)
-	{
-	    for(j=0; j<Mf; j++)
-	    {
-		scr.scratchp1[indfft(i,j)] =
-		    scr.ytransform[indfft(i,j)] * scr.scratchp1[indfft(i,j)];
-	    }
-	}
-
-	to_spectral_r(scr.scratchp1, arrout, scr, cnsts);
-    }
-    
     
 }
 
@@ -1333,9 +1313,7 @@ double calc_KE_mode(fftw_complex *u, fftw_complex *v, int n, flow_params cnsts)
 	}
 }
 
-void trC_tensor(complex *cij, complex *trC, double *scratchp1, double
-	*scratchp2, fftw_complex *scratchin, fftw_complex *scratchout,
-	fftw_plan *phys_plan, fftw_plan *spec_plan, flow_params cnsts)
+int trC_tensor(complex *cij, complex *trC, flow_scratch scr, flow_params cnsts)
 {
     // Calculate the trace of the conformation tensor. This is both a measure
     // of the polymer stretch and a useful thing to be able to do for a FENE
@@ -1344,17 +1322,35 @@ void trC_tensor(complex *cij, complex *trC, double *scratchp1, double
     int i=0;
     int N = cnsts.N;
     int M = cnsts.M;
+    int Nf = cnsts.Nf;
+    int Mf = cnsts.Mf;
+
+    int posdefck=1;
 
     // Form a sum of those stresses at every point in the domain
-    for(i=0;i<(N+1)*M; i++)
+    to_physical_r(&cij[0], scr.scratchp1, scr, cnsts);
+    to_physical_r(&cij[(N+1)*M], scr.scratchp2, scr, cnsts);
+
+    for(i=0;i<(2*Nf+1)*Mf; i++)
     {
-	trC[i] = cij[i] + cij[(N+1)*M + i];
+	scr.scratchp1[i] += scr.scratchp2[i];
     }
 
-    // Square this result
-    //fft_convolve_r(trC, trC, trC, scratchp1, scratchp2, 
-    //        scratchin, scratchout, phys_plan, spec_plan, cnsts);
+    // check positive definite everywhere
 
+    for (i=0; i<(2*Nf+1)*Mf; i++) 
+    {
+	if (scr.scratchp1<0) 
+	{
+	    posdefck = 0;
+	}
+    }
+
+
+    // transform trC back to spectral space
+    to_spectral_r(scr.scratchp1, trC, scr, cnsts);
+
+    return posdefck;
 
 }
 
@@ -1407,23 +1403,25 @@ double calc_EE_mode(complex *trC, int n, flow_params cnsts)
     
     int j=0;
     int M=cnsts.M;
+    double Wi = cnsts.Wi;
 
     complex EE=0;
+
 
     for (j=0; j<M; j+=2)
     {
 
-	EE += (2. / (1.-j*j)) * trC[ind(n,j)];
-
+	EE += (2. / (1.-j*j)) * (trC[ind(n,0)]);
     }
 
     if (n == 0)
     {
-	return 0.5*creal(EE);
+	// subtract the trace of identity matrix integrated over the domain
+	return 0.5*creal(EE-4.0);
     } else {
 	return creal(EE);
     }
 
 
-    return EE;
+    return EE/Wi;
 }

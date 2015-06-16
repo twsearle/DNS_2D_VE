@@ -7,8 +7,8 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu 19 Mar 16:39:00 2015
-// Last modified: Thu 19 Mar 16:39:00 2015
+// Last modified: Mon 23 Mar 12:59:04 2015
+// Last modified: Mon 23 Mar 12:59:04 2015
 
 /* Program Description:
  *
@@ -60,7 +60,7 @@ int main()
 
     params.N = 5;
     params.M = 100;
-    params.U0 = 0.0;
+    params.U0 = 0;
     params.kx = 1.31;
     params.Re = 400;
     params.Wi = 1e-05;
