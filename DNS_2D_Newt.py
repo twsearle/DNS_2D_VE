@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Tue 16 Jun 17:40:32 2015
+#   Last modified: Wed 17 Jun 12:02:04 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -555,6 +555,10 @@ PSI = f2d.to_spectral(PSI, CNSTS)
 
 PSI = fftshift(PSI, axes=1)
 PSI = PSI.T.flatten()
+
+# WARNING THIS DOESN'T SATISFY THE BCS??
+PSI[(N+1)*M:(N+1)*M + M/2] = 1e-12*(1*rand(M/2) + 1.j*rand(M/2))
+PSI[(N-1)*M:N*M] = conj(PSI[(N+1)*M:(N+2)*M])
 
 # set forcing
 forcing = zeros((Mf, 2*Nf+1), dtype='d')

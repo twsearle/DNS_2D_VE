@@ -138,7 +138,9 @@ def convert_series(f,n):
     time = 0.0
 
     psi_ti = load_hdf5_snapshot(f, time)
-    psi_ti = psi_ti.reshape((2*N+1, M)).T
+    psi_ti = psi_ti.reshape((N+1, M)).T
+    psi_ti = hstack((psi_ti, conj(psi_ti[:, N:0:-1])))
+
 
     u_ti =  f2d.dy(psi_ti, CNSTS)
 
@@ -149,7 +151,9 @@ def convert_series(f,n):
     for i in range(1, numFrames):
         time = i*(totTime/numFrames)
         psi_ti = load_hdf5_snapshot(f, time)
-        psi_ti = psi_ti.reshape((2*N+1, M)).T
+        psi_ti = psi_ti.reshape((N+1, M)).T
+        psi_ti = hstack((psi_ti, conj(psi_ti[:, N:0:-1])))
+
 
         u_ti =  f2d.dy(psi_ti, CNSTS)
 
@@ -282,7 +286,7 @@ else:
     # mode 0
     ax0 = fig.add_subplot(131)
     ax0.set_xlim([-1., 1.])
-    ax0.set_ylim([-1, 1])
+    ax0.set_ylim([-1.1, 1.1])
     ax0.set_xlabel('y')
     ax0.set_ylabel('$u_{n}$'.format(n=0))
 
