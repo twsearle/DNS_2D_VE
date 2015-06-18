@@ -23,7 +23,7 @@ argparser.add_argument("-p", "--path", type=str, default=".",
 args = argparser.parse_args()
 
 config = ConfigParser.RawConfigParser()
-fp = open(path + 'config.cfg')
+fp = open(args.path + '/config.cfg')
 config.readfp(fp)
 N = config.getint('General', 'N')
 M = config.getint('General', 'M')
@@ -150,7 +150,7 @@ NumTimeSteps\t= {NT}
 ------------------------------------
 """.format(N=N, M=M, kx=kx, Re=Re, dt=dt, NT=numTimeSteps, t=totTime)
 
-fpvd = open(path + "traj.pvd", 'w')
+fpvd = open(args.path + "/traj.pvd", 'w')
 
 fpvd.write('''<?xml version="1.0"?>
 <VTKFile type="Collection" version="0.1"
@@ -174,7 +174,7 @@ y = cos(pi*arange(Mf)/(Mf-1))
 z = array([0.0, 1.0])
 
 # create directory for output
-cargs = ["mkdir","{0}".format(path+"/vtktraj")]
+cargs = ["mkdir","{0}".format(args.path+"/vtktraj")]
 subprocess.call(cargs)
 
 if args.Newt:
@@ -193,7 +193,7 @@ if args.Newt:
         psiReal[:,:,0] = real(tmp)
         psiReal[:,:,1] = real(tmp)
 
-        filename = path + "/vtktraj/t{0}.vtr".format(time)
+        filename = args.path + "/vtktraj/t{0}.vtr".format(time)
 
         gridToVTK(filename[:-4], x, y, z, pointData = {"psi" : psiReal}) 
 
@@ -239,7 +239,7 @@ else:
         cxyReal[:,:,0] = real(tmp)
         cxyReal[:,:,1] = real(tmp)
 
-        filename = path + "/vtktraj/t{0}.vtr".format(time)
+        filename = args.path + "/vtktraj/t{0}.vtr".format(time)
 
         gridToVTK(filename[:-4], x, y, z, pointData = {"psi": psiReal, "cxx": cxxReal,
                                                        "cyy": cyyReal, "cxy": cxyReal}) 

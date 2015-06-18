@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Mon 15 Jun 14:18:39 2015
+#   Last modified: Thu 18 Jun 11:52:07 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -453,12 +453,15 @@ print """------------------------------------
 N \t\t= {N}
 M \t\t= {M}              
 Re \t\t= {Re}         
+beta \t\t= {beta}         
+Wi \t\t= {Wi}         
 kx \t\t= {kx}
 dt\t\t= {dt}
 totTime\t\t= {t}
 NumTimeSteps\t= {NT}
 ------------------------------------
-        """.format(N=N, M=M, kx=kx, Re=Re, dt=dt, NT=numTimeSteps, t=totTime)
+        """.format(N=N, M=M, kx=kx, Re=Re, beta=beta, Wi=Wi,
+                   dt=dt, NT=numTimeSteps, t=totTime)
 
 # SET UP
 
@@ -693,9 +696,9 @@ Cxx, Cyy, Cxy = x_independent_profile(PSI)
 #sigma = 0.1
 #gam = 2
 #
-# WARNING THIS DOESN'T SATISFY THE BCS??
 #PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
 
+# WARNING THIS DOESN'T SATISFY THE BCS??
 PSI[(N+1)*M:(N+1)*M + M/2] = 1e-12*(1*rand(M/2) + 1.j*rand(M/2))
 PSI[(N-1)*M:N*M] = conj(PSI[(N+1)*M:(N+2)*M])
 
@@ -749,9 +752,7 @@ PsiOpInvListHalf = form_operators(dt/2.0)
 for i in range(N+1):
     # operator order in list is 0->N
     n = i
-    print n
     opFn = "./operators/op{0}.h5".format(n)
-    print "writing ", opFn
     f = h5py.File(opFn, "w")
     dset = f.create_dataset("op", (M*M,), dtype='complex')
     dset[...] = PsiOpInvList[i].flatten()
@@ -763,9 +764,7 @@ del i
 for i in range(N+1):
     # operator order in list is 0->N
     n = i
-    print n
     opFn = "./operators/hOp{0}.h5".format(n)
-    print "writing ", opFn
     f = h5py.File(opFn, "w")
     dset = f.create_dataset("op", (M*M,), dtype='complex')
     dset[...] = PsiOpInvListHalf[i].flatten()

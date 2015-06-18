@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu 11 Jun 11:36:45 2015
+// Last modified: Tue 16 Jun 17:47:25 2015
 
 #include"fields_2D.h"
 
@@ -937,8 +937,8 @@ void equilibriate_stress(
 	// output some trajectories to check everything is going ok! 
 	if ((timeStep % (numSteps / 100)) == 0 )
 	{
-	    trC_tensor(cij, trC, scr.scratchp1, scr.scratchp2, scr.scratchin, scr.scratchout,
-		    scr.phys_plan, scr.spec_plan, params);
+	    int posdefck;
+	    posdefck = trC_tensor(cij, trC, scr, params);
 
 	//    diagonalised_C(complex *cij, complex *ecij, double *rcij, double
 	//	    *scr.scratchp1, double *scr.scratchp2, fftw_complex *scr.scratchin, fftw_complex

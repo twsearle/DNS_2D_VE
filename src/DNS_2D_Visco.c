@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 15 Jun 22:10:31 2015
+// Last modified: Mon 15 Jun 22:19:16 2015
 
 /* Program Description:
  *
@@ -607,6 +607,7 @@ int main(int argc, char **argv)
             fflush(tracePSI);
             fflush(trace1mode);
             fflush(tracefp);
+            fflush(traceStressfp);
             H5Fflush(hdf5fp, H5F_SCOPE_GLOBAL);
 
          }
