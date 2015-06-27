@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 15 Jun 22:19:16 2015
+// Last modified: Sat 27 Jun 13:29:34 2015
 
 /* Program Description:
  *
@@ -398,8 +398,8 @@ int main(int argc, char **argv)
     #endif
 
     #ifndef MYDEBUG
-    //equilibriate_stress( psiOld, psi_lam, cijOld, cij, cijNL, dt, scr, params,
-    //	    		&hdf5fp, &filetype_id, &datatype_id);
+    equilibriate_stress( psiOld, psi_lam, cijOld, cij, cijNL, dt, scr, params,
+    	    		&hdf5fp, &filetype_id, &datatype_id);
     #endif
 
     save_hdf5_snapshot_visco(&hdf5fp, &filetype_id, &datatype_id,

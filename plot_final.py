@@ -173,7 +173,7 @@ def stupid_transform_i(GLspec, CNSTS):
 
     return out
 
-def plot_modes(arr_ti, arr_true, phase_factor, arrname, time, CNSTS):
+def plot_comp_modes(arr_ti, arr_true, phase_factor, arrname, time, CNSTS):
 
     fig=gcf()
     fig.suptitle(
@@ -205,7 +205,7 @@ def plot_modes(arr_ti, arr_true, phase_factor, arrname, time, CNSTS):
         xlabel('y')
         ylabel('$Im[{0}_{1}]$'.format(arrname, n))
 
-    fig.tight_layout()
+    #fig.tight_layout()
     if arrname == "\psi" :
         savefig(args.path + "/modal_comparison_{0}.pdf".format("psi"))
     else:
@@ -213,6 +213,45 @@ def plot_modes(arr_ti, arr_true, phase_factor, arrname, time, CNSTS):
 
     fig.clf()
 
+def plot_modes(arr_ti, arrname, time, CNSTS):
+
+    fig=gcf()
+    fig.suptitle(
+        '${0}$ time iteration red at t = {1}'.format(arrname, time))
+    subplot_indices= {0:231, 1:232, 2:233, 3:234, 4:235, 5:236}
+    for n in range(3):
+
+        ti_mode = stupid_transform_i(arr_ti[:, n], CNSTS)
+
+        # plot graph
+        splt =subplot(subplot_indices[n])
+        splt.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
+        splt.yaxis.major.formatter._useMathText = True
+        plot(y, real(ti_mode), 'r', linewidth=2.0)
+        title('{0}'.format(n))
+        xlabel('y')
+        ylabel('$Re[{0}_{1}]$'.format(arrname, n))
+
+    for n in range(3):
+
+        ti_mode = stupid_transform_i(arr_ti[:, n], CNSTS)
+
+        # plot graph
+        splt =subplot(subplot_indices[(3+n)])
+        splt.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
+        splt.yaxis.major.formatter._useMathText = True
+        plot(y, imag(ti_mode), 'r', linewidth=2.0)
+        title('{0}'.format(n))
+        xlabel('y')
+        ylabel('$Im[{0}_{1}]$'.format(arrname, n))
+
+    #fig.tight_layout()
+    if arrname == "\psi" :
+        savefig(args.path + "/modes_{0}.pdf".format("psi"))
+    else:
+        savefig(args.path + "/modes_{0}.pdf".format(arrname))
+
+    fig.clf()
 
 
 ##### MAIN ######
@@ -230,8 +269,7 @@ NumTimeSteps\t= {NT}
 ------------------------------------
 """.format(N=N, M=M, kx=kx, Re=Re, dt=dt, NT=numTimeSteps, t=totTime)
 
-#time = totTime
-time = 9960
+time = totTime
 
 f = h5py.File(inFileName, "r")
 
@@ -239,7 +277,7 @@ if args.Newt:
     psi = array(f["/psi"])
     psi_ti = psi_ti.reshape((2*N+1, M)).T
 
-    psi_true, Nu = pickle.load(open(twsFileName, 'r'))
+    #psi_true, Nu = pickle.load(open(twsFileName, 'r'))
 
 else:
     #psi_ti, cxx_ti, cyy_ti, cxy_ti = load_hdf5_snapshot_visco(f, time)
@@ -258,32 +296,51 @@ else:
     cxy_ti = cxy_ti.reshape((N+1, M)).T
     cxy_ti = hstack((cxy_ti, conj(cxy_ti[:, N:0:-1])))
 
-    psi_true, cxx_true, cyy_true, cxy_true, Nu = pickle.load(open(twsFileName, 'r'))
+    #psi_true, cxx_true, cyy_true, cxy_true, Nu = pickle.load(open(twsFileName, 'r'))
 
 f.close()
 
-silly_test = copy(psi_true)
-psi_true = psi_true.reshape(2*N+1, M).T
-psi_true = ifftshift(psi_true, axes=1)
-print psi_true[:,1] - silly_test[(N+1)*M:(N+2)*M]
+#psi_true = psi_true.reshape(2*N+1, M).T
+#psi_true = ifftshift(psi_true, axes=1)
+#cxx_true = cxx_true.reshape(2*N+1, M).T
+#cxx_true = ifftshift(cxx_true, axes=1)
+#cyy_true = cyy_true.reshape(2*N+1, M).T
+#cyy_true = ifftshift(cyy_true, axes=1)
+#cxy_true = cxy_true.reshape(2*N+1, M).T
+#cxy_true = ifftshift(cxy_true, axes=1)
+# Choose the value of the streamfunction at a point for 1st mode, 
+# psi_1(0) = 1
 
-cxx_true = cxx_true.reshape(2*N+1, M).T
-cxx_true = ifftshift(cxx_true, axes=1)
-cyy_true = cyy_true.reshape(2*N+1, M).T
-cyy_true = ifftshift(cyy_true, axes=1)
-cxy_true = cxy_true.reshape(2*N+1, M).T
-cxy_true = ifftshift(cxy_true, axes=1)
+PSIr1 =  stupid_transform_i(real(psi_ti[:, 1]), CNSTS) +\
+        stupid_transform_i(imag(psi_ti[:, 1]), CNSTS)*1.j
 
-phase_factor = conj(psi_true[2, 1] / psi_ti[2, 1])
-print phase_factor
+# calculate a phase factor 1 / (psi_1(0)) such that the streamfunction is real
+phase_factor = 1./PSIr1[Mf/2]
+
+# scale the phase factor so that it is just a phase with no amplitude,
+phase_factor = phase_factor / sqrt(phase_factor*conj(phase_factor))
+
+for n in range(1,N+1):
+    psi_ti[:, n] = phase_factor**n*psi_ti[:, n]
+    psi_ti[:, 2*N+1-n] = phase_factor**(-n)*psi_ti[:, 2*N+1-n]
+    cxx_ti[:, n] = phase_factor**n*cxx_ti[:, n]
+    cxx_ti[:, 2*N+1-n] = phase_factor**(-n)*cxx_ti[:, 2*N+1-n]
+    cyy_ti[:, n] = phase_factor**n*cyy_ti[:, n]
+    cyy_ti[:, 2*N+1-n] = phase_factor**(-n)*cyy_ti[:, 2*N+1-n]
+    cxy_ti[:, n] = phase_factor**n*cxy_ti[:, n]
+    cxy_ti[:, 2*N+1-n] = phase_factor**(-n)*cxy_ti[:, 2*N+1-n]
 
 #y = cos(pi*arange(Mf)/(Mf-1))
 y = 2.0*arange(Mf)/(Mf-1.) -1
 
 # Compare mode by mode
 
-plot_modes(psi_ti, psi_true, phase_factor, "\psi", time, CNSTS)
-plot_modes(cxx_ti, cxx_true, phase_factor, "cxx", time, CNSTS)
-plot_modes(cyy_ti, cyy_true, phase_factor, "cyy", time, CNSTS)
-plot_modes(cxy_ti, cxy_true, phase_factor, "cxy", time, CNSTS)
+#plot_comp_modes(psi_ti, psi_true, phase_factor, "\psi", time, CNSTS)
+#plot_comp_modes(cxx_ti, cxx_true, phase_factor, "cxx", time, CNSTS)
+#plot_comp_modes(cyy_ti, cyy_true, phase_factor, "cyy", time, CNSTS)
+#plot_comp_modes(cxy_ti, cxy_true, phase_factor, "cxy", time, CNSTS)
 
+plot_modes(psi_ti, "\psi", time, CNSTS)
+plot_modes(cxx_ti, "cxx", time, CNSTS)
+plot_modes(cyy_ti, "cyy", time, CNSTS)
+plot_modes(cxy_ti, "cxy", time, CNSTS)
