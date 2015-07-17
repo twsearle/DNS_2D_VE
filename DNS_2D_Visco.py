@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Thu 18 Jun 11:52:07 2015
+#   Last modified: Mon  6 Jul 21:13:54 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -56,6 +56,7 @@ from numpy.random import rand
 import cPickle as pickle
 
 import ConfigParser
+import argparse
 import subprocess
 import h5py
 
@@ -81,6 +82,29 @@ numFrames = config.getint('Time Iteration', 'numFrames')
 dealiasing = config.getboolean('Time Iteration', 'Dealiasing')
 
 fp.close()
+
+argparser = argparse.ArgumentParser()
+
+argparser.add_argument("-N", type=int, default=N, 
+                help='Override Number of Fourier modes given in the config file')
+argparser.add_argument("-M", type=int, default=M, 
+                help='Override Number of Chebyshev modes in the config file')
+argparser.add_argument("-Re", type=float, default=Re, 
+                help="Override Reynold's number in the config file") 
+argparser.add_argument("-b", type=float, default=beta, 
+                help='Override beta of the config file')
+argparser.add_argument("-Wi", type=float, default=Wi, 
+                help='Override Weissenberg number of the config file')
+argparser.add_argument("-kx", type=float, default=kx, 
+                help='Override wavenumber of the config file')
+
+args = argparser.parse_args()
+N = args.N 
+M = args.M
+Re = args.Re
+beta = args.b
+Wi = args.Wi
+kx = args.kx
 
 if dealiasing:
     Nf = (3*N)/2 + 1
