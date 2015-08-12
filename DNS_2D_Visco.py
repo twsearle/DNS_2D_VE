@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Fri 17 Jul 11:47:24 2015
+#   Last modified: Wed 12 Aug 16:05:30 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -73,6 +73,8 @@ Re = config.getfloat('General', 'Re')
 Wi = config.getfloat('General', 'Wi')
 beta = config.getfloat('General', 'beta')
 kx = config.getfloat('General', 'kx')
+
+delta = config.getfloat('Shear Layer', 'delta')
 
 Omega = config.getfloat('Oscillatory Flow', 'Omega')
 
@@ -481,10 +483,13 @@ beta \t\t= {beta}
 Wi \t\t= {Wi}         
 kx \t\t= {kx}
 dt\t\t= {dt}
+Omega\t\t={Omega}
+delta\t\t={delta}
 totTime\t\t= {t}
 NumTimeSteps\t= {NT}
 ------------------------------------
         """.format(N=N, M=M, kx=kx, Re=Re, beta=beta, Wi=Wi,
+                   Omega=Omega, delta=delta,
                    dt=dt, NT=numTimeSteps, t=totTime)
 
 # SET UP
@@ -687,7 +692,6 @@ lsd = 1e-8
 ## --------------- SHEAR LAYER -----------------
 ##
 #y_points = cos(pi*arange(Mf)/(Mf-1))
-#delta = 0.1
 #
 ## Set initial streamfunction
 #PSI = zeros((Mf, 2*Nf+1), dtype='d')
