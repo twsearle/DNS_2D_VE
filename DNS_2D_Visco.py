@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Wed 12 Aug 16:05:30 2015
+#   Last modified: Tue 18 Aug 12:10:46 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -588,35 +588,35 @@ Cxy = zeros((2*N+1)*M,dtype='complex')
 
 # --------------- POISEUILLE -----------------
 
-plugAmp = 0.00 #* (M/32.0)
-
-PSI[N*M]   += (1.-plugAmp) * 2.0/3.0
-PSI[N*M+1] += (1.-plugAmp) * 3.0/4.0
-PSI[N*M+2] += (1.-plugAmp) * 0.0
-PSI[N*M+3] += (1.-plugAmp) * -1.0/12.0
-
-## set initial stress guess based on laminar flow
-Cxx, Cyy, Cxy = x_independent_profile(PSI)
-psiLam = copy(PSI)
-
-## --- PLUG  ---
+#plugAmp = 0.00 #* (M/32.0)
 #
-#PSI[N*M]   += (plugAmp) * (5.0/8.0) * 4.0/5.0
-#PSI[N*M+1] += (plugAmp) * (5.0/8.0) * 7.0/8.0
-#PSI[N*M+3] += (plugAmp) * (5.0/8.0) * -1.0/16.0
-#PSI[N*M+5] += (plugAmp) * (5.0/8.0) * -1.0/80.0
+#PSI[N*M]   += (1.-plugAmp) * 2.0/3.0
+#PSI[N*M+1] += (1.-plugAmp) * 3.0/4.0
+#PSI[N*M+2] += (1.-plugAmp) * 0.0
+#PSI[N*M+3] += (1.-plugAmp) * -1.0/12.0
 #
-##PSI[N*M:] = 0
-##PSI[:(N+1)*M] = 0
-
-perKEestimate = 1.e-7
-totEnergy = 1.0 + 1.e-7
-sigma = 0.1
-gam = 2
-
-PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
-
-lsd = 1e-8
+### set initial stress guess based on laminar flow
+#Cxx, Cyy, Cxy = x_independent_profile(PSI)
+#psiLam = copy(PSI)
+#
+### --- PLUG  ---
+##
+##PSI[N*M]   += (plugAmp) * (5.0/8.0) * 4.0/5.0
+##PSI[N*M+1] += (plugAmp) * (5.0/8.0) * 7.0/8.0
+##PSI[N*M+3] += (plugAmp) * (5.0/8.0) * -1.0/16.0
+##PSI[N*M+5] += (plugAmp) * (5.0/8.0) * -1.0/80.0
+##
+###PSI[N*M:] = 0
+###PSI[:(N+1)*M] = 0
+#
+#perKEestimate = 1.e-7
+#totEnergy = 1.0 + 1.e-7
+#sigma = 0.1
+#gam = 2
+#
+#PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
+#
+#lsd = 1e-8
 
 #Real part y**7 - 2y**6 + 2y**4 -4y
 #PSI[(N)*M+7] += lsd *(1./64.)
@@ -689,71 +689,71 @@ lsd = 1e-8
 
 
 
-## --------------- SHEAR LAYER -----------------
+# --------------- SHEAR LAYER -----------------
+#
+y_points = cos(pi*arange(Mf)/(Mf-1))
+
+# Set initial streamfunction
+PSI = zeros((Mf, 2*Nf+1), dtype='d')
+
+for i in range(Mf):
+    y =y_points[i]
+    for j in range(2*Nf+1):
+        PSI[i,j] = delta * (1./tanh(1./delta)) * log(cosh(y/delta))
+
+del y, i, j
+
+PSI = f2d.to_spectral(PSI, CNSTS)
+
+
+
+#test = f2d.dy(PSI, CNSTS) 
+#test = f2d.to_physical(test, CNSTS)
+#savetxt('U.dat', vstack((y_points,test[:,0])).T)
+#PSI = f2d.to_physical(PSI, CNSTS)
+#savetxt('PSI.dat', vstack((y_points,PSI[:,0])).T)
+#exit(1)
+
+PSI = fftshift(PSI, axes=1)
+PSI = PSI.T.flatten()
+psiLam = copy(PSI)
+Cxx, Cyy, Cxy = x_independent_profile(PSI)
+
+#perKEestimate = 1e-12
+#totEnergy = 1.687501 
+#sigma = 0.1
+#gam = 2
+#
+#PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
+
+# WARNING THIS DOESN'T SATISFY THE BCS??
+PSI[(N+1)*M:(N+1)*M + M/2] = 1e-12*(1*rand(M/2) + 1.j*rand(M/2))
+PSI[(N-1)*M:N*M] = conj(PSI[(N+1)*M:(N+2)*M])
+
+
+# set forcing
+forcing = zeros((Mf, 2*Nf+1), dtype='d')
+#test = zeros((Mf, 2*Nf+1), dtype='d')
+
+for i in range(Mf):
+    y =y_points[i]
+    for j in range(2*Nf+1):
+        forcing[i,j] = ( 2.0/tanh(1.0/delta)) * (1.0/cosh(y/delta)**2) * tanh(y/delta)
+        forcing[i,j] *= 1.0/(Re * delta**2) 
+
+del y, i, j
+forcing = f2d.to_spectral(forcing, CNSTS)
+forcing[:, 1:] = 0
+# set BC
+CNSTS['U0'] = 1.0
+
+## --------------- OSCILLATORY FLOW -----------------
 ##
-#y_points = cos(pi*arange(Mf)/(Mf-1))
 #
-## Set initial streamfunction
-#PSI = zeros((Mf, 2*Nf+1), dtype='d')
+## PSI
 #
-#for i in range(Mf):
-#    y =y_points[i]
-#    for j in range(2*Nf+1):
-#        PSI[i,j] = delta * (1./tanh(1./delta)) * log(cosh(y/delta))
-#
-#del y, i, j
-#
-#PSI = f2d.to_spectral(PSI, CNSTS)
-#
-#
-#
-##test = f2d.dy(PSI, CNSTS) 
-##test = f2d.to_physical(test, CNSTS)
-##savetxt('U.dat', vstack((y_points,test[:,0])).T)
-##PSI = f2d.to_physical(PSI, CNSTS)
-##savetxt('PSI.dat', vstack((y_points,PSI[:,0])).T)
-##exit(1)
-#
-#PSI = fftshift(PSI, axes=1)
-#PSI = PSI.T.flatten()
-#psiLam = copy(PSI)
-#Cxx, Cyy, Cxy = x_independent_profile(PSI)
-#
-##perKEestimate = 1e-12
-##totEnergy = 1.687501 
-##sigma = 0.1
-##gam = 2
-##
-##PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
-#
-## WARNING THIS DOESN'T SATISFY THE BCS??
-#PSI[(N+1)*M:(N+1)*M + M/2] = 1e-12*(1*rand(M/2) + 1.j*rand(M/2))
-#PSI[(N-1)*M:N*M] = conj(PSI[(N+1)*M:(N+2)*M])
-#
-#
-## set forcing
-#forcing = zeros((Mf, 2*Nf+1), dtype='d')
-##test = zeros((Mf, 2*Nf+1), dtype='d')
-#
-#for i in range(Mf):
-#    y =y_points[i]
-#    for j in range(2*Nf+1):
-#        forcing[i,j] = ( 2.0/tanh(1.0/delta)) * (1.0/cosh(y/delta)**2) * tanh(y/delta)
-#        forcing[i,j] *= 1.0/(Re * delta**2) 
-#
-#del y, i, j
-#forcing = f2d.to_spectral(forcing, CNSTS)
-#forcing[:, 1:] = 0
-## set BC
-#CNSTS['U0'] = 1.0
-
-# --------------- OSCILLATORY FLOW -----------------
-#
-
-# PSI
-
-forcing = zeros((M,2*N+1), dtype='complex')
-forcing[0,0] = Omega / Re
+#forcing = zeros((M,2*N+1), dtype='complex')
+#forcing[0,0] = Omega / Re
 
 
 # ----------------------------------------------------------------------------
