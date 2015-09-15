@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Tue 18 Aug 12:10:46 2015
+#   Last modified: Tue 15 Sep 12:06:28 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -99,6 +99,8 @@ argparser.add_argument("-Wi", type=float, default=Wi,
                 help='Override Weissenberg number of the config file')
 argparser.add_argument("-kx", type=float, default=kx, 
                 help='Override wavenumber of the config file')
+argparser.add_argument("-initTime", type=float, default=0.0, 
+                help='Start simulation from a different time')
 
 args = argparser.parse_args()
 N = args.N 
@@ -107,6 +109,7 @@ Re = args.Re
 beta = args.b
 Wi = args.Wi
 kx = args.kx
+initTime = args.initTime
 
 if dealiasing:
     Nf = (3*N)/2 + 1
@@ -691,69 +694,70 @@ Cxy = zeros((2*N+1)*M,dtype='complex')
 
 # --------------- SHEAR LAYER -----------------
 #
-y_points = cos(pi*arange(Mf)/(Mf-1))
-
-# Set initial streamfunction
-PSI = zeros((Mf, 2*Nf+1), dtype='d')
-
-for i in range(Mf):
-    y =y_points[i]
-    for j in range(2*Nf+1):
-        PSI[i,j] = delta * (1./tanh(1./delta)) * log(cosh(y/delta))
-
-del y, i, j
-
-PSI = f2d.to_spectral(PSI, CNSTS)
-
-
-
-#test = f2d.dy(PSI, CNSTS) 
-#test = f2d.to_physical(test, CNSTS)
-#savetxt('U.dat', vstack((y_points,test[:,0])).T)
-#PSI = f2d.to_physical(PSI, CNSTS)
-#savetxt('PSI.dat', vstack((y_points,PSI[:,0])).T)
-#exit(1)
-
-PSI = fftshift(PSI, axes=1)
-PSI = PSI.T.flatten()
-psiLam = copy(PSI)
-Cxx, Cyy, Cxy = x_independent_profile(PSI)
-
-#perKEestimate = 1e-12
-#totEnergy = 1.687501 
-#sigma = 0.1
-#gam = 2
+#y_points = cos(pi*arange(Mf)/(Mf-1))
 #
-#PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
-
-# WARNING THIS DOESN'T SATISFY THE BCS??
-PSI[(N+1)*M:(N+1)*M + M/2] = 1e-12*(1*rand(M/2) + 1.j*rand(M/2))
-PSI[(N-1)*M:N*M] = conj(PSI[(N+1)*M:(N+2)*M])
-
-
-# set forcing
-forcing = zeros((Mf, 2*Nf+1), dtype='d')
-#test = zeros((Mf, 2*Nf+1), dtype='d')
-
-for i in range(Mf):
-    y =y_points[i]
-    for j in range(2*Nf+1):
-        forcing[i,j] = ( 2.0/tanh(1.0/delta)) * (1.0/cosh(y/delta)**2) * tanh(y/delta)
-        forcing[i,j] *= 1.0/(Re * delta**2) 
-
-del y, i, j
-forcing = f2d.to_spectral(forcing, CNSTS)
-forcing[:, 1:] = 0
-# set BC
-CNSTS['U0'] = 1.0
-
-## --------------- OSCILLATORY FLOW -----------------
+## Set initial streamfunction
+#PSI = zeros((Mf, 2*Nf+1), dtype='d')
+#
+#for i in range(Mf):
+#    y =y_points[i]
+#    for j in range(2*Nf+1):
+#        PSI[i,j] = delta * (1./tanh(1./delta)) * log(cosh(y/delta))
+#
+#del y, i, j
+#
+#PSI = f2d.to_spectral(PSI, CNSTS)
+#
+#
+#
+##test = f2d.dy(PSI, CNSTS) 
+##test = f2d.to_physical(test, CNSTS)
+##savetxt('U.dat', vstack((y_points,test[:,0])).T)
+##PSI = f2d.to_physical(PSI, CNSTS)
+##savetxt('PSI.dat', vstack((y_points,PSI[:,0])).T)
+##exit(1)
+#
+#PSI = fftshift(PSI, axes=1)
+#PSI = PSI.T.flatten()
+#psiLam = copy(PSI)
+#Cxx, Cyy, Cxy = x_independent_profile(PSI)
+#
+##perKEestimate = 1e-12
+##totEnergy = 1.687501 
+##sigma = 0.1
+##gam = 2
 ##
+##PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
 #
-## PSI
+## WARNING THIS DOESN'T SATISFY THE BCS??
+#PSI[(N+1)*M:(N+1)*M + M/2] = 1e-12*(1*rand(M/2) + 1.j*rand(M/2))
+#PSI[(N-1)*M:N*M] = conj(PSI[(N+1)*M:(N+2)*M])
 #
-#forcing = zeros((M,2*N+1), dtype='complex')
-#forcing[0,0] = Omega / Re
+#
+## set forcing
+#forcing = zeros((Mf, 2*Nf+1), dtype='d')
+##test = zeros((Mf, 2*Nf+1), dtype='d')
+#
+#for i in range(Mf):
+#    y =y_points[i]
+#    for j in range(2*Nf+1):
+#        forcing[i,j] = ( 2.0/tanh(1.0/delta)) * (1.0/cosh(y/delta)**2) * tanh(y/delta)
+#        forcing[i,j] *= 1.0/(Re * delta**2) 
+#
+#del y, i, j
+#forcing = f2d.to_spectral(forcing, CNSTS)
+#forcing[:, 1:] = 0
+## set BC
+#CNSTS['U0'] = 1.0
+
+# --------------- OSCILLATORY FLOW -----------------
+#
+
+# PSI
+psiLam = copy(PSI)
+
+forcing = zeros((M,2*N+1), dtype='complex')
+forcing[0,0] = Omega / Re
 
 
 # ----------------------------------------------------------------------------
@@ -843,7 +847,7 @@ if dealiasing:
              "{0:e}".format(CNSTS["Omega"]),
              "-t", "{0:e}".format(CNSTS["dt"]),
              "-s", "{0:d}".format(stepsPerFrame), "-T",
-             "{0:d}".format(numTimeSteps), "-d"]
+             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime), "-d"]
 
     print "./DNS_2D_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
@@ -852,7 +856,7 @@ if dealiasing:
              "{0:e}".format(CNSTS["beta"]), "-w", "{0:e}".format(CNSTS["Omega"]),\
              "-t", "{0:e}".format(CNSTS["dt"]),\
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
-             "{0:d}".format(numTimeSteps), "-d"
+             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime), "-d"
 
 else:
     cargs = ["./DNS_2D_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
@@ -863,7 +867,7 @@ else:
              "{0:e}".format(CNSTS["Omega"]),
              "-t", "{0:e}".format(CNSTS["dt"]),
              "-s", "{0:d}".format(stepsPerFrame), "-T",
-             "{0:d}".format(numTimeSteps)]
+             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime)]
 
     print "./DNS_2D_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
@@ -873,7 +877,7 @@ else:
     "{0:e}".format(CNSTS["Omega"]),\
              "-t", "{0:e}".format(CNSTS["dt"]),\
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
-             "{0:d}".format(numTimeSteps)
+             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime)
 
 subprocess.call(cargs)
 

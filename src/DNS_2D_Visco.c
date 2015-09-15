@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Sat 27 Jun 13:29:34 2015
+// Last modified: Tue 15 Sep 12:09:24 2015
 
 /* Program Description:
  *
@@ -72,6 +72,12 @@ int main(int argc, char **argv)
     int posdefck = 0;
     double dt = 0;
     double time = 0;
+    double initTime = 0;
+
+    #ifdef OSCIL_FLOW
+    int periods = 0;
+    double phase = 0;
+    #endif
 
     double KE0 = 1.0;
     double KE1 = 0.0;
@@ -100,7 +106,7 @@ int main(int argc, char **argv)
 
     // Read in parameters from cline args.
 
-    while ((shortArg = getopt (argc, argv, "dN:M:U:k:R:W:b:w:t:s:T:")) != -1)
+    while ((shortArg = getopt (argc, argv, "dN:M:U:k:R:W:b:w:t:s:T:i:")) != -1)
 	switch (shortArg)
 	  {
 	  case 'N':
@@ -135,6 +141,9 @@ int main(int argc, char **argv)
 	    break;
 	  case 'T':
 	    numTimeSteps = atoi(optarg);
+	    break;
+	  case 'i':
+	    initTime = atof(optarg);
 	    break;
 	  case 'd':
 	    params.dealiasing = 1;
@@ -174,7 +183,9 @@ int main(int argc, char **argv)
     printf("\nbeta                \t %e ", params.beta);
     printf("\nTime Step           \t %e ", dt);
     printf("\nNumber of Time Steps\t %d ", numTimeSteps);
-    printf("\nTime Steps per frame\t %d \n", stepsPerFrame);
+    printf("\nTime Steps per frame\t %d ", stepsPerFrame);
+    printf("\nInitial Time\t %d \n", initTime);
+    
 
     FILE *tracefp, *tracePSI, *trace1mode, *traceStressfp;
     char *trace_fn, *traj_fn;
@@ -398,8 +409,8 @@ int main(int argc, char **argv)
     #endif
 
     #ifndef MYDEBUG
-    equilibriate_stress( psiOld, psi_lam, cijOld, cij, cijNL, dt, scr, params,
-    	    		&hdf5fp, &filetype_id, &datatype_id);
+    //equilibriate_stress( psiOld, psi_lam, cijOld, cij, cijNL, dt, scr, params,
+    //	    		&hdf5fp, &filetype_id, &datatype_id);
     #endif
 
     save_hdf5_snapshot_visco(&hdf5fp, &filetype_id, &datatype_id,
@@ -446,8 +457,13 @@ int main(int argc, char **argv)
 
 	// calculate forcing 
 	#ifdef OSCIL_FLOW
-	forcing[ind(0,0)] = cos(params.Omega*(timeStep)*dt) / params.Re;
-	forcingN[ind(0,0)] = cos(params.Omega*(timeStep+0.5)*dt) / params.Re;
+
+	periods = floor(params.Omega*initTime/(2.0*M_PI));
+	phase = params.Omega*initTime - 2.0*M_PI*periods;
+
+	forcing[ind(0,0)] = cos(params.Omega*(timeStep)*dt + phase) / params.Re;
+	forcingN[ind(0,0)] = cos(params.Omega*(timeStep+0.5)*dt + phase) / params.Re;
+
 	#endif
 
 	step_conformation_Crank_Nicolson(cijOld, cijNL, psiOld, cijOld,
@@ -480,8 +496,11 @@ int main(int argc, char **argv)
 
 	// calculate forcing on the half step
 	#ifdef OSCIL_FLOW
-	forcing[ind(0,0)] = cos(params.Omega*(timeStep)*dt) / params.Re;
-	forcingN[ind(0,0)] = cos(params.Omega*(timeStep+1.0)*dt) / params.Re;
+	periods = floor(params.Omega*initTime / (2.0*M_PI));
+	phase = params.Omega*initTime - 2.0*M_PI*periods;
+
+	forcing[ind(0,0)] = cos(params.Omega*(timeStep)*dt + phase) / params.Re;
+	forcingN[ind(0,0)] = cos(params.Omega*(timeStep+1.0)*dt + phase) / params.Re;
 	#endif
 
         // use the old values plus the values on the half step for the NL terms
@@ -529,6 +548,7 @@ int main(int argc, char **argv)
         // output some information at every frame
         if (((timeStep+1) % stepsPerFrame) == 0 )
         {
+
 
 	    time = (timeStep + 1)*dt;
 
