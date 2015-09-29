@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Thu 19 Mar 16:26:58 2015
+#   Last modified: Tue 29 Sep 15:23:27 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -433,7 +433,6 @@ print "writing initial state to initial.h5"
 f = h5py.File("initial.h5", "w")
 dset = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
 dset[...] = PSI.T.flatten()
-print shape(dset)
 f.close()
 
 #### TIME ITERATE 

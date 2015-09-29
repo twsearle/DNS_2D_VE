@@ -1,42 +1,47 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Tue 29 Sep 15:35:44 2015
+#   Last modified: Tue 15 Sep 12:06:28 2015
 #
 #-----------------------------------------------------------------------------
 
 """
 
-Simulation of plane Poiseuille flow. In the past I have used a numerical scheme
-which uses the streamfunction at the wrong time in the Runge-Kutta method. Here
-I attempt to correct this by calculating the streamfunction twice, Once at t
-+ dt/2 and once at t + dt.
-
-Simulation of 2D Newtonian flow.
+Simulation of Viscoelastic Oldroyd-B plane Poiseuille flow.
 
 TODO:
+
+    * predictor-corrector ABM for the streamfunction. Test if it is faster/
+    better.
     
-    * Test BLAS against loops for random matrices.
-
-    * Test BLAS against loops with openMP
-
-    * Write 1st, 2nd, 3rd, 4th derivative in fortran for Chebyshev modes
-
-    * Write Fourier derivatives, 1st, 2nd, 4th order
-
 Outline:
     
     * read in data
 
     * Form operators for semi-implicit crank-nicolson
 
-    * for all times do:
+    * Form half step operators
+
+    * set up the initial streamfunction and stresses
+
+    * Pass to C code 
+
+    * for the first three time steps:
 
         * solve for Psi at current time based on previous time
 
+        * solve for Psi on the half step 
+
+        * solve for the stresses using 4th order Runge-Kutta 
+
+    * for all other times do:
+
+        * solve for Psi at current time based on previous time
+
+        * Solve for the stresses using 4th Order Adams-Bashforth
+        predictor-corrector.j
+
     until: timeup
-
-
 
 """
 
@@ -51,6 +56,7 @@ from numpy.random import rand
 import cPickle as pickle
 
 import ConfigParser
+import argparse
 import subprocess
 import h5py
 
@@ -68,12 +74,42 @@ Wi = config.getfloat('General', 'Wi')
 beta = config.getfloat('General', 'beta')
 kx = config.getfloat('General', 'kx')
 
+delta = config.getfloat('Shear Layer', 'delta')
+
+Omega = config.getfloat('Oscillatory Flow', 'Omega')
+
 dt = config.getfloat('Time Iteration', 'dt')
 totTime = config.getfloat('Time Iteration', 'totTime')
 numFrames = config.getint('Time Iteration', 'numFrames')
 dealiasing = config.getboolean('Time Iteration', 'Dealiasing')
 
 fp.close()
+
+argparser = argparse.ArgumentParser()
+
+argparser.add_argument("-N", type=int, default=N, 
+                help='Override Number of Fourier modes given in the config file')
+argparser.add_argument("-M", type=int, default=M, 
+                help='Override Number of Chebyshev modes in the config file')
+argparser.add_argument("-Re", type=float, default=Re, 
+                help="Override Reynold's number in the config file") 
+argparser.add_argument("-b", type=float, default=beta, 
+                help='Override beta of the config file')
+argparser.add_argument("-Wi", type=float, default=Wi, 
+                help='Override Weissenberg number of the config file')
+argparser.add_argument("-kx", type=float, default=kx, 
+                help='Override wavenumber of the config file')
+argparser.add_argument("-initTime", type=float, default=0.0, 
+                help='Start simulation from a different time')
+
+args = argparser.parse_args()
+N = args.N 
+M = args.M
+Re = args.Re
+beta = args.b
+Wi = args.Wi
+kx = args.kx
+initTime = args.initTime
 
 if dealiasing:
     Nf = (3*N)/2 + 1
@@ -82,21 +118,17 @@ else:
     Nf = N
     Mf = M
 
-numTimeSteps = int(totTime / dt)
+numTimeSteps = int(ceil(totTime / dt))
 assert (totTime / dt) - float(numTimeSteps) == 0, "Non-integer number of timesteps"
 assert Wi != 0.0, "cannot have Wi = 0!"
 
-NOld = N 
-MOld = M
-kwargs = {'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0, 'Re': Re, 'Wi': Wi, 'beta': beta,
-          'kx': kx,'time': totTime, 'dt':dt, 'dealiasing':dealiasing}
-baseFileName  = "-N{N}-M{M}-kx{kx}-Re{Re}.pickle".format(**kwargs)
-outFileName  = "pf{0}".format(baseFileName)
-outFileNameTrace = "trace{0}.dat".format(baseFileName[:-7])
-outFileNameTime = "series-pf{0}".format(baseFileName)
-#inFileName = "pf-N{N}-M{M}-kx{kx}-Re{Re}.pickle".format(N=NOld, M=MOld, 
-#                                                        kx=kx, Re=Re)
-inFileName = "pf-N{N}-M{M}-kx{kx}-Re{Re}.pickle".format(**kwargs)
+NOld = 3 
+MOld = 40
+kwargs = {'NOld': NOld, 'MOld': MOld, 'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0,
+          'Re': Re, 'Wi': Wi, 'beta': beta, 'Omega':Omega, 'kx': kx,'time': totTime, 'dt':dt,
+          'dealiasing':dealiasing}
+
+inFileName = "pf-N{NOld}-M{MOld}-kx{kx}-Re{Re}-b{beta}-Wi{Wi}.pickle".format(**kwargs)
 
 CNSTS = kwargs
 
@@ -120,19 +152,6 @@ def mk_cheb_int():
     del m
     
     return integrator
-
-def cheb_prod_mat(velA):
-    """Function to return a matrix for left-multiplying two Chebychev vectors"""
-
-    D = zeros((M, M), dtype='complex')
-
-    for n in range(M):
-        for m in range(-M+1,M):     # Bottom of range is inclusive
-            itr = abs(n-m)
-            if (itr < M):
-                D[n, abs(m)] += 0.5*oneOverC[n]*CFunc[itr]*CFunc[abs(m)]*velA[itr]
-    del m, n, itr
-    return D
 
 def append_save_array(array, fp):
 
@@ -202,7 +221,7 @@ def form_operators(dt):
 
     # zeroth mode
     Psi0thOp = zeros((M,M), dtype='complex')
-    Psi0thOp = SMDY - 0.5*dt*oneOverRe*SMDYYY + 0j
+    Psi0thOp = SMDY - 0.5*dt*oneOverRe*beta*SMDYYY + 0j
 
     # Apply BCs
 
@@ -211,9 +230,6 @@ def form_operators(dt):
     Psi0thOp[M-2, :] = DERIVBOT
     # psi0(-1) =  0
     Psi0thOp[M-1, :] = BBOT
-
-    print "condition numbers for dt = {0} operators".format(dt)
-    print "mode 0, condition number {0:e}".format(cond(Psi0thOp))
 
     PsiOpInvList.append(linalg.inv(Psi0thOp))
 
@@ -224,7 +240,7 @@ def form_operators(dt):
         SLAPLAC = -n*n*kx*kx*SII + SMDYY
 
         PSIOP[0:M, 0:M] = 0
-        PSIOP[0:M, M:2*M] = SII - 0.5*oneOverRe*dt*SLAPLAC
+        PSIOP[0:M, M:2*M] = SII - 0.5*oneOverRe*beta*dt*SLAPLAC
 
         PSIOP[M:2*M, 0:M] = SLAPLAC
         PSIOP[M:2*M, M:2*M] = -SII
@@ -237,10 +253,6 @@ def form_operators(dt):
         # dxpsi(+-1) = 0
         PSIOP[2*M-2, :] = concatenate((BTOP, zeros(M, dtype='complex')))
         PSIOP[2*M-1, :] = concatenate((BBOT, zeros(M, dtype='complex')))
-
-        # Calculate condition number before taking the inverse
-        conditionNum = cond(PSIOP)
-        print "mode {0}, condition number {1:e}".format(n, conditionNum)
 
         # store the inverse of the relevent part of the matrix
         PSIOP = linalg.inv(PSIOP)
@@ -315,13 +327,6 @@ def perturb(psi_, totEnergy, perKEestimate, sigma, gam):
 
         for n in range(1,N+1):
             if (n % 2) == 0:
-                ##------------- PURE RANDOM PERTURBATIONS -------------------
-                ## Make sure you satisfy the optimum symmetry for the
-                ## perturbation
-                #psi_[(N-n)*M + 1:(N-n)*M + M/2 :2] = (10.0**(-n+1))*perAmp*0.5*(1-rand(M/4) + 1.j*rand(M/4))
-                #psi_[(N-n)*M + 1:(N-n)*M + 6 :2] =\
-                #(10.0**((n+1)))*perAmp*0.5*(1-rand(3) + 1.j*rand(3))
-                #psi_[(N-n)*M + 1:(N-n)*M + M/2 :2] = perAmp*0.5*(rand(M/4) + 1.j*rand(M/4))
 
                 ##------------- PERTURBATIONS WHICH SATISFY BCS -------------------
                 rSpace = zeros(M, dtype='complex')
@@ -436,6 +441,37 @@ def perturb(psi_, totEnergy, perKEestimate, sigma, gam):
 
     return psi_
 
+def x_independent_profile(PSI):
+    """
+     I think these are the equations for the x independent stresses from the base
+     profile.
+    """
+
+    dyu = dot(SMDYY, PSI[N*M:(N+1)*M])
+    Cyy = zeros(vecLen, dtype='complex')
+    Cyy[N*M] += 1.0
+    Cxy = zeros(vecLen, dtype='complex')
+    Cxy[N*M:(N+1)*M] = Wi*dyu
+    Cxx = zeros(vecLen, dtype='complex')
+    Cxx[N*M:(N+1)*M] = 2*Wi*Wi*dot(cheb_prod_mat(dyu), dyu)
+    Cxx[N*M] += 1.0
+
+    return (Cxx, Cyy, Cxy)
+
+def cheb_prod_mat(velA):
+    """Function to return a matrix for left-multiplying two Chebychev vectors"""
+
+    D = zeros((M, M), dtype='complex')
+
+    for n in range(M):
+        for m in range(-M+1,M):     # Bottom of range is inclusive
+            itr = abs(n-m)
+            if (itr < M):
+                D[n, abs(m)] += 0.5*oneOverC[n]*CFunc[itr]*CFunc[abs(m)]*velA[itr]
+    del m, n, itr
+    return D
+
+
 # -----------------------------------------------------------------------------
 # MAIN
 # -----------------------------------------------------------------------------
@@ -446,12 +482,18 @@ print """------------------------------------
 N \t\t= {N}
 M \t\t= {M}              
 Re \t\t= {Re}         
+beta \t\t= {beta}         
+Wi \t\t= {Wi}         
 kx \t\t= {kx}
 dt\t\t= {dt}
+Omega\t\t={Omega}
+delta\t\t={delta}
 totTime\t\t= {t}
 NumTimeSteps\t= {NT}
 ------------------------------------
-        """.format(N=N, M=M, kx=kx, Re=Re, dt=dt, NT=numTimeSteps, t=totTime)
+        """.format(N=N, M=M, kx=kx, Re=Re, beta=beta, Wi=Wi,
+                   Omega=Omega, delta=delta,
+                   dt=dt, NT=numTimeSteps, t=totTime)
 
 # SET UP
 
@@ -490,49 +532,169 @@ del j
 
 #### The initial stream-function
 PSI = zeros((2*N+1)*M,dtype='complex')
+Cxx = zeros((2*N+1)*M,dtype='complex')
+Cyy = zeros((2*N+1)*M,dtype='complex')
+Cxy = zeros((2*N+1)*M,dtype='complex')
 
-# --------------- TWS -----------------
 
-# Read in stream function from file
-#(PSI, Nu) = pickle.load(open(inFileName,'r'))
+## Read in stream function from file
+#(PSI, Cxx, Cyy, Cxy, Nu) = pickle.load(open(inFileName,'r'))
+#PSI = decide_resolution(PSI, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+#Cxx = decide_resolution(Cxx, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+#Cyy = decide_resolution(Cyy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+#Cxy = decide_resolution(Cxy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+#psiLam = copy(PSI)
+#print inFileName
 
+#f = h5py.File("final.h5","r")
+#
+#PSI = array(f["psi"])
+#Cxx = array(f["cxx"])
+#Cyy = array(f["cyy"])
+#Cxy = array(f["cxy"])
+#
+#f.close()
+#
+#tmp = PSI.reshape((N+1, M)).T
+#PSI = zeros((M, 2*N+1), dtype='complex')
+#PSI[:, :N+1] = tmp
+#for n in range(1, N+1):
+#    PSI[:, 2*N+1 - n] = conj(PSI[:, n])
+#PSI = fftshift(PSI, axes=1)
+#PSI = PSI.T.flatten()
+#
+#tmp = Cxx.reshape((N+1, M)).T
+#Cxx = zeros((M, 2*N+1), dtype='complex')
+#Cxx[:, :N+1] = tmp
+#for n in range(1, N+1):
+#    Cxx[:, 2*N+1 - n] = conj(Cxx[:, n])
+#Cxx = fftshift(Cxx, axes=1)
+#Cxx = Cxx.T.flatten()
+#
+#tmp = Cyy.reshape((N+1, M)).T
+#Cyy = zeros((M, 2*N+1), dtype='complex')
+#Cyy[:, :N+1] = tmp
+#for n in range(1, N+1):
+#    Cyy[:, 2*N+1 - n] = conj(Cyy[:, n])
+#Cyy = fftshift(Cyy, axes=1)
+#Cyy = Cyy.T.flatten()
+#
+#tmp = Cxy.reshape((N+1, M)).T
+#Cxy = zeros((M, 2*N+1), dtype='complex')
+#Cxy[:, :N+1] = tmp
+#for n in range(1, N+1):
+#    Cxy[:, 2*N+1 - n] = conj(Cxy[:, n])
+#Cxy = fftshift(Cxy, axes=1)
+#Cxy = Cxy.T.flatten()
+#
+#psiLam = copy(PSI)
 
 # --------------- POISEUILLE -----------------
 
-#
-#plugAmp = 0.02 #* (M/32.0)
+#plugAmp = 0.00 #* (M/32.0)
 #
 #PSI[N*M]   += (1.-plugAmp) * 2.0/3.0
 #PSI[N*M+1] += (1.-plugAmp) * 3.0/4.0
 #PSI[N*M+2] += (1.-plugAmp) * 0.0
 #PSI[N*M+3] += (1.-plugAmp) * -1.0/12.0
 #
+### set initial stress guess based on laminar flow
+#Cxx, Cyy, Cxy = x_independent_profile(PSI)
+#psiLam = copy(PSI)
+#
+### --- PLUG  ---
+##
+##PSI[N*M]   += (plugAmp) * (5.0/8.0) * 4.0/5.0
+##PSI[N*M+1] += (plugAmp) * (5.0/8.0) * 7.0/8.0
+##PSI[N*M+3] += (plugAmp) * (5.0/8.0) * -1.0/16.0
+##PSI[N*M+5] += (plugAmp) * (5.0/8.0) * -1.0/80.0
+##
+###PSI[N*M:] = 0
+###PSI[:(N+1)*M] = 0
+#
+#perKEestimate = 1.e-7
+#totEnergy = 1.0 + 1.e-7
+#sigma = 0.1
+#gam = 2
+#
+#PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
+#
+#lsd = 1e-8
 
-# --------------- PLUG  -----------------
+#Real part y**7 - 2y**6 + 2y**4 -4y
+#PSI[(N)*M+7] += lsd *(1./64.)
+#PSI[(N)*M+6] += lsd *(-1./16.)
+#PSI[(N)*M+5] += lsd *(3./16. + 7./(4*16.))
+#PSI[(N)*M+4] += lsd *(1./8. )
+#PSI[(N)*M+3] += lsd *(81./(16.*4) )
+#PSI[(N)*M+2] += lsd *(1./16. )
+#PSI[(N)*M+1] += lsd *(155./64. - 4. )
+#PSI[(N)*M+0] += lsd *(1./8) 
 
-#PSI[N*M]   += (plugAmp) * (5.0/8.0) * 4.0/5.0
-#PSI[N*M+1] += (plugAmp) * (5.0/8.0) * 7.0/8.0
-#PSI[N*M+3] += (plugAmp) * (5.0/8.0) * -1.0/16.0
-#PSI[N*M+5] += (plugAmp) * (5.0/8.0) * -1.0/80.0
+#for n in range(1,2):
+#
+#    # imaginary part
+#    PSI[(N+n)*M]   += lsd * (10**-n)*(1.j) * (5.0/8.0) * 4.0/5.0
+#    PSI[(N+n)*M+1] += lsd * (10**-n)*(1.j) * (5.0/8.0) * 7.0/8.0
+#    PSI[(N+n)*M+3] += lsd * (10**-n)*(1.j) * (5.0/8.0) * -1.0/16.0
+#    PSI[(N+n)*M+5] += lsd * (10**-n)*(1.j) * (5.0/8.0) * -1.0/80.0
+#
+#    PSI[(N+n)*M]   += lsd * (10**-n)*(1.j) * (5.0/8.0) * -2.0
+#    PSI[(N+n)*M+3] += lsd * (10**-n)*(1.j) * (5.0/8.0) * 1.0
+#    PSI[(N+n)*M+5] += lsd * (10**-n)*(1.j) * (5.0/8.0) * 1.0
+#
+#    #Real part y**7 - 2y**6 + 2y**4 -4y
+#    PSI[(N+n)*M+7] += lsd *(10**-n)*(1./64.)
+#    PSI[(N+n)*M+6] += lsd *(10**-n)*(-1./16.)
+#    PSI[(N+n)*M+5] += lsd *(10**-n)*(3./16. + 7./(4*16.))
+#    PSI[(N+n)*M+4] += lsd *(10**-n)*(1./8. )
+#    PSI[(N+n)*M+3] += lsd *(10**-n)*(81./(16.*4) )
+#    PSI[(N+n)*M+2] += lsd *(10**-n)*(1./16. )
+#    PSI[(N+n)*M+1] += lsd *(10**-n)*(155./64. - 4. )
+#    PSI[(N+n)*M+0] += lsd *(10**-n)*(1./8) 
+#
+#    PSI[(N-n)*M] = conj(PSI[(N+n)*M])
 
-#PSI[N*M:] = 0
-#PSI[:(N+1)*M] = 0
+#forcing = zeros((M,2*N+1), dtype='complex')
+#forcing[0,0] = 2.0/Re
 
-perKEestimate = 0.2
-totEnergy = 0.8
-sigma = 0.1
-gam = 2
+#KE = 0
+#SMDY =  mk_single_diffy()
+#u0 = dot(SMDY, PSI[N*M: (N+1)*M])
+#u0sq = zeros(M, dtype='complex')
+#for n in range(0,M,2):
+#    for m in range(n-M+1, M):
+#
+#        p = abs(n-m)
+#        if (p==0):
+#            tmp = 2.0*u0[p]
+#        else:
+#            tmp = u0[p]
+#
+#        if (abs(m)==0):
+#            tmp *= 2.0*conj(u0[abs(m)])
+#        else:
+#            tmp *= conj(u0[abs(m)])
+#
+#        if (n==0):
+#            u0sq[n] += 0.25*tmp
+#        else:
+#            u0sq[n] += 0.5*tmp
+#
+#    KE += (2. / (1.-n*n)) * u0sq[n];
+#    print KE
+#
+#u0sq2 = dot(cheb_prod_mat(u0), u0)
+#print u0sq2-u0sq
+#
+#print 'KE0', KE*(15./8.)*0.5
 
-PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
 
-forcing = zeros((M,2*N+1), dtype='complex')
-forcing[0,0] = 2.0/Re
 
 
 # --------------- SHEAR LAYER -----------------
 #
 #y_points = cos(pi*arange(Mf)/(Mf-1))
-#delta = 0.1
 #
 ## Set initial streamfunction
 #PSI = zeros((Mf, 2*Nf+1), dtype='d')
@@ -546,6 +708,8 @@ forcing[0,0] = 2.0/Re
 #
 #PSI = f2d.to_spectral(PSI, CNSTS)
 #
+#
+#
 ##test = f2d.dy(PSI, CNSTS) 
 ##test = f2d.to_physical(test, CNSTS)
 ##savetxt('U.dat', vstack((y_points,test[:,0])).T)
@@ -555,10 +719,24 @@ forcing[0,0] = 2.0/Re
 #
 #PSI = fftshift(PSI, axes=1)
 #PSI = PSI.T.flatten()
+#psiLam = copy(PSI)
+#Cxx, Cyy, Cxy = x_independent_profile(PSI)
+#
+##perKEestimate = 1e-12
+##totEnergy = 1.687501 
+##sigma = 0.1
+##gam = 2
+##
+##PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
+#
+## WARNING THIS DOESN'T SATISFY THE BCS??
+#PSI[(N+1)*M:(N+1)*M + M/2] = 1e-12*(1*rand(M/2) + 1.j*rand(M/2))
+#PSI[(N-1)*M:N*M] = conj(PSI[(N+1)*M:(N+2)*M])
+#
 #
 ## set forcing
 #forcing = zeros((Mf, 2*Nf+1), dtype='d')
-#test = zeros((Mf, 2*Nf+1), dtype='d')
+##test = zeros((Mf, 2*Nf+1), dtype='d')
 #
 #for i in range(Mf):
 #    y =y_points[i]
@@ -568,12 +746,29 @@ forcing[0,0] = 2.0/Re
 #
 #del y, i, j
 #forcing = f2d.to_spectral(forcing, CNSTS)
-#
+#forcing[:, 1:] = 0
 ## set BC
 #CNSTS['U0'] = 1.0
 
+# --------------- OSCILLATORY FLOW -----------------
+#
+
+# PSI
+psiLam = copy(PSI)
+
+forcing = zeros((M,2*N+1), dtype='complex')
+forcing[0,0] = Omega / Re
+
+
 # ----------------------------------------------------------------------------
 
+##  output forcing and the streamfunction corresponding to the initial stress
+f = h5py.File("laminar.h5", "w")
+dset = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
+psiLam = psiLam.reshape(2*N+1, M).T
+psiLam = ifftshift(psiLam, axes=1)
+dset[...] = psiLam.T.flatten()
+f.close()
 
 f = h5py.File("forcing.h5", "w")
 dset = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
@@ -589,9 +784,7 @@ PsiOpInvListHalf = form_operators(dt/2.0)
 for i in range(N+1):
     # operator order in list is 0->N
     n = i
-    print n
     opFn = "./operators/op{0}.h5".format(n)
-    print "writing ", opFn
     f = h5py.File(opFn, "w")
     dset = f.create_dataset("op", (M*M,), dtype='complex')
     dset[...] = PsiOpInvList[i].flatten()
@@ -603,9 +796,7 @@ del i
 for i in range(N+1):
     # operator order in list is 0->N
     n = i
-    print n
     opFn = "./operators/hOp{0}.h5".format(n)
-    print "writing ", opFn
     f = h5py.File(opFn, "w")
     dset = f.create_dataset("op", (M*M,), dtype='complex')
     dset[...] = PsiOpInvListHalf[i].flatten()
@@ -615,17 +806,30 @@ for i in range(N+1):
     #savetxt("./operators/op{0}.dat".format(abs(n)),PsiOpInvList[n])
 del i
 
-# make PSI 2D
+
 PSI = PSI.reshape(2*N+1, M).T
-# put PSI into FFT ordering.
 PSI = ifftshift(PSI, axes=1)
 
-print "writing initial state to initial.h5"
+Cxx = Cxx.reshape(2*N+1, M).T
+Cxx = ifftshift(Cxx, axes=1)
 
-f = h5py.File("initial.h5", "w")
-dset = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
-dset[...] = PSI.T.flatten()
+Cyy = Cyy.reshape(2*N+1, M).T
+Cyy = ifftshift(Cyy, axes=1)
+
+Cxy = Cxy.reshape(2*N+1, M).T
+Cxy = ifftshift(Cxy, axes=1)
+
+f = h5py.File("initial_visco.h5", "w")
+psih = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
+psih[...] = PSI.T.flatten()
+cxxh = f.create_dataset("cxx", ((2*N+1)*M,), dtype='complex')
+cxxh[...] = Cxx.T.flatten()
+cyyh = f.create_dataset("cyy", ((2*N+1)*M,), dtype='complex')
+cyyh[...] = Cyy.T.flatten()
+cxyh = f.create_dataset("cxy", ((2*N+1)*M,), dtype='complex')
+cxyh[...] = Cxy.T.flatten()
 f.close()
+
 
 #### TIME ITERATE 
 
@@ -635,39 +839,47 @@ stepsPerFrame = numTimeSteps/numFrames
 
 # pass the flow variables and the time iteration settings to the C code
 if dealiasing:
-    cargs = ["./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M",
+    cargs = ["./DNS_2D_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),
+             "{0:e}".format(CNSTS["beta"]), "-w",
+             "{0:e}".format(CNSTS["Omega"]),
+             "-t", "{0:e}".format(CNSTS["dt"]),
              "-s", "{0:d}".format(stepsPerFrame), "-T",
-             "{0:d}".format(numTimeSteps), "-d"]
-    print "./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M", \
+             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime), "-d"]
+
+    print "./DNS_2D_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
-             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),\
+             "{0:e}".format(CNSTS["beta"]), "-w", "{0:e}".format(CNSTS["Omega"]),\
+             "-t", "{0:e}".format(CNSTS["dt"]),\
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
-             "{0:d}".format(numTimeSteps), "-d"
+             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime), "-d"
 
 else:
-    cargs = ["./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M",
+    cargs = ["./DNS_2D_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),
+             "{0:e}".format(CNSTS["beta"]), "-w",
+             "{0:e}".format(CNSTS["Omega"]),
+             "-t", "{0:e}".format(CNSTS["dt"]),
              "-s", "{0:d}".format(stepsPerFrame), "-T",
-             "{0:d}".format(numTimeSteps)]
-    print "./DNS_2D_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M", \
+             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime)]
+
+    print "./DNS_2D_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
-             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),\
+             "{0:e}".format(CNSTS["beta"]), "-w",\
+    "{0:e}".format(CNSTS["Omega"]),\
+             "-t", "{0:e}".format(CNSTS["dt"]),\
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
-             "{0:d}".format(numTimeSteps)
+             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime)
 
 subprocess.call(cargs)
 
 # Read in data from the C code
 print 'done'
-

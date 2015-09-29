@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Tue 16 Jun 18:02:22 2015
+// Last modified: Tue 29 Sep 15:26:37 2015
 
 /* Program Description:
  *
@@ -245,7 +245,6 @@ int main(int argc, char **argv)
     scr.d4xpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     scr.d2xd2ypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     scr.dypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.dyu = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
     scr.vdyypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
 
     scr.scratchin = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));

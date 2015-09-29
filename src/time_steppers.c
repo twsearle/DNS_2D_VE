@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Tue 16 Jun 17:59:39 2015
+// Last modified: Tue 29 Sep 15:28:24 2015
 
 #include"fields_2D.h"
 
@@ -257,6 +257,7 @@ void step_sf_SI_Crank_Nicolson(
 
 	}
     }
+
 }
 
 
@@ -906,17 +907,20 @@ void equilibriate_stress(
 
     complex *trC = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
 
-    numSteps = 2.0*Wi/dt;
+    numSteps = 10.0*Wi/dt;
 
     for (timeStep = 0; timeStep<numSteps; timeStep++)
     {
 	// set the velocity via the homotopy
 
 	time = timeStep * dt;
-	for (i=0; i<M*(N+1); i++)
+	if (time < 2.0*Wi)
 	{
-	    psi_tmp[i] = 0.5*(1.-cos(time * M_PI/(2.0*Wi))) * psiOld[i];
-	    psi_tmp[i] += 0.5*(1.+cos(time * M_PI/(2.0*Wi))) * psi_lam[i];
+	    for (i=0; i<M*(N+1); i++)
+	    {
+		psi_tmp[i] = 0.5*(1.-cos(time * M_PI/(2.0*Wi))) * psiOld[i];
+		psi_tmp[i] += 0.5*(1.+cos(time * M_PI/(2.0*Wi))) * psi_lam[i];
+	    }
 	}
 
 	// step the stress to t star

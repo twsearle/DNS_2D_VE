@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 15 Jun 22:12:47 2015
+// Last modified: Tue 29 Sep 15:27:31 2015
 
 #include"fields_2D.h"
 
@@ -1340,7 +1340,7 @@ int trC_tensor(complex *cij, complex *trC, flow_scratch scr, flow_params cnsts)
 
     for (i=0; i<(2*Nf+1)*Mf; i++) 
     {
-	if (scr.scratchp1<0) 
+	if (scr.scratchp1[i]<0) 
 	{
 	    posdefck = 0;
 	}

@@ -2,6 +2,7 @@ from scipy import *
 from scipy import linalg
 from scipy import fftpack
 from numpy.fft import fftshift, ifftshift
+import subprocess
 import argparse
 
 from pyevtk.hl import gridToVTK 
@@ -12,9 +13,17 @@ import h5py
 
 import fields_2D as f2d
 
+argparser = argparse.ArgumentParser()
+argparser.add_argument("-Newt", 
+                help = 'Examine newtonian ECS',
+                       action="store_true")
+argparser.add_argument("-p", "--path", type=str, default=".", 
+                help='specify the directory containing the data')
+
+args = argparser.parse_args()
 
 config = ConfigParser.RawConfigParser()
-fp = open('config.cfg')
+fp = open(args.path + '/config.cfg')
 config.readfp(fp)
 N = config.getint('General', 'N')
 M = config.getint('General', 'M')
@@ -33,23 +42,17 @@ dealiasing = config.getboolean('Time Iteration', 'Dealiasing')
 
 fp.close()
 
-argparser = argparse.ArgumentParser()
-argparser.add_argument("-Newt", 
-                help = 'Examine pure newtonian ECS',
-                       action="store_true")
-
-args = argparser.parse_args()
-
 numTimeSteps = int(totTime / dt)
 
 kwargs = {'N': N, 'M': M, 'Nf': Nf, 'Mf':Mf, 
           'Re': Re,'Wi': Wi, 'beta': beta, 'kx': kx,'time':
           totTime, 'dt':dt, 'dealiasing':dealiasing }
 
-if args.Newt:
-    inFileName = "./output/traj_psi.h5".format()
+if args.path == '.':
+    inFileName = args.path + "/output/traj.h5".format()
 else:
-    inFileName = "./output/traj.h5".format()
+    inFileName = args.path + "/traj.h5".format()
+
 
 CNSTS = kwargs
 
@@ -147,7 +150,7 @@ NumTimeSteps\t= {NT}
 ------------------------------------
 """.format(N=N, M=M, kx=kx, Re=Re, dt=dt, NT=numTimeSteps, t=totTime)
 
-fpvd = open("traj.pvd", 'w')
+fpvd = open(args.path + "/traj.pvd", 'w')
 
 fpvd.write('''<?xml version="1.0"?>
 <VTKFile type="Collection" version="0.1"
@@ -170,6 +173,10 @@ x = arange(0, lx + dx, dx, dtype='float64')
 y = cos(pi*arange(Mf)/(Mf-1))
 z = array([0.0, 1.0])
 
+# create directory for output
+cargs = ["mkdir","{0}".format(args.path+"/vtktraj")]
+subprocess.call(cargs)
+
 if args.Newt:
 
     for frameNum in range(numFrames):
@@ -186,7 +193,7 @@ if args.Newt:
         psiReal[:,:,0] = real(tmp)
         psiReal[:,:,1] = real(tmp)
 
-        filename = "vtktraj/t{0}.vtr".format(time)
+        filename = args.path + "/vtktraj/t{0}.vtr".format(time)
 
         gridToVTK(filename[:-4], x, y, z, pointData = {"psi" : psiReal}) 
 
@@ -196,7 +203,7 @@ if args.Newt:
 
 else:
 
-    for frameNum in range(numFrames):
+    for frameNum in range(1,numFrames):
         time = (totTime / numFrames) * frameNum
         psi, cxx, cyy, cxy = load_hdf5_snapshot_visco(f, time)
 
@@ -232,7 +239,7 @@ else:
         cxyReal[:,:,0] = real(tmp)
         cxyReal[:,:,1] = real(tmp)
 
-        filename = "vtktraj/t{0}.vtr".format(time)
+        filename = args.path + "/vtktraj/t{0}.vtr".format(time)
 
         gridToVTK(filename[:-4], x, y, z, pointData = {"psi": psiReal, "cxx": cxxReal,
                                                        "cyy": cyyReal, "cxy": cxyReal}) 
