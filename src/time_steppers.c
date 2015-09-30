@@ -7,15 +7,16 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Tue 29 Sep 15:28:24 2015
+// Last modified: Wed 30 Sep 12:56:29 2015
 
 #include"fields_2D.h"
+#include"fields_IO.h"
 
 // Functions
 
 void step_sf_SI_Crank_Nicolson(
-	complex *psi, complex *psi2, double dt, int timeStep, complex
-	*forcing, complex *opsList, flow_scratch scr, flow_params params)
+	complex_d *psi, complex_d *psi2, double dt, int timeStep, complex_d
+	*forcing, complex_d *opsList, flow_scratch scr, flow_params params)
 {
     int i, j, l;
     int N = params.N;
@@ -260,9 +261,8 @@ void step_sf_SI_Crank_Nicolson(
 
 }
 
-
 void step_conformation_Crank_Nicolson(
-	 complex *cijOld, complex *cij, complex *psi, complex *cijNL, double
+	 complex_d *cijOld, complex_d *cij, complex_d *psi, complex_d *cijNL, double
 	 dt, flow_scratch scr, flow_params params)
 {
     int N = params.N;
@@ -414,9 +414,9 @@ void step_conformation_Crank_Nicolson(
 }
 
 void step_sf_SI_Crank_Nicolson_visco(
-	complex *psiOld, complex *psi, complex *cijOld, complex *cij, complex
-	*psiNL, complex *forcing, complex *forcingN, double dt, int timeStep,
-	complex *opsList, flow_scratch scr, flow_params params)
+	complex_d *psiOld, complex_d *psi, complex_d *cijOld, complex_d *cij, complex_d
+	*psiNL, complex_d *forcing, complex_d *forcingN, double dt, int timeStep,
+	complex_d *opsList, flow_scratch scr, flow_params params)
 {
     int i, j, l;
     int N = params.N;
@@ -734,8 +734,8 @@ void step_sf_SI_Crank_Nicolson_visco(
 
 
 void stress_time_derivative(
-	complex *psi, complex *cxx, complex *cyy, complex *cxy, complex *fxx,
-	complex *fyy, complex *fxy, complex *txx, complex *tyy, complex *txy,
+	complex_d *psi, complex_d *cxx, complex_d *cyy, complex_d *cxy, complex_d *fxx,
+	complex_d *fyy, complex_d *fxy, complex_d *txx, complex_d *tyy, complex_d *txy,
 	flow_scratch scr, flow_params params
 	)
 {
@@ -870,8 +870,8 @@ void stress_time_derivative(
 }
 
 void equilibriate_stress(
-	complex *psiOld, complex *psi_lam, complex *cijOld, complex *cij,
-	complex *cijNL, double dt,flow_scratch scr, flow_params params, hid_t
+	complex_d *psiOld, complex_d *psi_lam, complex_d *cijOld, complex_d *cij,
+	complex_d *cijNL, double dt,flow_scratch scr, flow_params params, hid_t
 	*file_id, hid_t *filetype_id, hid_t *datatype_id
 	)
 
@@ -903,9 +903,9 @@ void equilibriate_stress(
     // setup temporary psi to perform the homotopy from the laminar flow to the
     // initial state.
 
-    complex *psi_tmp = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    complex_d *psi_tmp = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
 
-    complex *trC = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    complex_d *trC = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
 
     numSteps = 10.0*Wi/dt;
 
@@ -943,7 +943,7 @@ void equilibriate_stress(
 	    int posdefck;
 	    posdefck = trC_tensor(cij, trC, scr, params);
 
-	//    diagonalised_C(complex *cij, complex *ecij, double *rcij, double
+	//    diagonalised_C(complex_d *cij, complex_d *ecij, double *rcij, double
 	//	    *scr.scratchp1, double *scr.scratchp2, fftw_complex *scr.scratchin, fftw_complex
 	//	    *scr.scratchout, fftw_plan *phys_plan, fftw_plan
 	//	    *spec_plan, flow_params cnsts)

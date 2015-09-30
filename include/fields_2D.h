@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 15 Jun 22:11:12 2015
+// Last modified: Wed 30 Sep 12:55:08 2015
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -21,6 +21,7 @@
 
 // Macros
 
+#define complex_d complex double
 #define ind(i, j) (M*(i) + (j))
 //#define ind(i, j) ((2*M-2)*(i) + (j))
 #define indfft(i, j) ((2*Mf-2)*(i) + (j))
@@ -28,7 +29,6 @@
 // Prototypes
 
 typedef struct flow_params flow_params;
-typedef struct complex_hdf complex_hdf;
 typedef struct flow_scratch flow_scratch;
 
 void dx(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts);
@@ -47,7 +47,7 @@ void to_physical_1(fftw_complex *arrin, fftw_complex *arrout,
 		 fftw_plan *phys_fou_plan, fftw_plan *phys_cheb_plan,
 		 flow_params cnsts);
 
-void to_physical_r(complex *arrin, double *arrout, flow_scratch scr,
+void to_physical_r(complex_d *arrin, double *arrout, flow_scratch scr,
 	flow_params cnsts);
 
 void to_spectral_1(fftw_complex *arrin, fftw_complex *arrout, fftw_complex *scratch,
@@ -56,45 +56,20 @@ void to_spectral_1(fftw_complex *arrin, fftw_complex *arrout, fftw_complex *scra
 		 fftw_plan *spec_fou_plan, fftw_plan *spec_cheb_plan,
 		 flow_params cnsts);
 
-void to_spectral_r(double *arrin, complex *arrout,
+void to_spectral_r(double *arrin, complex_d *arrout,
 	flow_scratch scr,  flow_params cnsts);
 
-void fft_convolve_r(complex *arr1, complex *arr2, complex *arrout,
+void fft_convolve_r(complex_d *arr1, complex_d *arr2, complex_d *arrout,
 		    flow_scratch scr, flow_params cnsts);
-
-void save_hdf5_state(char *filename, fftw_complex *arr, flow_params cnsts);
-
-void save_hdf5_arr(char *filename, fftw_complex *arr, int size);
-
-void save_hdf5_snapshot(hid_t *file_id, hid_t *filetype_id, hid_t *datatype_id,
-	fftw_complex *arr, double time, flow_params cnsts);
-
-void save_hdf5_snapshot_visco(hid_t *file_id, hid_t *filetype_id, hid_t *datatype_id,
-	complex *psi, complex *cxx, complex *cyy, complex *cxy, double time, flow_params cnsts);
-
-void save_state(FILE *fp, fftw_complex *arr, flow_params cnsts);
-
-void save_hdf5_state_visco(hid_t *file_id, hid_t *filetype_id, hid_t *datatype_id,
-	complex *psi, complex *cxx, complex *cyy, complex *cxy, flow_params cnsts);
-
-void load_hdf5_state(char *filename, fftw_complex *arr, flow_params cnsts);
-
-void load_hdf5_state_visco(char *filename, complex *psi, complex *cxx, complex *cyy, complex *cxy, flow_params cnsts);
-
-void load_state(FILE *fp, fftw_complex *arr, flow_params cnsts);
-
-void load_operator(FILE *fp, fftw_complex *arr, flow_params cnsts);
-
-void load_hdf5_operator(char *filename, fftw_complex *arr, flow_params cnsts);
 
 double calc_KE_mode(fftw_complex *u, fftw_complex *v, int n, flow_params cnsts);
 
-int trC_tensor(complex *cij, complex *trC, flow_scratch scr, flow_params cnsts);
+int trC_tensor(complex_d *cij, complex_d *trC, flow_scratch scr, flow_params cnsts);
 
-void diagonalised_C(complex *cij, complex *ecij, double *rcij,
+void diagonalised_C(complex_d *cij, complex_d *ecij, double *rcij,
 	flow_scratch scr, flow_params cnsts);
 
-double calc_EE_mode(complex *trC, int n, flow_params cnsts);
+double calc_EE_mode(complex_d *trC, int n, flow_params cnsts);
 
 struct flow_params {
     int N;
@@ -111,18 +86,18 @@ struct flow_params {
 };
 
 struct flow_scratch {
-    complex *scratch, *scratch2, *scratch3, *scratch4, *scratch5;
-    complex *u, *v, *udxlplpsi, *vdylplpsi, *biharmpsi, *lplpsi;
-    complex *d2ypsi;
-    complex *dyyypsi, *dypsi, *vdyypsi;
-    complex *d4ypsi, *d4xpsi, *d2xd2ypsi;
-    complex *dxu, *dyu, *dxv, *dyv;
+    complex_d *scratch, *scratch2, *scratch3, *scratch4, *scratch5;
+    complex_d *U0, *u, *v, *udxlplpsi, *vdylplpsi, *biharmpsi, *lplpsi;
+    complex_d *d2ypsi;
+    complex_d *dyyypsi, *dypsi, *vdyypsi;
+    complex_d *d4ypsi, *d4xpsi, *d2xd2ypsi;
+    complex_d *dxu, *dyu, *dxv, *dyv;
 
-    complex *d2ycxy, *d2xcxy, *dxycyy_cxx, *dycxy;
-    complex *d2ycxyN, *d2xcxyN, *dxycyy_cxxN, *dycxyN;
+    complex_d *d2ycxy, *d2xcxy, *dxycyy_cxx, *dycxy;
+    complex_d *d2ycxyN, *d2xcxyN, *dxycyy_cxxN, *dycxyN;
 
-    complex *cxxdxu, *cxydyu, *vgradcxx, *cxydxv, *cyydyv;
-    complex *vgradcyy, *cxxdxv, *cyydyu, *vgradcxy;
+    complex_d *cxxdxu, *cxydyu, *vgradcxx, *cxydxv, *cyydyv;
+    complex_d *vgradcyy, *cxxdxv, *cyydyu, *vgradcxy;
 
     fftw_complex *scratchin, *scratchout;
 
@@ -133,12 +108,6 @@ struct flow_scratch {
     fftw_complex *opsList, *hopsList, *tmpop;
 
     fftw_plan *phys_plan, *spec_plan;
-};
-
-
-struct complex_hdf {
-    double r;
-    double i;
 };
 
 #endif // FIELDS_2D_C_H

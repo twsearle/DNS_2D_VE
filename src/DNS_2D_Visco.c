@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Tue 15 Sep 12:09:24 2015
+// Last modified: Wed 30 Sep 13:02:08 2015
 
 /* Program Description:
  *
@@ -59,6 +59,7 @@
 // Headers
 
 #include"fields_2D.h"
+#include"fields_IO.h"
 #include"time_steppers.h"
 
 // Main
@@ -184,7 +185,7 @@ int main(int argc, char **argv)
     printf("\nTime Step           \t %e ", dt);
     printf("\nNumber of Time Steps\t %d ", numTimeSteps);
     printf("\nTime Steps per frame\t %d ", stepsPerFrame);
-    printf("\nInitial Time\t %d \n", initTime);
+    printf("\nInitial Time\t %f \n", initTime);
     
 
     FILE *tracefp, *tracePSI, *trace1mode, *traceStressfp;
@@ -224,12 +225,12 @@ int main(int argc, char **argv)
 
     // field arrays are declared as pointers and then I malloc.
 
-    complex *psi, *psiOld, *psiNL, *psi_lam;
-    complex *forcing, *forcingN;
-    complex *cijOld, *cij, *cijNL;
-    complex *trC;
-    complex *tmpop;
-    complex *opsList, *hopsList;
+    complex_d *psi, *psiOld, *psiNL, *psi_lam;
+    complex_d *forcing, *forcingN;
+    complex_d *cijOld, *cij, *cijNL;
+    complex_d *trC;
+    complex_d *tmpop;
+    complex_d *opsList, *hopsList;
 
     flow_scratch scr;
 
@@ -243,69 +244,69 @@ int main(int argc, char **argv)
     #endif
 
     // dynamically malloc array of complex numbers.
-    tmpop = (complex*) fftw_malloc(M*M * sizeof(complex));
-    opsList = (complex*) fftw_malloc((N+1)*M*M * sizeof(complex));
-    hopsList = (complex*) fftw_malloc((N+1)*M*M * sizeof(complex));
+    tmpop = (complex_d*) fftw_malloc(M*M * sizeof(complex_d));
+    opsList = (complex_d*) fftw_malloc((N+1)*M*M * sizeof(complex_d));
+    hopsList = (complex_d*) fftw_malloc((N+1)*M*M * sizeof(complex_d));
 
-    psiOld = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    psi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    psiNL = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    psi_lam = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    forcing = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    forcingN = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    psiOld = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    psi = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    psiNL = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    psi_lam = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    forcing = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    forcingN = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
 
     // temporary Newtonian variables
 
-    scr.u = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.v = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.udxlplpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.vdylplpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.lplpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.biharmpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.dyyypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.d4ypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.d4xpsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.d2xd2ypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.dypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.vdyypsi = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.u = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.v = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.udxlplpsi = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.vdylplpsi = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.lplpsi = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.biharmpsi = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.dyyypsi = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.d4ypsi = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.d4xpsi = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.d2xd2ypsi = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.dypsi = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.vdyypsi = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
 
-    scr.scratch = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.scratch2 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.scratch3 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.scratch4 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.scratch5 = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.scratch = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.scratch2 = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.scratch3 = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.scratch4 = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.scratch5 = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
 
     // Viscoelastic variables
 
-    trC = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    trC = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
 
-    cijOld = (complex*) fftw_malloc(3*(N+1)*M * sizeof(complex));
-    cij = (complex*) fftw_malloc(3*(N+1)*M * sizeof(complex));
-    cijNL = (complex*) fftw_malloc(3*(N+1)*M * sizeof(complex));
+    cijOld = (complex_d*) fftw_malloc(3*(N+1)*M * sizeof(complex_d));
+    cij = (complex_d*) fftw_malloc(3*(N+1)*M * sizeof(complex_d));
+    cijNL = (complex_d*) fftw_malloc(3*(N+1)*M * sizeof(complex_d));
 
     // temporary Viscoelastic variables
 
-    scr.dxu = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.dyu = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.dxv = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.dyv = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.cxxdxu = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.cxydyu = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.vgradcxx = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.cxydxv = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.cyydyv = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.vgradcyy = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.cxxdxv = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.cyydyu = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.vgradcxy = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.d2ycxy = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.d2xcxy = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.dxycyy_cxx = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.dycxy = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.d2ycxyN = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.d2xcxyN = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.dxycyy_cxxN = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
-    scr.dycxyN = (complex*) fftw_malloc(M*(N+1) * sizeof(complex));
+    scr.dxu = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.dyu = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.dxv = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.dyv = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.cxxdxu = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.cxydyu = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.vgradcxx = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.cxydxv = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.cyydyv = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.vgradcyy = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.cxxdxv = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.cyydyu = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.vgradcxy = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.d2ycxy = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.d2xcxy = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.dxycyy_cxx = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.dycxy = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.d2ycxyN = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.d2xcxyN = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.dxycyy_cxxN = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.dycxyN = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
 
     scr.scratchin = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
     scr.scratchout = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
@@ -313,7 +314,7 @@ int main(int argc, char **argv)
     scr.scratchp1 = (double*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(double));
     scr.scratchp2 = (double*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(double));
 
-    scr.RHSvec = (complex*) fftw_malloc(M * sizeof(complex));
+    scr.RHSvec = (complex_d*) fftw_malloc(M * sizeof(complex_d));
 
     // Set up some dft plans
     printf("\n------\nSetting up fftw3 plans\n------\n");

@@ -1,25 +1,20 @@
 /* -------------------------------------------------------------------------- *
  *									      *
- *  DNS_2D_Newt.c							      *
+ *  test_fields.c							      *
  *                                                                            *
- *  Time stepping DNS program for 2D Newtonian fluid.			      *
+ *  testing for the calculation of 2D derivatives and convolutions	      *
  *                                                                            *
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 23 Mar 12:59:04 2015
-// Last modified: Mon 23 Mar 12:59:04 2015
+// Last modified: Wed 30 Sep 15:47:30 2015
 
 /* Program Description:
  *
  * This program is written to work with a python setup program. The setup
- * program will write a series of files containing matrix operators of all
- * Fourier modes in the problem. These will then be imported and this program
- * will perform the timestepping using FFT's for the products and my own
- * functions to perform derivatives. Every so often I want to be able to save
- * the state of the fluid, this will mean outputting the current field into a
- * data file. Also I would like to output several properties of the fluid at
- * this point, such as energy etc.
+ * program will output some test vectors, on which this program performs some
+ * operations. The python program will then check that the output of this code
+ * is consistent with that of fields_2D.py.
  * 
  * Functions required:
  *
@@ -50,6 +45,7 @@
 
 // Headers
 
+#include"fields_IO.h"
 #include"fields_2D.h"
 
 // Main
@@ -78,67 +74,56 @@ int main()
     }
 
     // Declare variables
-    FILE *fpi = NULL;
-    //double arr[2][10][10];
 
-    int i;
+    int i=0;
+    int j=0;
     int N = params.N;
     int M = params.M;
     int Nf = params.Nf;
     int Mf = params.Mf;
 
-    fftw_complex *arrin, *physout, *derivout, *scratchin, *scratchout, *phystest;
-    fftw_complex *specout, *specout2, *scratch, *physout2, *physout3;
+    flow_scratch scr;
+
     fftw_plan phys_plan, spec_plan;
     char infn[20] = "initial.h5";
 
-    int shape[2] = { M*(2*N+1), 0 };
-    int shapefft[2] = { (2*Mf-2)*(2*Nf+1), 0 };
-
-
-
-    //********************************************************************
-    // * Test of npy library for complex 2D arrays
-    //int testshape[2] = { M*(2*N+1), M };
-    //fftw_complex *data; //[M][2*N+1];
-    //malloc_array(&data, M, 2*N+1);
-    //data = (fftw_complex*) fftw_malloc(M*(2*N+1) * sizeof(fftw_complex));
-    //data[ind(0,0)] = 1.0 + 1.0 * I;
-    //data[ind(0,2)] = 1.0 + 1.0 * I;
-    //data[ind(1,0)] = 1.0 + 1.0 * I;
-    //npy_save_double_complex("npytest.npy", 0, 1, testshape, &data[0]);
-    //********************************************************************/
+    int shapefft = (2*Mf-2)*(2*Nf+1);
 
     //dynamically malloc array of complex numbers.
-    arrin = (fftw_complex*) fftw_malloc(M*(2*N+1) * sizeof(fftw_complex));
-    specout = (fftw_complex*) fftw_malloc(M*(2*N+1) * sizeof(fftw_complex));
-    specout2 = (fftw_complex*) fftw_malloc(M*(2*N+1) * sizeof(fftw_complex));
-    derivout = (fftw_complex*) fftw_malloc(M*(2*N+1) * sizeof(fftw_complex));
-    scratch = (fftw_complex*) fftw_malloc(M*(2*N+1) * sizeof(fftw_complex));
+    fftw_complex* arrin = (fftw_complex*) fftw_malloc(M*(2*N+1) * sizeof(fftw_complex));
+    fftw_complex* specout = (fftw_complex*) fftw_malloc(M*(2*N+1) * sizeof(fftw_complex));
+    fftw_complex* specout2 = (fftw_complex*) fftw_malloc(M*(2*N+1) * sizeof(fftw_complex));
+    fftw_complex* derivout = (fftw_complex*) fftw_malloc(M*(2*N+1) * sizeof(fftw_complex));
+    fftw_complex* scratch = (fftw_complex*) fftw_malloc(M*(2*N+1) * sizeof(fftw_complex));
 
-    physout = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
-    physout2 = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
-    physout3 = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
-    phystest = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
-    scratchin = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
-    scratchout = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
+    double* physout = (double*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(double));
+    double* physout2 = (double*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(double));
+    double* phystest = (double*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(double));
+
+    // flow scratch space for the field calculations
+    scr.scratch = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.scratch2 = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.scratch3 = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.scratch4 = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.scratchin = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
+    scr.scratchout = (fftw_complex*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(fftw_complex));
+
+    scr.scratchp1 = (double*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(double));
+    scr.scratchp2 = (double*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(double));
 
     //Set up some dft plans
-    phys_plan = fftw_plan_dft_2d(2*Nf+1, 2*Mf-2,  scratchin, scratchout, FFTW_BACKWARD, FFTW_ESTIMATE);
-    spec_plan = fftw_plan_dft_2d(2*Nf+1, 2*Mf-2,  scratchin, scratchout, FFTW_FORWARD, FFTW_ESTIMATE);
+    phys_plan = fftw_plan_dft_2d(2*Nf+1, 2*Mf-2,  scr.scratchin, scr.scratchout,
+			 FFTW_BACKWARD, FFTW_ESTIMATE);
+    spec_plan = fftw_plan_dft_2d(2*Nf+1, 2*Mf-2,  scr.scratchin, scr.scratchout,
+			 FFTW_FORWARD, FFTW_ESTIMATE);
+    scr.phys_plan = &phys_plan;
+    scr.spec_plan = &spec_plan;
 
-    // load the initial field from scipy
-    // fpi = fopen(infn, "r");
-    // load_state(fpi, arrin, params);
-    // fclose(fpi);
 
     load_hdf5_state(infn, arrin, params);
 
     save_hdf5_state("testSpec.h5", arrin, params);
-    //for(j=0; j<M; j++)
-    //{
-    //    printf("%e+%ej \n", creal(arrin[ind(1,j)]), cimag(arrin[ind(1,j)]) );
-    //}
+
     printf("check the index function works correctly\n");
     if ((M*2 + 10) == (ind(2,10)))
     {
@@ -147,112 +132,83 @@ int main()
     {
 	printf("False\n");
     }
-    
 
-    // perform the derivative
+    // check derivatives
 
     dx(arrin, derivout, params);
-    int j;
     
-    //npy_save_double_complex("testdx.npy", 0, 1, shape, &derivout[0]);
     save_hdf5_state("testdx.h5", derivout, params);
 
     dy(arrin, derivout, params);
-    //npy_save_double_complex("testdy.npy", 0, 1, shape, &derivout[0]);
     save_hdf5_state("testdy.h5", derivout, params);
+
     dy(derivout, scratch, params);
     dy(scratch, derivout, params);
     dy(derivout, scratch, params);
-    //npy_save_double_complex("testd4y.npy", 0, 1, shape, &scratch[0]);
     save_hdf5_state("testd4y.h5", scratch, params);
 
+    // test transform to physical space 
+    to_physical_r(arrin, physout, scr, params);
+    save_hdf5_real_arr("testPhysicalT.h5", physout, shapefft);
 
-
-    to_physical(arrin, physout, scratchin, scratchout, &phys_plan, params);
-    to_physical(arrin, physout3, scratchin, scratchout, &phys_plan, params);
-    //npy_save_double_complex("testPhysicalT.npy", 0, 1, shapefft, &physout[0]);
-    save_hdf5_arr("testPhysicalT.h5", physout, shapefft[0]);
-
-    // Test a product
-    for (i=0; i<2*Nf+1; i++)
-    {
-	for (j=0; j<Mf; j++)
-	{
-	    physout2[indfft(i,j)] = physout[indfft(i,j)]*physout3[indfft(i,j)];
-	}
-	
-    }
-    save_hdf5_arr("psipsiR.h5", physout2, shapefft[0]);
-
-    to_spectral(physout2, specout, scratchin, scratchout, &spec_plan, params);
-    save_hdf5_state("psipsi.h5", specout, params);
-
-    to_spectral(physout, specout, scratchin, scratchout, &spec_plan, params);
-    //npy_save_double_complex("testSpectralT.npy", 0, 1, shape, &specout[0]);
+    // test transform to spectral space
+    to_spectral_r(physout, specout, scr, params);
     save_hdf5_state("testSpectralT.h5", specout, params);
 
-    fft_convolve(arrin, arrin, specout, physout2, physout3, scratchin, scratchout,
-	    &phys_plan, &spec_plan, params);
+    // Test a convolution
+    fft_convolve_r(arrin, arrin, specout, scr, params);
+
     save_hdf5_state("fft_convolve.h5", specout, params);
 
-
-
-    // Test transforms from physical space
+    // Test transforms from physical space array
     for (i=0; i<2*Nf+1; i++)
     {
 	for (j=0; j<Mf; j++)
 	{
 	    phystest[indfft(i,j)] = cos(i*M_PI/(2.*Nf)) * tanh(j*M_PI/(Mf-1.));
-	    // phystest[indfft(i,j)] = i + j;
 	    
 	}
     }
 
-    to_spectral(phystest, specout2, scratchin, scratchout, &spec_plan, params);
-    //npy_save_double_complex("phystest2.npy", 0, 1, shapefft, &phystest[0]);
-    save_hdf5_arr("phystest2.h5", phystest, shapefft[0]);
-
-    //npy_save_double_complex("testSpectralT2.npy", 0, 1, shape, &specout2[0]);
+    to_spectral_r(phystest, specout2, scr, params);
+    save_hdf5_real_arr("phystest2.h5", phystest, shapefft);
     save_hdf5_state("testSpectralT2.h5", specout2, params);
 
-    to_physical(specout2, physout, scratchin, scratchout, &phys_plan, params);
-    //npy_save_double_complex("testPhysT4.npy", 0, 1, shapefft, &physout[0]);
-    save_hdf5_arr("testPhysT4.h5", physout, shapefft[0]);
+    to_physical_r(specout2, physout, scr, params);
+    save_hdf5_real_arr("testPhysT4.h5", physout, shapefft);
 
 
     //Test repeated spectral transforms
-    int k;
     for (i=0; i<100; i++)
     {
-	//for (j=0; j<2*Nf+1; j++)
-	//{
-	//    for (k=0; k<(2*Mf-2); k++)
-	//    {
-	//	scratchin[indfft(j,k)] = 0;
-	//    }
-	//}
+	to_physical_r(arrin, physout, scr, params);
 
-	to_physical(arrin, physout, scratchin, scratchout, &phys_plan, params);
+	to_spectral_r(physout, arrin, scr, params);
+     }
 
-	to_spectral(physout, arrin, scratchin, scratchout, &spec_plan, params);
-    }
-
-    //npy_save_double_complex("testSpectralTR.npy", 0, 1, shape, &arrin[0]);
     save_hdf5_state("testSpectralTR.h5", arrin, params);
 
     //garbage collection
     fftw_destroy_plan(phys_plan);
     fftw_destroy_plan(spec_plan);
     fftw_free(arrin);
-    fftw_free(physout);
-    fftw_free(physout2);
     fftw_free(derivout);
     fftw_free(specout);
     fftw_free(specout2);
-    fftw_free(phystest);
     fftw_free(scratch);
-    fftw_free(scratchin);
-    fftw_free(scratchout);
+
+    free(physout);
+    free(physout2);
+    free(phystest);
+
+    fftw_free(scr.scratch);
+    fftw_free(scr.scratch2);
+    fftw_free(scr.scratch3);
+    fftw_free(scr.scratch4);
+    fftw_free(scr.scratchin); 
+    fftw_free(scr.scratchout);
+    fftw_free(scr.scratchp1);
+    fftw_free(scr.scratchp2);
 
     return 0;
 }

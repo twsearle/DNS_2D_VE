@@ -7,13 +7,13 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 30 Sep 13:00:57 2015
+// Last modified: Wed 30 Sep 16:28:52 2015
 
 #include"fields_2D.h"
 
 // Functions
 
-void dx(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
+void single_dx(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
 {
     int N = cnsts.N;
     int M = cnsts.M;
@@ -34,7 +34,7 @@ void dx(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
     }
 }
 
-void d2x(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
+void single_d2x(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
 {
     int N = cnsts.N;
     int M = cnsts.M;
@@ -54,7 +54,7 @@ void d2x(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
     }
 }
 
-void d4x(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
+void single_d4x(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
 {
     int N = cnsts.N;
     int M = cnsts.M;
@@ -74,7 +74,7 @@ void d4x(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
     }
 }
 
-void dy(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
+void single_dy(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
 {
     int N = cnsts.N;
     int M = cnsts.M;
@@ -99,130 +99,7 @@ void dy(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
     
 }
 
-void matdy(fftw_complex *matarr, flow_params cnsts)
-{
-    int i, j;
-    int M = cnsts.M;
-
-    for (i=0; i<M*M; i++)
-    {
-	matarr[i] = 0;
-    }
-
-
-    for (j=1; j<M; j=j+2)
-    {
-	matarr[j] = j;
-    }
-
-    for (i=1; i<M; i++)
-    {
-	for (j=i+1; j<M; j=j+2)
-	{
-	    matarr[M*i + j] = 2*j;
-	}
-    }
-
-}
-
-void to_physical_1(fftw_complex *arrin, fftw_complex *arrout,
-		 fftw_complex *scratchFin, fftw_complex *scratchFout,
-		 fftw_complex *scratchCin, fftw_complex *scratchCout,
-		 fftw_plan *phys_fou_plan, fftw_plan *phys_cheb_plan,
-		 flow_params cnsts)
-{
-    int i,j;
-    int M = cnsts.M;
-    int Mf = cnsts.Mf;
-    int N = cnsts.N;
-    int Nf = cnsts.Nf;
-
-    // Do the Fourier Transfrom
-
-    // for each Chebyshev mode, fourier transform
-    for (j=0; j<M; j++)
-    {
-
-        // copy the fourier mode into scratch
-        if (cnsts.dealiasing)
-        {
-            scratchFin[0] = arrin[ind(0,j)];
-            for (i=1; i<N+1; i++)
-            {
-        	scratchFin[i] = arrin[ind(i,j)];
-        	scratchFin[2*Nf+1-i] = arrin[ind(2*N+1-i,j)];
-            }
-            // zero off the rest of the modes
-            for(i=N+1; i<2*Nf+1-N; i++)
-            {
-        	scratchFin[i] = 0;
-            }
-
-        } else
-        {
-            for (i=0; i<2*N+1; i++)
-            {
-        	scratchFin[i] = arrin[ind(i,j)];
-            }
-        }
-
-        fftw_execute(*phys_fou_plan);
-
-        // copy the transformed array into the output for now
-        for (i=0; i<2*Nf+1; i++)
-        {
-            arrout[indfft(i,j)] = scratchFout[i];
-        }
-    
-    }
-
-    // For each x column, do the Chebyshev transform
-
-    for(i=0; i<2*Nf+1; i++)
-    {
-
-        for (j=0; j<M; j++)
-        {
-            scratchCin[j] = 0.5*arrout[indfft(i,j)];
-        }
-
-        if (cnsts.dealiasing)
-        {
-            // zero off the rest of the Chebyshev modes
-            for(j=M; j<Mf; j++)
-            {
-        	scratchCin[j] = 0;
-            }
-        }
-
-
-        //out2D[M:, :] = out2D[M-2:0:-1, :]
-
-        for (j=2; j<Mf; j++)
-        {
-            scratchCin[Mf-2+j] = scratchCin[Mf-j];
-        }
-
-        //out2D[0, :] = 2*out2D[0, :]
-        scratchCin[0] = 2*scratchCin[0];
-
-        //out2D[Mf-1, :] = 2*out2D[Mf-1, :]
-        scratchCin[Mf-1] = 2*scratchCin[Mf-1];
-
-
-        //perform the 2D fft.
-        //out2D = fftpack.fft2(out2D)
-
-        fftw_execute(*phys_cheb_plan);
-
-        for (j=0; j<Mf; j++)
-        {
-            arrout[indfft(i,j)] = scratchCout[j];
-        }
-    }
-}
-
-void to_physical_r(complex_d *arrin, double *arrout, flow_scratch scr,
+void to_cheby_physical(complex_d *arrin, double *arrout, flow_scratch scr,
 	flow_params cnsts)
 {
     int N = cnsts.N;
@@ -318,129 +195,7 @@ void to_physical_r(complex_d *arrin, double *arrout, flow_scratch scr,
     }
 }
 
-void to_spectral_1(fftw_complex *arrin, fftw_complex *arrout, fftw_complex *scratch,
-		 fftw_complex *scratchFin, fftw_complex *scratchFout,
-		 fftw_complex *scratchCin, fftw_complex *scratchCout,
-		 fftw_plan *spec_fou_plan, fftw_plan *spec_cheb_plan,
-		 flow_params cnsts)
-{
-    int N = cnsts.N;
-    int M = cnsts.M;
-    int Nf = cnsts.Nf;
-    int Mf = cnsts.Mf;
-    double normalise = 2*Nf+1;
-    int i=0;
-    int j=0;
-
-    // zero out the interim array
-
-    for (i=0; i<2*Nf+1; i++)
-    {
-	for (j=0; j<2*Mf-2; j++)
-	{
-	    scratch[indfft(i,j)] = 0;
-	}
-    }
-
-    // Perform the Chebyshev transforms
-    
-    for (i=0; i<2*Nf+1; i++)
-    {
-
-	for (j=0; j<Mf; j++)
-	{
-	    scratchCin[j] = arrin[indfft(i,j)] / normalise;
-	    //scratch[indfft(i,j)] = arrin[indfft(i,j)] ;// normalise;
-	}
-
-	// The second half contains the vector on the Gauss-Labatto points excluding
-	// the first and last elements and in reverse order
-	// out2D[M:, :] = out2D[M-2:0:-1, :]
-
-	for (j=2; j<Mf; j++)
-	{
-	    scratchCin[Mf-2+j] = scratchCin[Mf-j];
-	    //scratch[indfft(i,Mf-2+j)] = scratch[indfft(i, Mf-j)];
-	}
-
-	// Perform the transformation on this temporary vector
-	// out2D = fftpack.fft2(out2D)
-	fftw_execute(*spec_cheb_plan);
-
-	if (cnsts.dealiasing)
-	{
-	    // out2D[0, :] = (0.5/(M-1.0))*out2D[0, :]
-	    scratch[indfft(i,0)] = (0.5/(Mf-1.0)) * scratchCout[0];
-
-	    // when dealiasing this will be still x 1.0 not 0.5, because it isn't
-	    // the last element in the transformed array
-	    for (j=1; j<M; j++)
-	    {
-		// out2D[1:M-1, :] = (1.0/(M-1.0))*out2D[1:M-1, :]
-		scratch[indfft(i,j)] = (1.0/(Mf-1.0))*scratchCout[j];
-	    }
-
-	}
-
-	else
-	{
-	    // out2D[0, :] = (0.5/(M-1.0))*out2D[0, :]
-	    scratch[indfft(i,0)] = (0.5/(M-1.0)) * scratchCout[0]; 
-
-	    for (j=1; j<M-1; j++)
-	    {
-		// out2D[1:M-1, :] = (1.0/(M-1.0))*out2D[1:M-1, :]
-		scratch[indfft(i,j)] = (1.0/(M-1.0))*scratchCout[j];
-	    }
-
-	    //out2D[M-1, :] = (0.5/(M-1.0))*out2D[M-1, :]
-	    scratch[indfft(i,M-1)] = (0.5/(M-1.0)) * scratchCout[M-1]; 
-	}
-    }
-
-    // Perform the Fourier transform
-
-    for (j=0; j<M; j++)
-    {
-        // copy the Chebyshev mode from the interim array
-        for (i=0; i<2*Nf+1;  i++)
-        {
-            scratchFin[i] = scratch[indfft(i,j)];
-        }
-
-        fftw_execute(*spec_fou_plan);
-
-        // copy the Chebyshev mode into the output
-
-        if (cnsts.dealiasing)
-        {
-            arrout[ind(0,j)] = scratchFout[0];
-            for (i=1; i<N+1; i++)
-            {
-        	arrout[ind(i,j)] = scratchFout[i];
-        	arrout[ind(2*N+1-i,j)] = scratchFout[2*Nf+1-i];
-            }
-
-        } else
-        {
-            for (i=0; i<2*N+1; i++)
-            {
-        	arrout[ind(i,j)] = scratchFout[i];
-            }
-        }
-    }
-
-    // // skip the Fourier transform, just output the chebyshev transform
-    // for (j=0; j<M; j++)
-    // {
-    //         for (i=0; i<2*N+1; i++)
-    //         {
-    //     	arrout[ind(i,j)] = scratch[indfft(i,j)];
-    //         }
-    // }
-}
-
-void to_spectral_r(double *arrin, complex_d *arrout,
+void to_cheby_spectral(double *arrin, complex_d *arrout,
 	flow_scratch scr,  flow_params cnsts)
 {
     int N = cnsts.N;
@@ -530,7 +285,7 @@ void to_spectral_r(double *arrin, complex_d *arrout,
 
 }
 
-void fft_convolve_r(complex_d *arr1, complex_d *arr2, complex_d *arrout,
+void fft_cheby_convolve(complex_d *arr1, complex_d *arr2, complex_d *arrout,
 		    flow_scratch scr, flow_params cnsts)
 {
     // all scratch arrays must be different
@@ -657,47 +412,6 @@ int trC_tensor(complex_d *cij, complex_d *trC, flow_scratch scr, flow_params cns
     to_spectral_r(scr.scratchp1, trC, scr, cnsts);
 
     return posdefck;
-
-}
-
-void diagonalised_C(complex_d *cij, complex_d *ecij, double *rcij,
-	flow_scratch scr, flow_params cnsts)
-{
-    // Calculate the trace of the diagonalised conformation tensor. This is 
-    // the root of the polymer stretch ??.
-    
-    int i =0; 
-    int N = cnsts.N;
-    int M = cnsts.M;
-    int Nf = cnsts.Nf;
-    int Mf = cnsts.Mf;
-
-    // First calculate the real space stresses
-    to_physical_r(&cij[0], &rcij[0], scr, cnsts);
-    to_physical_r(&cij[M*(N+1)], &rcij[Mf*(2*Nf+1)], scr, cnsts);
-    to_physical_r(&cij[2*M*(N+1)], &rcij[2*Mf*(2*Nf+1)], scr, cnsts);
-
-    // Find the eigenvalues of the stress tensor at every point in the domain.
-    for (i=0; i<Mf*(2*Nf+1);i++)
-    {
-	scr.scratchp1[i] = rcij[i] + rcij[Mf*(2*Nf+1) + i];
-	scr.scratchp1[i] += sqrt(
-			    pow(rcij[i] + rcij[Mf*(2*Nf+1) + i],2)
-			    - 4*(rcij[i] * rcij[Mf*(2*Nf+1) + i] 
-				    - rcij[2*Mf*(2*Nf+1) + i]));
-	scr.scratchp1[i] *= 0.5;
-
-	scr.scratchp2[i] = rcij[i] + rcij[Mf*(2*Nf+1) + i]; 
-	scr.scratchp2[i] -= sqrt(
-			    pow(rcij[i] + rcij[Mf*(2*Nf+1) + i],2)
-			    - 4*(rcij[i] * rcij[Mf*(2*Nf+1) + i] 
-				    - rcij[2*Mf*(2*Nf+1) + i]));
-	scr.scratchp2[i] *= 0.5;
-
-    }
-
-    to_spectral_r(scr.scratchp1, &ecij[0], scr, cnsts);
-    to_spectral_r(scr.scratchp2, &ecij[M*(N+1)], scr, cnsts);
 
 }
 
