@@ -5,7 +5,7 @@ MYFLAGS= -O3
 
 ODIR= obj
 SDIR= src
-HEADERS= include/fields_2D.h include/fields_IO.h include/time_steppers.h include/time_steppers_linear.h
+HEADERS= include/fields_2D.h include/fields_1D.h include/fields_IO.h include/time_steppers.h include/time_steppers_linear.h
 
 .PHONY : clean debug oscil
 
@@ -25,14 +25,14 @@ DNS_2D_Visco : obj/fields_2D.o obj/fields_IO.o obj/DNS_2D_Visco.o obj/time_stepp
 DNS_2D_Newt : obj/fields_2D.o obj/fields_IO.o obj/DNS_2D_Newt.o obj/time_steppers.o
 	$(CC) -o DNS_2D_Newt obj/DNS_2D_Newt.o obj/fields_2D.o obj/fields_IO.o obj/time_steppers.o $(CFLAGS) $(LIBFLAGS) $(MYFLAGS)
 
-test_fields : obj/fields_2D.o obj/fields_IO.o obj/test_fields.o
+test_fields : obj/fields_2D.o obj/fields_1D.o obj/fields_IO.o obj/test_fields.o obj/test_fields_1D.o
 	$(CC) -o test_fields obj/test_fields.o obj/fields_2D.o obj/fields_IO.o $(CFLAGS) $(LIBFLAGS)
+	$(CC) -o test_fields_1D obj/test_fields_1D.o obj/fields_1D.o obj/fields_IO.o $(CFLAGS) $(LIBFLAGS)
 
 $(ODIR)/%.o : $(SDIR)/%.c $(HEADERS)
-	$(CC) -c -o $@ $< $(CFLAGS) $(MYFLAGS)
+	$(CC) -c -o $@ $< $(CFLAGS) $(MYFLAGS) 
 
 all : obj/fields_IO.o obj/fields_2D.o obj/time_steppers.o obj/test_fields.o obj/DNS_2D_Newt.o obj/DNS_2D_Visco.o 
-	#$(CC) -o test_fields obj/test_fields.o obj/fields_IO.o obj/fields_2D.o $(CFLAGS) $(LIBFLAGS)
 	$(CC) -o DNS_2D_Newt obj/DNS_2D_Newt.o obj/time_steppers.o obj/fields_IO.o obj/fields_2D.o $(CFLAGS) $(LIBFLAGS) $(MYFLAGS)
 	$(CC) -o DNS_2D_Visco obj/DNS_2D_Visco.o obj/fields_2D.o obj/fields_IO.o obj/time_steppers.o $(CFLAGS) $(LIBFLAGS) $(MYFLAGS)
 

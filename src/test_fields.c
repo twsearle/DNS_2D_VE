@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 30 Sep 15:47:30 2015
+// Last modified: Thu  1 Oct 11:45:47 2015
 
 /* Program Description:
  *
@@ -122,7 +122,7 @@ int main()
 
     load_hdf5_state(infn, arrin, params);
 
-    save_hdf5_state("testSpec.h5", arrin, params);
+    save_hdf5_state("./output/testSpec.h5", arrin, params);
 
     printf("check the index function works correctly\n");
     if ((M*2 + 10) == (ind(2,10)))
@@ -137,28 +137,28 @@ int main()
 
     dx(arrin, derivout, params);
     
-    save_hdf5_state("testdx.h5", derivout, params);
+    save_hdf5_state("./output/testdx.h5", derivout, params);
 
     dy(arrin, derivout, params);
-    save_hdf5_state("testdy.h5", derivout, params);
+    save_hdf5_state("./output/testdy.h5", derivout, params);
 
     dy(derivout, scratch, params);
     dy(scratch, derivout, params);
     dy(derivout, scratch, params);
-    save_hdf5_state("testd4y.h5", scratch, params);
+    save_hdf5_state("./output/testd4y.h5", scratch, params);
 
     // test transform to physical space 
     to_physical_r(arrin, physout, scr, params);
-    save_hdf5_real_arr("testPhysicalT.h5", physout, shapefft);
+    save_hdf5_real_arr("./output/testPhysicalT.h5", physout, shapefft);
 
     // test transform to spectral space
     to_spectral_r(physout, specout, scr, params);
-    save_hdf5_state("testSpectralT.h5", specout, params);
+    save_hdf5_state("./output/testSpectralT.h5", specout, params);
 
     // Test a convolution
     fft_convolve_r(arrin, arrin, specout, scr, params);
 
-    save_hdf5_state("fft_convolve.h5", specout, params);
+    save_hdf5_state("./output/fft_convolve.h5", specout, params);
 
     // Test transforms from physical space array
     for (i=0; i<2*Nf+1; i++)
@@ -171,11 +171,11 @@ int main()
     }
 
     to_spectral_r(phystest, specout2, scr, params);
-    save_hdf5_real_arr("phystest2.h5", phystest, shapefft);
-    save_hdf5_state("testSpectralT2.h5", specout2, params);
+    save_hdf5_real_arr("./output/phystest2.h5", phystest, shapefft);
+    save_hdf5_state("./output/testSpectralT2.h5", specout2, params);
 
     to_physical_r(specout2, physout, scr, params);
-    save_hdf5_real_arr("testPhysT4.h5", physout, shapefft);
+    save_hdf5_real_arr("./output/testPhysT4.h5", physout, shapefft);
 
 
     //Test repeated spectral transforms
@@ -186,7 +186,7 @@ int main()
 	to_spectral_r(physout, arrin, scr, params);
      }
 
-    save_hdf5_state("testSpectralTR.h5", arrin, params);
+    save_hdf5_state("./output/testSpectralTR.h5", arrin, params);
 
     //garbage collection
     fftw_destroy_plan(phys_plan);

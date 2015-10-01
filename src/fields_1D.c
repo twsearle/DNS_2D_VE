@@ -7,310 +7,292 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 30 Sep 16:28:52 2015
+// Last modified: Thu  1 Oct 16:50:51 2015
 
-#include"fields_2D.h"
+#include"fields_1D.h"
 
 // Functions
 
-void single_dx(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
+void single_dx(fftw_complex *arrin, fftw_complex *arrout, int fou, flow_params cnsts)
 {
-    int N = cnsts.N;
     int M = cnsts.M;
     double kx = cnsts.kx;
-    int i, j;
+    int j=0;
 
-
-    // For positive fourier modes
-    for(i=0; i<N+1; i++)
+    //For all Chebyshev modes
+    for(j=0; j<M; j++)
     {
-	//printf("%d\n",i);
-	//For all Chebyshev modes
-	for(j=0; j<M; j++)
-	{
-	    arrout[ind(i, j)] = i*kx*I*arrin[ind(i, j)];
-	}
-
+	arrout[j] = fou*kx*I*arrin[j];
     }
 }
 
-void single_d2x(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
+void single_d2x(fftw_complex *arrin, fftw_complex *arrout, int fou, flow_params cnsts)
 {
-    int N = cnsts.N;
     int M = cnsts.M;
     double kx = cnsts.kx;
-    int i, j;
+    int j=0;
 
 
-    // For positive fourier modes
-    for(i=0; i<N+1; i++)
+    //For all Chebyshev modes
+    for(j=0; j<M; j++)
     {
-	//For all Chebyshev modes
-	for(j=0; j<M; j++)
-	{
-	    arrout[ind(i, j)] = -pow(i*kx, 2)*arrin[ind(i, j)];
-	}
-
+	arrout[j] = -pow(fou*kx, 2)*arrin[j];
     }
 }
 
-void single_d4x(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
+void single_d4x(fftw_complex *arrin, fftw_complex *arrout, int fou, flow_params cnsts)
 {
-    int N = cnsts.N;
     int M = cnsts.M;
     double kx = cnsts.kx;
-    int i, j;
+    int j=0;
 
 
-    // For positive fourier modes
-    for(i=0; i<N+1; i++)
+    //For all Chebyshev modes
+    for(j=0; j<M; j++)
     {
-	//For all Chebyshev modes
-	for(j=0; j<M; j++)
-	{
-	    arrout[ind(i, j)] = pow(i*kx, 4)*arrin[ind(i, j)];
-	}
-
+	arrout[j] = pow(fou*kx, 4)*arrin[j];
     }
 }
 
-void single_dy(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts)
+void single_dy(fftw_complex *arrin, fftw_complex *arrout, flow_params cnsts)
 {
-    int N = cnsts.N;
     int M = cnsts.M;
-    int i, j;
+    int j=0;
 
-    // For all Fourier modes
-    for(i=0; i<N+1; i++)
-    {
-	// Last 2 modes
-	arrout[ind(i, M-1)] = 0;
-	arrout[ind(i, M-2)] = 2.0*(M-1.0)*arrin[ind(i, M-1)];
-	
-	// For rest of the Chebyshev modes
-	for(j=M-3; j>0; j=j-1)
-	{
-	    arrout[ind(i, j)] = 2.0*(j+1.0)*arrin[ind(i, j+1)] + arrout[ind(i, j+2)];
-	}
-
-	// Zeroth mode
-	arrout[ind(i, 0)] = arrin[ind(i, 1)] + 0.5*arrout[ind(i, 2)];
-    }
+    // Last 2 modes
+    arrout[M-1] = 0;
+    arrout[M-2] = 2.0*(M-1.0)*arrin[M-1];
     
+    // For rest of the Chebyshev modes
+    for(j=M-3; j>0; j=j-1)
+    {
+	arrout[j] = 2.0*(j+1.0)*arrin[j+1] + arrout[j+2];
+    }
+
+    // Zeroth mode
+    arrout[0] = arrin[1] + 0.5*arrout[2];
+
 }
 
-void to_cheby_physical(complex_d *arrin, double *arrout, flow_scratch scr,
+void to_cheby_physical(complex_d *arrin, complex_d *arrout, lin_flow_scratch scr,
 	flow_params cnsts)
 {
-    int N = cnsts.N;
+
+    // takes a 1D vector of Chebyshevs and transforms them to real space
+    // preserving the imaginary part.  This uses an inverse FT. sign is +1.
+    
     int M = cnsts.M;
-    int Nf = cnsts.Nf;
     int Mf = cnsts.Mf;
-    int i,j;
+    int j=0;
 
-    // This uses an inverse FT. sign is +1.
-    // factor of 2*N+1 is just here because my other method I am comparing with
-    // has transforms in the inverse direction which pick up a normalisation
-    // factor. 
 
-    if (cnsts.dealiasing)
+    // Read in the real part of the input array, transform that first
+    for (j=0; j<M; j++)
     {
-        for (j=0; j<M; j++)
-        {
-            scr.scratchin[indfft(0,j)] = arrin[ind(0,j)];
-        }
-
-        for (i=1; i<N+1; i++)
-        {
-            for (j=0; j<M; j++)
-            {
-        	scr.scratchin[indfft(i,j)] = arrin[ind(i,j)];
-        	scr.scratchin[indfft(2*Nf+1-i, j)] =  conj(arrin[ind(i,j)]);
-           }
-        }
-
-        // zero off the rest of the fourier modes
-        for(i=N+1; i<2*Nf+1-N; i++)
-        {
-            for(j=0; j<Mf; j++)
-            {
-        	scr.scratchin[indfft(i,j)] = 0;
-            }
-        }
-
-        // zero off the rest of the Chebyshev modes
-        for(i=0; i<2*Nf+1; i++)
-        {
-            for(j=M; j<Mf; j++)
-            {
-        	scr.scratchin[indfft(i,j)] = 0;
-            }
-        }
-    }
-    else
-    {
-        for (j=0; j<M; j++)
-        {
-            scr.scratchin[indfft(0,j)] = arrin[ind(0,j)];
-        }
-
-        for (i=1; i<N+1; i++)
-        {
-            for (j=0; j<M; j++)
-            {
-        	scr.scratchin[indfft(i,j)] = arrin[ind(i,j)];
-        	scr.scratchin[indfft(2*Nf+1-i, j)] =  conj(arrin[ind(i,j)]);
-           }
-        }
+	scr.scratchin[j] = creal(arrin[j]);
     }
 
+    // zero off the rest of the Chebyshev modes
+    for(j=M; j<Mf; j++)
+    {
+	scr.scratchin[j] = 0;
+    }
 
     //out2D[M:, :] = out2D[M-2:0:-1, :]
 
-    for (i=0; i<2*Nf+1; i++)
+    for (j=2; j<Mf; j++)
     {
-        for (j=2; j<Mf; j++)
-        {
-            scr.scratchin[indfft(i, Mf-2+j)] = scr.scratchin[indfft(i, Mf-j)];
-        }
-
-        //out2D[0, :] = 2*out2D[0, :]
-        scr.scratchin[indfft(i, 0)] = 2*scr.scratchin[indfft(i, 0)];
-
-        //out2D[Mf-1, :] = 2*out2D[Mf-1, :]
-        scr.scratchin[indfft(i, Mf-1)] = 2*scr.scratchin[indfft(i, Mf-1)];
+	scr.scratchin[Mf-2+j] = scr.scratchin[Mf-j];
     }
+
+    //out2D[0, :] = 2*out2D[0, :]
+    scr.scratchin[0] = 2*scr.scratchin[0];
+
+    //out2D[Mf-1, :] = 2*out2D[Mf-1, :]
+    scr.scratchin[Mf-1] = 2*scr.scratchin[Mf-1];
 
     ////perform the 2D ifft?.
     ////out2D = 0.5*fftpack.ifft2(out2D)
 
     fftw_execute(*scr.phys_plan);
 
-    for (i=0; i<2*Nf+1; i++)
+    for (j=0; j<Mf; j++)
     {
-        for (j=0; j<Mf; j++)
-        {
-            arrout[indfft(i,j)] = 0.5*creal(scr.scratchout[indfft(i,j)]);
-        }
+	arrout[j] = 0.5*creal(scr.scratchout[j]);
     }
+
+    // Now read in the imaginary part of the input array, transform that 
+    for (j=0; j<M; j++)
+    {
+	scr.scratchin[j] = cimag(arrin[j]);
+    }
+
+    // zero off the rest of the Chebyshev modes
+    for(j=M; j<Mf; j++)
+    {
+	scr.scratchin[j] = 0;
+    }
+
+    //out2D[M:, :] = out2D[M-2:0:-1, :]
+
+    for (j=2; j<Mf; j++)
+    {
+	scr.scratchin[Mf-2+j] = scr.scratchin[Mf-j];
+    }
+
+    //out2D[0, :] = 2*out2D[0, :]
+    scr.scratchin[0] = 2*scr.scratchin[0];
+
+    //out2D[Mf-1, :] = 2*out2D[Mf-1, :]
+    scr.scratchin[Mf-1] = 2*scr.scratchin[Mf-1];
+
+    ////perform the 2D ifft?.
+    ////out2D = 0.5*fftpack.ifft2(out2D)
+
+    fftw_execute(*scr.phys_plan);
+
+    for (j=0; j<Mf; j++)
+    {
+	arrout[j] += I * 0.5*creal(scr.scratchout[j]);
+    }
+
 }
 
-void to_cheby_spectral(double *arrin, complex_d *arrout,
-	flow_scratch scr,  flow_params cnsts)
+void to_cheby_spectral(complex_d *arrin, complex_d *arrout,
+	lin_flow_scratch scr,  flow_params cnsts)
 {
-    int N = cnsts.N;
     int M = cnsts.M;
-    int Nf = cnsts.Nf;
     int Mf = cnsts.Mf;
-    int i,j;
-
-    fftw_complex normalise = 2*Nf+1;
-
-    // Perform the FFT across the x direction   
+    int j=0;
 
     // The first half contains the vector on the Gauss-Labatto points
     // out2D[:M, :] = real(in2D)
-    // include normalisation here so that spectral space has same normalisation as it	   
-    // started with.
 
-    for (i=0; i<2*Nf+1; i++)
+    // Transform real part of the array
+    for (j=0; j<Mf; j++)
     {
-	for (j=0; j<Mf; j++)
-	{
-	    scr.scratchin[indfft(i,j)] = arrin[indfft(i,j)]/normalise;
-	}
+	scr.scratchin[j] = creal(arrin[j]);
     }
 
     // The second half contains the vector on the Gauss-Labatto points excluding
     // the first and last elements and in reverse order
     // out2D[M:, :] = out2D[M-2:0:-1, :]
 
-    for (i=0; i<2*Nf+1; i++)
+    for (j=2; j<Mf; j++)
     {
-	for (j=2; j<Mf; j++)
-	{
-	    scr.scratchin[indfft(i, Mf-2+j)] = scr.scratchin[indfft(i, Mf-j)];
-	}
+	scr.scratchin[Mf-2+j] = scr.scratchin[Mf-j];
     }
 
     // Perform the transformation on this temporary vector
     // out2D = fftpack.fft2(out2D)
     fftw_execute(*scr.spec_plan);
+
     if (cnsts.dealiasing)
     {
 	// copy zeroth and positive modes into output
 
 	// out2D[0, :] = (0.5/(M-1.0))*out2D[0, :]
-	arrout[ind(0,0)] = (0.5/(Mf-1.0)) * scr.scratchout[indfft(0,0)]; 
+	arrout[0] = (0.5/(Mf-1.0)) * creal(scr.scratchout[0]); 
 
 	// when dealiasing this will be still x 1.0 not 0.5, because it isn't
 	// the last element in the transformed array
 	for (j=1; j<M; j++)
 	{
 	    // out2D[1:M-1, :] = (1.0/(M-1.0))*out2D[1:M-1, :]
-	    arrout[ind(0,j)] = (1.0/(Mf-1.0))*scr.scratchout[indfft(0,j)];
-	}
-
-
-	for (i=1; i<N+1; i++)
-	{
-	    arrout[ind(i,0)] = (0.5/(Mf-1.0)) * scr.scratchout[indfft(i,0)]; 
-
-	    // when dealiasing this will be still x 1.0 not 0.5, because it isn't
-	    // the last element in the transformed array
-	    for (j=1; j<M; j++)
-	    {
-		arrout[ind(i,j)] = (1.0/(Mf-1.0))*scr.scratchout[indfft(i,j)];
-	    }
+	    arrout[j] = (1.0/(Mf-1.0))*creal(scr.scratchout[j]);
 	}
     }
 
     else
     {
-	for (i=0; i<N+1; i++)
+	// out2D[0, :] = (0.5/(M-1.0))*out2D[0, :]
+	arrout[0] = (0.5/(M-1.0)) * creal(scr.scratchout[0]); 
+
+	for (j=1; j<M-1; j++)
 	{
-	    // out2D[0, :] = (0.5/(M-1.0))*out2D[0, :]
-	    arrout[ind(i,0)] = (0.5/(M-1.0)) * scr.scratchout[indfft(i,0)]; 
-
-	    for (j=1; j<M-1; j++)
-	    {
-		// out2D[1:M-1, :] = (1.0/(M-1.0))*out2D[1:M-1, :]
-		arrout[ind(i,j)] = (1.0/(M-1.0))*scr.scratchout[indfft(i,j)];
-	    }
-
-	    //out2D[M-1, :] = (0.5/(M-1.0))*out2D[M-1, :]
-	    arrout[ind(i,M-1)] = (0.5/(M-1.0)) * scr.scratchout[indfft(i,M-1)]; 
+	    // out2D[1:M-1, :] = (1.0/(M-1.0))*out2D[1:M-1, :]
+	    arrout[j] = (1.0/(M-1.0))*creal(scr.scratchout[j]);
 	}
+
+	//out2D[M-1, :] = (0.5/(M-1.0))*out2D[M-1, :]
+	arrout[M-1] = (0.5/(M-1.0)) * creal(scr.scratchout[M-1]); 
+    }
+
+    // Transform imaginary part of the array
+    for (j=0; j<Mf; j++)
+    {
+	scr.scratchin[j] = cimag(arrin[j]);
+    }
+
+    // The second half contains the vector on the Gauss-Labatto points excluding
+    // the first and last elements and in reverse order
+    // out2D[M:, :] = out2D[M-2:0:-1, :]
+
+    for (j=2; j<Mf; j++)
+    {
+	scr.scratchin[Mf-2+j] = scr.scratchin[Mf-j];
+    }
+
+    // Perform the transformation on this temporary vector
+    // out2D = fftpack.fft2(out2D)
+    fftw_execute(*scr.spec_plan);
+
+
+    if (cnsts.dealiasing)
+    {
+	// copy zeroth and positive modes into output
+
+	// out2D[0, :] = (0.5/(M-1.0))*out2D[0, :]
+	arrout[0] += I * (0.5/(Mf-1.0)) * creal(scr.scratchout[0]); 
+
+	// when dealiasing this will be still x 1.0 not 0.5, because it isn't
+	// the last element in the transformed array
+	for (j=1; j<M; j++)
+	{
+	    // out2D[1:M-1, :] = (1.0/(M-1.0))*out2D[1:M-1, :]
+	    arrout[j] += I * (1.0/(Mf-1.0)) * creal(scr.scratchout[j]);
+	}
+    }
+
+    else
+    {
+	// out2D[0, :] = (0.5/(M-1.0))*out2D[0, :]
+	arrout[0] += I * (0.5/(M-1.0)) * creal(scr.scratchout[0]); 
+
+	for (j=1; j<M-1; j++)
+	{
+	    // out2D[1:M-1, :] = (1.0/(M-1.0))*out2D[1:M-1, :]
+	    arrout[j] += I * (1.0/(M-1.0)) * creal(scr.scratchout[j]);
+	}
+
+	//out2D[M-1, :] = (0.5/(M-1.0))*out2D[M-1, :]
+	arrout[M-1] += I * (0.5/(M-1.0)) * creal(scr.scratchout[M-1]); 
     }
 
 }
 
 void fft_cheby_convolve(complex_d *arr1, complex_d *arr2, complex_d *arrout,
-		    flow_scratch scr, flow_params cnsts)
+		    lin_flow_scratch scr, flow_params cnsts)
 {
     // all scratch arrays must be different
     // out array may be the same as one in array
 
-    int Nf = cnsts.Nf;
     int Mf = cnsts.Mf;
 
-    int i, j;
+    int j=0;
 
-    to_physical_r(arr1, scr.scratchp1, scr, cnsts);
-    to_physical_r(arr2, scr.scratchp2, scr, cnsts);
+    to_cheby_physical(arr1, scr.scratchp1, scr, cnsts);
+    to_cheby_physical(arr2, scr.scratchp2, scr, cnsts);
 
-    for (i=0; i<(2*Nf+1); i++)
+    for(j=0; j<Mf; j++)
     {
-	for(j=0; j<Mf; j++)
-	{
-	    scr.scratchp1[indfft(i,j)] = scr.scratchp2[indfft(i,j)]*scr.scratchp1[indfft(i,j)];
-	}
+	scr.scratchp1[j] = scr.scratchp2[j]*scr.scratchp1[j];
     }
 
-    to_spectral_r(scr.scratchp1, arrout, scr, cnsts);
+    to_cheby_spectral(scr.scratchp1, arrout, scr, cnsts);
 }
 
-double calc_KE_mode(fftw_complex *u, fftw_complex *v, int n, flow_params cnsts)
+double calc_cheby_KE_mode(fftw_complex *u, fftw_complex *v, int n, flow_params cnsts)
 {
     double KE = 0;
     int i=0;
@@ -372,76 +354,4 @@ double calc_KE_mode(fftw_complex *u, fftw_complex *v, int n, flow_params cnsts)
 	} else {
 	    return creal(KE);
 	}
-}
-
-int trC_tensor(complex_d *cij, complex_d *trC, flow_scratch scr, flow_params cnsts)
-{
-    // Calculate the trace of the conformation tensor. This is both a measure
-    // of the polymer stretch and a useful thing to be able to do for a FENE
-    // code.
-
-    int i=0;
-    int N = cnsts.N;
-    int M = cnsts.M;
-    int Nf = cnsts.Nf;
-    int Mf = cnsts.Mf;
-
-    int posdefck=1;
-
-    // Form a sum of those stresses at every point in the domain
-    to_physical_r(&cij[0], scr.scratchp1, scr, cnsts);
-    to_physical_r(&cij[(N+1)*M], scr.scratchp2, scr, cnsts);
-
-    for(i=0;i<(2*Nf+1)*Mf; i++)
-    {
-	scr.scratchp1[i] += scr.scratchp2[i];
-    }
-
-    // check positive definite everywhere
-
-    for (i=0; i<(2*Nf+1)*Mf; i++) 
-    {
-	if (scr.scratchp1[i]<0) 
-	{
-	    posdefck = 0;
-	}
-    }
-
-
-    // transform trC back to spectral space
-    to_spectral_r(scr.scratchp1, trC, scr, cnsts);
-
-    return posdefck;
-
-}
-
-double calc_EE_mode(complex_d *trC, int n, flow_params cnsts)
-{
-    // Use the (diagonalised) stress (??) to calculate the Trace of C
-    // (?) and integrate it over y for the mode in question to get the Elastic
-    // energy
-    
-    int j=0;
-    int M=cnsts.M;
-    double Wi = cnsts.Wi;
-
-    complex_d EE=0;
-
-
-    for (j=0; j<M; j+=2)
-    {
-
-	EE += (2. / (1.-j*j)) * (trC[ind(n,0)]);
-    }
-
-    if (n == 0)
-    {
-	// subtract the trace of identity matrix integrated over the domain
-	return 0.5*creal(EE-4.0);
-    } else {
-	return creal(EE);
-    }
-
-
-    return EE/Wi;
 }

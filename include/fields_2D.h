@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 30 Sep 12:55:08 2015
+// Last modified: Thu  1 Oct 14:37:12 2015
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -18,17 +18,16 @@
 #include<complex.h>
 #include"hdf5.h"
 #include"fftw3.h"
+#include"fields_IO.h"
 
 // Macros
 
-#define complex_d complex double
 #define ind(i, j) (M*(i) + (j))
 //#define ind(i, j) ((2*M-2)*(i) + (j))
 #define indfft(i, j) ((2*Mf-2)*(i) + (j))
 
 // Prototypes
 
-typedef struct flow_params flow_params;
 typedef struct flow_scratch flow_scratch;
 
 void dx(fftw_complex *arrin, fftw_complex *arrout,  flow_params cnsts);
@@ -71,24 +70,9 @@ void diagonalised_C(complex_d *cij, complex_d *ecij, double *rcij,
 
 double calc_EE_mode(complex_d *trC, int n, flow_params cnsts);
 
-struct flow_params {
-    int N;
-    int M;
-    int dealiasing;
-    int Nf;
-    int Mf;
-    double kx;
-    double U0;
-    double Re;
-    double Wi;
-    double beta;
-    double Omega;
-};
-
 struct flow_scratch {
     complex_d *scratch, *scratch2, *scratch3, *scratch4, *scratch5;
     complex_d *U0, *u, *v, *udxlplpsi, *vdylplpsi, *biharmpsi, *lplpsi;
-    complex_d *d2ypsi;
     complex_d *dyyypsi, *dypsi, *vdyypsi;
     complex_d *d4ypsi, *d4xpsi, *d2xd2ypsi;
     complex_d *dxu, *dyu, *dxv, *dyv;

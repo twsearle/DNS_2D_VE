@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 30 Sep 13:01:36 2015
+// Last modified: Thu  1 Oct 11:23:43 2015
 
 /* Program Description:
  *
@@ -240,7 +240,7 @@ int main(int argc, char **argv)
     scr.vdylplpsi = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
     scr.lplpsi = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
     scr.biharmpsi = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
-    scr.d2ypsi = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
+    scr.dyu = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
     scr.dyyypsi = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
     scr.d4ypsi = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
     scr.d4xpsi = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
@@ -347,6 +347,9 @@ int main(int argc, char **argv)
 
 	step_sf_SI_Crank_Nicolson( psi2, psi, dt/2., timeStep, forcing, hopsList, scr, params);
 
+	#ifdef MYDEBUG
+	exit(1);
+	#endif
 	#ifdef OSCIL_FLOW
 	forcing[ind(0,0)] = cos(params.Omega*(time+0.5*dt)) / params.Re;
 	#endif
@@ -455,7 +458,6 @@ int main(int argc, char **argv)
     fftw_free(scr.scratchout);
     fftw_free(scr.scratchp1);
     fftw_free(scr.scratchp2);
-    fftw_free(scr.d2ypsi);
     fftw_free(scr.dyyypsi);
     fftw_free(scr.d4ypsi);
     fftw_free(scr.d4xpsi);

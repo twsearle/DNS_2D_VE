@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 30 Sep 12:56:29 2015
+// Last modified: Wed 30 Sep 17:32:05 2015
 
 #include"fields_2D.h"
 #include"fields_IO.h"
@@ -34,6 +34,7 @@ void step_sf_SI_Crank_Nicolson(
 
     // v
     dx(psi2, scr.v, params);
+
     for(i=0; i<N+1; i++)
     {
 	for(j=0; j<M; j++)
@@ -58,36 +59,34 @@ void step_sf_SI_Crank_Nicolson(
 
     // udxlplpsi 
     dx(scr.lplpsi, scr.udxlplpsi, params);
-    #ifdef MYDEBUG
+#ifdef MYDEBUG
     if(timeStep==0)
     {
 	save_hdf5_state("./output/dxlplpsi.h5", &scr.udxlplpsi[0], params);
     }
-    #endif
+#endif
 
 
-    fft_convolve_r(scr.udxlplpsi, scr.u, scr.udxlplpsi, 
-	    scr, params);
+    fft_convolve_r(scr.udxlplpsi, scr.u, scr.udxlplpsi, scr, params);
 
     // vdylplpsi 
     dy(scr.lplpsi, scr.vdylplpsi, params);
 
-    #ifdef MYDEBUG
+#ifdef MYDEBUG
     if(timeStep==0)
     {
 	save_hdf5_state("./output/dylplpsi.h5", &scr.vdylplpsi[0], params);
     }
-    #endif
+#endif
 
-
-    fft_convolve_r(scr.vdylplpsi, scr.v, scr.vdylplpsi, 
-	    scr, params);
-
+    fft_convolve_r(scr.vdylplpsi, scr.v, scr.vdylplpsi, scr, params);
+    
     //vdyypsi = vdyu
     dy(scr.u, scr.dyu, params);
 
     fft_convolve_r(scr.dyu, scr.v, scr.vdyypsi, 
 	    scr, params);
+
 
 #ifdef MYDEBUG
     if(timeStep==0)
@@ -97,7 +96,7 @@ void step_sf_SI_Crank_Nicolson(
 #endif
 
     // ----------- linear Terms --------------
-    
+
     // lplpsi dyy(psi) + dxx(psi)
 
     d2x(psi, scr.scratch, params);
@@ -148,7 +147,7 @@ void step_sf_SI_Crank_Nicolson(
     // 	+ LPLPSI 
     // 	- dt*UDXLPLPSI 
     // 	- dt*VDYLPLPSI 
-    
+
 #ifdef MYDEBUG
     if(timeStep==0)
     {

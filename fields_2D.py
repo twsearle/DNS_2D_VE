@@ -98,6 +98,7 @@ so the fft doesn't bother including it.
 from scipy import *
 from numpy.random import rand
 from scipy import fftpack, optimize, linalg, special
+from scipy.fftpack import dct as dct
 import subprocess
 import cPickle as pickle
 import h5py
@@ -147,9 +148,34 @@ def mk_diff_x(CNSTS):
     del n, i
     return MDX
 
+def single_dy(cSpec, CNSTS):
+    """
+    Efficient (ignoring the slowness of loops) way of computing the Chebyshev
+    derivative of an array of Chebyshev coefficients
+    """
+
+    M = CNSTS['M']
+    Ly = CNSTS['Ly']
+
+    out = zeros(M, 'complex')
+
+    # Use recurrence relation to calculate each mode in turn, given we know that
+    # m>M modes must all be zero
+
+    # m = M-2 special case
+    out[M-2] = 2*(M-1)*cSpec[M-1]
+    for i in range(3, M):
+        m = M - i  
+        out[m] = out[m+2] + 2*(m+1)*cSpec[m+1]
+    del i
+    # apply the normal C function for the zeroth mode
+    out[0] = 0.5*(out[2] + 2*cSpec[1])
+
+    return out
+
 def dy(spec2D, CNSTS):
     """
-    Orszag's method for doing a single y derivative. 
+    Orszag's method for doing a y derivative. 
 
     """
 
@@ -670,7 +696,7 @@ def to_spectral_2(in2D, CNSTS):
 
     return out2D / (2*Nf+1)
 
-def forward_cheb_transform(GLreal, CNSTS):
+def forward_cheb_transform(GLcmplx, CNSTS):
     """
     Use a real FFT to transform a single array from the Gauss-Labatto grid to
     Chebyshev polynomials.
@@ -684,17 +710,15 @@ def forward_cheb_transform(GLreal, CNSTS):
     Mf = CNSTS['Mf']
     dealiasing = CNSTS['dealiasing']
 
-    Ly = CNSTS['Ly']
-
     # Define the temporary vector for the transformation
     tmp = zeros(2*Mf-2)
 
     # The first half contains the vector on the Gauss-Labatto points
-    tmp[:Mf] = real(GLreal)
+    tmp[:Mf] = real(GLcmplx)
 
     # The second half contains the vector on the Gauss-Labatto points excluding
     # the first and last elements and in reverse order
-    tmp[Mf:] = real(GLreal[Mf-2:0:-1])
+    tmp[Mf:] = real(GLcmplx[Mf-2:0:-1])
 
     # Perform the transformation on this temporary vector
     # TODO: Think about antialiasing here
@@ -709,7 +733,61 @@ def forward_cheb_transform(GLreal, CNSTS):
     else:
         out[M-1] = (0.5/(Mf-1.0)) * tmp[M-1]
 
+    # Define the temporary vector for the transformation
+    tmp = zeros(2*Mf-2)
+
+    # The first half contains the vector on the Gauss-Labatto points
+    tmp[:Mf] = imag(GLcmplx)
+
+    # The second half contains the vector on the Gauss-Labatto points excluding
+    # the first and last elements and in reverse order
+    tmp[Mf:] = imag(GLcmplx[Mf-2:0:-1])
+
+    # Perform the transformation on this temporary vector
+    tmp = real(fftpack.rfft(tmp))
+
+    # Renormalise and divide by c_k to convert to Chebyshev polynomials
+    out[0] += 1.j * (0.5/(Mf-1.0)) * tmp[0]
+    out[1:M-1] += 1.j * (1.0/(Mf-1.0)) * tmp[1:M-1]
+    if dealiasing:
+        out[M-1] += 1.j * (1.0/(Mf-1.0)) * tmp[M-1]
+    else:
+        out[M-1] += 1.j * (0.5/(Mf-1.0)) * tmp[M-1]
+
     return out
+
+def backward_cheb_transform(cSpec, CNSTS):
+    """
+    Use a real FFT to transform a single array of Chebyshev polynomials to the
+    Gauss-Labatto grid.
+    """
+
+    Mf = CNSTS['Mf']
+    M = CNSTS['M']
+
+    # Define the temporary vector for the transformation
+    tmp = zeros(Mf)
+
+    # The first half contains the vector on the Gauss-Labatto points * c_k
+    tmp[0] = real(cSpec[0])
+    tmp[1:M] = 0.5*real(cSpec[1:M])
+    tmp[Mf-1] = 2*tmp[Mf-1]
+
+    # Perform the transformation via a dct
+    out = real(dct(tmp, type=1))
+
+    # Define the temporary vector for the transformation
+    tmp = zeros(Mf)
+
+    # The first half contains the vector on the Gauss-Labatto points * c_k
+    tmp[0] = imag(cSpec[0])
+    tmp[1:M] = 0.5*imag(cSpec[1:M])
+    tmp[Mf-1] = 2*tmp[Mf-1]
+
+    # Perform the transformation for the imaginary part via a dct
+    out += 1.j * real(dct(tmp, type=1))
+
+    return out[0:Mf]
 
 def increase_resolution(vec, NOld, MOld, CNSTS):
     """increase resolution from Nold, Mold to N, M and return the higher res
@@ -1123,6 +1201,34 @@ def test_prods(CNSTS):
     print allclose(Aold,As), allclose(Bold,Bs)
     print linalg.norm(Aold)/linalg.norm(As)
 
+def test_arrays_equal(arr1, arr2, tol=1e-12):
+    testBool = allclose(arr1, arr2)
+    print testBool
+    if not testBool:
+        print 'difference', linalg.norm(arr1-arr2)
+
+        if linalg.norm(arr1-arr2)>tol:
+            print 'relative difference', linalg.norm(arr1-arr2)
+
+            print "max difference", amax(arr1-arr2)
+            print "max difference arg", argmax(arr1-arr2)
+
+            print "mode 0", linalg.norm(arr1[N*M:(N+1)*M]-arr2[N*M:(N+1)*M])
+            for n in range(1,N+1):
+                print "mode", n, linalg.norm(arr1[(N+n)*M:(N+n+1)*M]-arr2[(N+n)*M:(N+n+1)*M])
+                print "mode", -n,linalg.norm(arr1[(N-n)*M:(N+1-n)*M]-arr2[(N-n)*M:(N+1-n)*M])
+
+            imshow(real(ctestSpec3), origin='lower')
+            colorbar()
+            show()
+            imshow(real(pythonSpec3), origin='lower')
+            colorbar()
+            show()
+
+            print 'FAIL'
+
+            exit(1)
+
 def test_c_version(CNSTS):
 
     """
@@ -1142,6 +1248,8 @@ def test_c_version(CNSTS):
     Lx = CNSTS['Lx']
     Ly = CNSTS['Ly']
     kx = CNSTS['kx']
+
+    outputdir = './output/'
 
     gamma = pi / Ly
     p = optimize.fsolve(lambda p: p*tan(p) + gamma*tanh(gamma), 2)
@@ -1181,11 +1289,11 @@ def test_c_version(CNSTS):
     # for y and x.  slice is because the rest of the array is junk I carry round
     # the c program to speed up the transforms.
     
-    ctestSpec = load_hdf5_state("testSpec.h5")
+    ctestSpec = load_hdf5_state(outputdir + "testSpec.h5")
     ctestSpec = ctestSpec.reshape(2*N+1, M).T
 
-    ctestdxSpec = load_hdf5_state("testdx.h5").reshape(2*N+1, M).T
-    ctestdySpec = load_hdf5_state("testdy.h5").reshape(2*N+1, M).T
+    ctestdxSpec = load_hdf5_state(outputdir + "testdx.h5").reshape(2*N+1, M).T
+    ctestdySpec = load_hdf5_state(outputdir + "testdy.h5").reshape(2*N+1, M).T
 
     # Compare python code and C code
 
@@ -1201,32 +1309,15 @@ def test_c_version(CNSTS):
     """
     dySpec = dy(actualSpec, CNSTS)
 
-    ChkBool = allclose(ctestdySpec, dySpec)
-    print "Python and C code give the same derivative: ", ChkBool
-    if not ChkBool:
-        print "\t\tdifference ", linalg.norm(ctestdySpec - dySpec)
+    print "Python and C code give the same derivative: "
+    test_arrays_equal(ctestdySpec, dySpec)
 
     d4ySpec = dy(dy(dy(dySpec, CNSTS), CNSTS), CNSTS)
-    ctestd4ySpec = load_hdf5_state("testd4y.h5").reshape(2*N+1, M).T
+    ctestd4ySpec = load_hdf5_state(outputdir + "testd4y.h5").reshape(2*N+1, M).T
 
-    ChkBool = allclose(ctestd4ySpec,d4ySpec)
-    print "Python and C code give the same d4y: ", ChkBool
+    print "Python and C code give the same d4y: "
+    test_arrays_equal(ctestd4ySpec,d4ySpec)
 
-    if not ChkBool:
-        print "\t\tdifference ", linalg.norm(ctestd4ySpec-d4ySpec)
-        print "fourier modes"
-        print "mode", 0, linalg.norm(ctestd4ySpec[:,0] - d4ySpec[:, 0])
-        for n in range(1,N):
-            print "mode", n, linalg.norm(ctestd4ySpec[:, n] - d4ySpec[:, n])
-            print "mode", -n, linalg.norm(ctestd4ySpec[:, 2*N+1-n] - d4ySpec[:, 2*N+1-n])
-
-        print "zeroth fourier diff", (ctestd4ySpec[:, 0] - d4ySpec[:, 0]) /d4ySpec[:,0]
-
-        print "chebyshev modes"
-        for m in range(M):
-            print "mode", m, linalg.norm(ctestd4ySpec[m, :] - d4ySpec[m, :])
-            
-        print "--------------------------------------------------------------"
 
     flatspec = fftshift(actualSpec, axes=1)
     flatspec = flatspec.T.flatten()
@@ -1240,22 +1331,9 @@ def test_c_version(CNSTS):
     matd4ySpec = matd4ySpec.reshape(2*N+1, M).T
     matd4ySpec = ifftshift(matd4ySpec, axes=-1)
 
-    #print "was that a good test?", linalg.norm(matd4ySpec - matd4ySpecud)
-    ChkBool = allclose(matd4ySpec,d4ySpec)
-    print "Python and matrix method give the same d4y: ", ChkBool
+    print "Python and matrix method give the same d4y: "
+    test_arrays_equal(matd4ySpec,d4ySpec)
 
-
-    if not ChkBool:
-        print "difference, ", linalg.norm(matd4ySpec-d4ySpec) 
-        print "fourier modes"
-        print "mode", 0, linalg.norm(matd4ySpec[:,0] - d4ySpec[:, 0])
-        for n in range(1,N):
-            print "mode", n, linalg.norm(matd4ySpec[:, n] - d4ySpec[:, n])
-            print "mode", -n, linalg.norm(matd4ySpec[:, 2*N+1-n] - d4ySpec[:, 2*N+1-n])
-
-        print "chebyshev modes"
-        for m in range(M):
-            print "mode", m, linalg.norm(matd4ySpec[m, :] - d4ySpec[m, :])
 
     print """
     -------------------
@@ -1265,18 +1343,8 @@ def test_c_version(CNSTS):
 
     dxSpec = dx(actualSpec, CNSTS)
 
-    ChkBool = allclose(ctestdxSpec,dxSpec)
-    print "Python and C code give the same derivative: ", ChkBool
-    if not ChkBool:
-        for n in range(1,N+1):
-            print "mode", n, linalg.norm(ctestdxSpec[:, n] - dxSpec[:, n])
-            print "mode", -n, linalg.norm(ctestdxSpec[:, 2*N+1-n] - dxSpec[:, 2*N+1-n])
-        print allclose(ctestdxSpec,actualSpec)
-        print ctestdxSpec[:,5]
-        print dxSpec[:,5]
-
-        print ctestdxSpec[:,2*N-4]
-        print dxSpec[:,2*N-4]
+    print "Python and C code give the same derivative: "
+    test_arrays_equal(ctestdxSpec,dxSpec)
 
     print "test matrix multiplication method and compare with python sum"
 
@@ -1289,13 +1357,8 @@ def test_c_version(CNSTS):
     matdxpsi2D = matdx.reshape(2*N+1, M).T
     matdxpsi2D = ifftshift(matdxpsi2D,axes=-1)
 
-    ChkBool = allclose(matdxpsi2D, dxSpec)
     print 'checking matrix deriv is the same as the python looped derivative'
-    print ChkBool
-    if not ChkBool:
-        for n in range(1,N):
-            print "mode", n, linalg.norm(matdx[(N+n)*M:(N+1+n)*M] - dxSpec[:, n])
-            print "mode", -n, linalg.norm(matdx[(N-n)*M: (N+1-n)*M] - dxSpec[:, 2*N+1-n])
+    test_arrays_equal(matdxpsi2D, dxSpec)
 
     print """
 
@@ -1306,124 +1369,45 @@ def test_c_version(CNSTS):
 
     # remember the normalisation factor
 
-    ctestPhys = load_hdf5_state("testPhysicalT.h5").reshape(2*Nf+1, 2*Mf-2).T[:Mf, :]
+    ctestPhys = load_hdf5_state(outputdir + "testPhysicalT.h5").reshape(2*Nf+1, 2*Mf-2).T[:Mf, :]
 
     actualPhys = real(to_physical(actualSpec,CNSTS))
-    testBool = allclose(actualPhys, real(ctestPhys))
-    print "Physical Transform: C transform is the same as python transform?", testBool
 
-    if testBool == False:
-        print "\ndifference: ", linalg.norm(ctestPhys - actualPhys)
-        print "complex residue", linalg.norm(imag(ctestPhys))
+    print "Physical Transform: C transform is the same as python transform?"
+    test_arrays_equal(actualPhys, real(ctestPhys))
 
-        print 'max diff', amax(ctestPhys - actualPhys)
-        print 'argmax diff', argmax(ctestPhys - actualPhys)
-
-        imshow(real(ctestPhys - actualPhys), origin='lower')
-        colorbar()
-        show()
-        #imshow(real(ctestPhys), origin='lower')
-        #show()
-
-    #ctestPhys1D = load_hdf5_state("testPhys_1D.h5").reshape(2*Nf+1, 2*Mf-2).T[:Mf, :]
-    #testBool = allclose(actualPhys, ctestPhys1D)
-    #print "Physical Transform: C 1D transform is the same as python transform?",testBool
-
-    ctestSpec = load_hdf5_state("testSpectralT.h5").reshape(2*N+1, M).T 
+    ctestSpec = load_hdf5_state(outputdir + "testSpectralT.h5").reshape(2*N+1, M).T 
     python2spec = to_spectral_2(actualPhys, CNSTS)
-    testBool = allclose(python2spec, ctestSpec)
-    print "Spectral Transform: C transform is the same as python transform?",testBool
 
-    if testBool == False:
-        print "\ndifference: ", linalg.norm(ctestSpec - python2spec)
-
-        print 'max diff', amax(ctestSpec - actualSpec)
-        print 'argmax diff', argmax(ctestSpec - actualSpec)
-
-        print "\nmodal differences\n"
-        print "mode", 0, linalg.norm(ctestSpec[:, 0] - python2spec[:, 0])
-        for n in range(1,N+1):
-            print "mode", n, linalg.norm(ctestSpec[:, n] - python2spec[:, n])
-            print "mode", -n, linalg.norm(ctestSpec[:, 2*N+1-n] - python2spec[:, 2*N+1-n])
-            print "python real?", allclose(python2spec[:, n], 
-                                           conj(python2spec[:,2*N+1-n]))
-            print "c real?", allclose(ctestSpec[:, n], 
-                                           conj(ctestSpec[:,2*N+1-n]))
-            print "ratio of terms", real(ctestSpec[0,n]/python2spec[0,n])
-            print "ratio of terms", real(ctestSpec[1,n]/python2spec[1,n])
-            print "ratio of terms", real(ctestSpec[2,n]/python2spec[2,n])
-
+    print "Spectral Transform: C transform is the same as python transform?"
+    test_arrays_equal(python2spec, ctestSpec)
 
     phystest = zeros((Mf, 2*Nf+1), dtype='complex')
 
     for i in range(2*Nf+1):
         for j in range(Mf):
 	    phystest[j,i] =  cos(i*pi/(2.*Nf)) * tanh(j*pi/(Mf-1.))
-	    #phystest[j,i] = i + j
 
     pythonSpec3 = to_spectral(phystest, CNSTS)
-    #ctestSpec3 = load_hdf5_state("testSpectralT2.h5").reshape(2*Nf+1, 2*Mf-2).T
-    ctestSpec3 = load_hdf5_state("testSpectralT2.h5").reshape(2*N+1, M).T 
-    cphystest = load_hdf5_state("phystest2.h5").reshape(2*Nf+1, 2*Mf-2).T[:Mf, :]
+    #ctestSpec3 = load_hdf5_state(outputdir + "testSpectralT2.h5").reshape(2*Nf+1, 2*Mf-2).T
+    ctestSpec3 = load_hdf5_state(outputdir + "testSpectralT2.h5").reshape(2*N+1, M).T 
+    cphystest = load_hdf5_state(outputdir + "phystest2.h5").reshape(2*Nf+1, 2*Mf-2).T[:Mf, :]
 
     print 'Spectral Transform: '
-    print 'c code has same test?', allclose(cphystest, phystest)
+    print 'c code has same physical space array to test ?'
+    test_arrays_equal(cphystest, phystest)
+
     print 'From real space problem to spectral space, comparision of python and C'
-    testBool =  allclose(pythonSpec3, ctestSpec3)
-    print testBool
-    if testBool == False:
-        print "\ndifference: ", linalg.norm(pythonSpec3 - ctestSpec3)
-        print "\nmodal differences\n"
-        print "mode", 0, linalg.norm(ctestSpec3[:, 0] - pythonSpec3[:, 0])
-        for n in range(1,N+1):
-            print "mode", n, linalg.norm(ctestSpec3[:, n] - pythonSpec3[:, n])
-            print "mode", -n, linalg.norm(ctestSpec3[:, 2*N+1-n] - pythonSpec3[:, 2*N+1-n])
+    test_arrays_equal(pythonSpec3, ctestSpec3)
 
-        print "mode", 0, "difference", ctestSpec3[:, 0] - pythonSpec3[:, 0]
-        print pythonSpec3[M-1, 0]
-        print ctestSpec3[M-1, 0]
-        print 2*ctestSpec3[M-1, 0] - pythonSpec3[M-1,0]
-
-        imshow(real(ctestSpec3), origin='lower')
-        colorbar()
-        show()
-        imshow(real(pythonSpec3), origin='lower')
-        colorbar()
-        show()
-
-    #ctestSpec_1D = load_hdf5_state("testSpec_1D.h5").reshape(2*N+1, M).T 
-
-    pythonSpecCheb = zeros((Mf, 2*Nf+1), dtype='complex')
-    pythonSpecCheb = to_spectral(phystest,CNSTS)
-    #for i in range(2*Nf+1):
-    #    pythonSpecCheb[:,i] = forward_cheb_transform(phystest[:,i], CNSTS)
-
-    #testBool =  allclose(pythonSpecCheb, ctestSpec_1D)
-
-    #print 'Spectral Transform: '
-    #print 'From real space problem to spectral space, comparision of python and C 1D'
-    #print testBool
-    #if not testBool:
-    #    print 'c'
-    #    imshow(real(ctestSpec_1D))
-    #    colorbar()
-    #    show()
-    #    print 'p'
-    #    imshow(real(pythonSpecCheb))
-    #    colorbar()
-    #    show()
-    #    print 'p-c'
-    #    imshow(real(pythonSpecCheb-ctestSpec_1D))
-    #    colorbar()
-    #    show()
+    #ctestSpec_1D = load_hdf5_state(outputdir + "testSpec_1D.h5").reshape(2*N+1, M).T 
 
     print 'Spectral Transform: '
-    print 'From real space problem to spectral space and back again, comparision of python and C'
     pythonPhys4 = to_physical(pythonSpec3, CNSTS)
-    ctestPhys4 = load_hdf5_state("testPhysT4.h5").reshape(2*Nf+1, (2*Mf-2)).T[:Mf, :] 
-    testBool = allclose(pythonPhys4, ctestPhys4)
+    ctestPhys4 = load_hdf5_state(outputdir + "testPhysT4.h5").reshape(2*Nf+1, (2*Mf-2)).T[:Mf, :] 
+    print 'From real space problem to spectral space and back again, comparision of python and C'
+    test_arrays_equal(pythonPhys4, ctestPhys4)
 
-    print testBool
 
     python2specR = copy(python2spec)
     for i in range(100):
@@ -1431,7 +1415,7 @@ def test_c_version(CNSTS):
         python2specR = to_spectral_2(pythonPhys, CNSTS)
     del i
 
-    testBool = allclose(python2spec, python2specR)
+    test_arrays_equal(python2spec, python2specR)
 
     print 'checking python fft products are equal to matrix method products'
     print 'vdyypsi'
@@ -1441,84 +1425,251 @@ def test_c_version(CNSTS):
 
     physv = to_physical(-dxSpec, CNSTS)
     physdyy = to_physical(dy(dy(actualSpec, CNSTS), CNSTS), CNSTS)
+    vdyypsi = to_spectral(physv*physdyy, CNSTS)
 
     matdx = fftshift(dxSpec, axes=-1)
     matdx = matdx.T.flatten()
     matdyypsi = fftshift(dy(dy(actualSpec, CNSTS), CNSTS), axes=-1)
     matdyypsi = matdyypsi.T.flatten()
-
     matvdyypsi = dot(tsm.prod_mat(-matdx), matdyypsi)
-
-    vdyypsi = to_spectral(physv*physdyy, CNSTS)
-
-    #print "mode", 0, linalg.norm(matvdyypsi[(N)*M:(N+1)*M] - vdyypsi[:, 0])
-    #for n in range(1,N+1):
-    #    print "mode", n, linalg.norm(matvdyypsi[(N+n)*M:(N+1+n)*M] - vdyypsi[:, n])
-    #    print "mode", -n, linalg.norm(matvdyypsi[(N-n)*M: (N+1-n)*M] - vdyypsi[:, 2*N+1-n])
-
     matvdyypsi2D = matvdyypsi.reshape(2*N+1, M).T
     matvdyypsi2D = ifftshift(matvdyypsi2D, axes=-1) 
 
-    print allclose(matvdyypsi2D, vdyypsi)
-    print linalg.norm(matvdyypsi2D - vdyypsi)
+    test_arrays_equal(matvdyypsi2D, vdyypsi)
 
 
-    print 'psipsi'
+    print 'Check matrix and python fft methods both convolve the same: psipsi'
     psiR = real(to_physical(actualSpec, CNSTS))
     psipsi = to_spectral(psiR*psiR, CNSTS)
     matpsipsi = dot(tsm.prod_mat(flatspec), flatspec)
     matpsipsi2D = matpsipsi.reshape(2*N+1, M).T
     matpsipsi2D = ifftshift(matpsipsi2D, axes=-1) 
 
-    print allclose(matpsipsi2D, psipsi)
+    test_arrays_equal(matpsipsi2D, psipsi)
 
-    if not allclose(matpsipsi2D, psipsi):
-        print "mode", 0, linalg.norm(matpsipsi[(N)*M:(N+1)*M] - psipsi[:, 0])
-        for n in range(1,N+1):
-            print "mode", n, linalg.norm(matpsipsi[(N+n)*M:(N+1+n)*M] - psipsi[:, n])
-            print "mode", -n, linalg.norm(matpsipsi[(N-n)*M: (N+1-n)*M] - psipsi[:, 2*N+1-n])
-
-        matpsipsi2D = matpsipsi.reshape(2*N+1, M).T
-        matpsipsi2D = ifftshift(matpsipsi2D, axes=-1)
-        
-        diff = matpsipsi2D - psipsi
-        print linalg.norm(diff)
-        print diff.flatten()[argmax(diff)]
-
-        imshow(real(psiR*psiR), origin='lower')
-        colorbar()
-        show()
-        rsmat =real(to_physical_2(matpsipsi2D, CNSTS))
-        imshow(rsmat, origin='lower')
-        colorbar()
-        show()
-        print 'difference between physical space representations', linalg.norm(rsmat-psiR*psiR)
-
-
-    psipsic = load_hdf5_state("fft_convolve.h5").reshape(2*N+1, M).T
+    psipsic = load_hdf5_state(outputdir + "fft_convolve.h5").reshape(2*N+1, M).T
 
     print 'Checking c products are the same as python products'
-    print allclose(psipsic, psipsi)
-    if not allclose(psipsic, psipsi):
-        print 'difference ', linalg.norm(psipsic-psipsi)
+    test_arrays_equal(psipsic, psipsi)
 
-    print "Repeated Transforms: python field is stable after 100 transforms?",testBool
-    if testBool == False:
-        print "\ndifference: ", linalg.norm(python2spec - python2specR)
+    ctestSpecR = load_hdf5_state(outputdir + "testSpectralTR.h5").reshape(2*N+1, M).T 
+
+    print "Repeated Transforms: C field is stable after 100 transforms?"
+    test_arrays_equal(ctestSpecR, ctestSpec)
+
+    print """
+    ==============================================================================
+
+        2D FIELDS TESTS PASSED! 
+
+    ==============================================================================
+    """
+
+def test_c_version_1D(CNSTS):
+
+    """
+    Test the C version of the code. Make sure constants are the same across
+    codes until I implement passing of this info back and forth.
+
+    Tests will be performed by comparing the results of the C code with the
+    results of this code, rather than the true results. this buys some time
+    before I have ot do the boring job of working out how to do the transform in
+    C.
+
+    """
+    M = CNSTS['M']
+    N = CNSTS['N']
+    Mf = CNSTS['Mf']
+    Nf = CNSTS['Nf']
+    Lx = CNSTS['Lx']
+    Ly = CNSTS['Ly']
+    kx = CNSTS['kx']
+
+    outputdir = './output/'
+
+    gamma = pi / Ly
+    p = optimize.fsolve(lambda p: p*tan(p) + gamma*tanh(gamma), 2)
+    oneOverC = ones(M)
+    oneOverC[0] = 1. / 2.
+
+    actualSpec, _ = pickle.load(open('pf-N5-M40-kx1.31-Re3000.0.pickle', 'r'))
+    actualSpec = decide_resolution(actualSpec, 5, 40, CNSTS)
+
+    actualSpec = actualSpec.reshape(2*N+1, M).T
+    actualSpec = ifftshift(actualSpec, axes=1)
+
+    actualSpec = actualSpec[:,1]
+
+    # save the initial state
+    f = h5py.File("initial.h5", "w")
+    dset = f.create_dataset("psi", (M,), dtype='complex')
+    dset[...] = actualSpec.T.flatten()
+    f.close()
+
+    # call the c program
+    subprocess.call(["./test_fields_1D"])
+
+    # Read in the c programs output Reshape is because fft insists on 1D double
+    # complex arrays.  T is because this program uses fortran order not c order
+    # for y and x.  slice is because the rest of the array is junk I carry round
+    # the c program to speed up the transforms.
+    
+    ctestSpec = load_hdf5_state(outputdir + "testSpec.h5")
+
+    ctestdxSpec = load_hdf5_state(outputdir + "testdx.h5")
+    ctestdySpec = load_hdf5_state(outputdir + "testdy.h5")
+
+    # Compare python code and C code
+
+    print "Python and C code have the same initial spectra?: "
+    test_arrays_equal(ctestSpec, actualSpec)
+
+    print """
+    -------------------
+    Test dy
+    -------------------
+    """
+    dySpec = single_dy(actualSpec, CNSTS)
+
+    print "Python and C code give the same derivative: "
+    test_arrays_equal(ctestdySpec, dySpec)
+
+    d4ySpec = single_dy(single_dy(single_dy(dySpec, CNSTS), CNSTS), CNSTS)
+    ctestd4ySpec = load_hdf5_state(outputdir + "testd4y.h5")
+
+    print "Python and C code give the same d4y: "
+    test_arrays_equal(ctestd4ySpec, d4ySpec)
 
 
-    ctestSpecR = load_hdf5_state("testSpectralTR.h5").reshape(2*N+1, M).T 
-    testBool = allclose(ctestSpecR, ctestSpec)
-    print "Repeated Transforms: C field is stable after 100 transforms?",testBool
-    if testBool == False:
-        print "\ndifference: ", linalg.norm(ctestSpec - ctestSpecR)
-        print "\nmodal differences\n"
-        print "mode", 0, linalg.norm(ctestSpec[:, 0] - ctestSpecR[:, 0])
-        for n in range(1,N+1):
-            print "mode", n, linalg.norm(ctestSpec[:, n] - ctestSpecR[:, n])
-            print "mode", -n, linalg.norm(ctestSpec[:, 2*N+1-n] - ctestSpecR[:, 2*N+1-n])
+    flatspec = copy(actualSpec)
 
-        print linalg.norm(ctestSpec[M-1,0] - ctestSpecR[M-1,0 ])
+    tsm.initTSM(N_=N, M_=M, kx_=kx)
+
+    MDX = 1.j*kx*eye(M, dtype='complex')
+    MDY = tsm.mk_single_diffy()
+
+    matd4ySpec = dot(MDY, dot(MDY, dot(MDY, dot(MDY, flatspec)))) 
+
+    print "Python and matrix method give the same d4y: "
+    test_arrays_equal(matd4ySpec, d4ySpec)
+
+
+    print """
+    -------------------
+    Test dx
+    -------------------
+    """
+
+    dxSpec = 1.j*kx*actualSpec
+
+    print "Python and C code give the same derivative: "
+    test_arrays_equal(ctestdxSpec,dxSpec)
+
+    print "test matrix multiplication method and compare with python sum"
+
+    flatspec = copy(actualSpec)
+    matdx = dot(MDX, flatspec)
+
+    matdyypsi = dot( dot(MDY, MDY), flatspec)
+
+    print 'checking matrix deriv is the same as the python looped derivative'
+    test_arrays_equal(matdx, dxSpec)
+
+    print """
+
+    -----------------------
+    Test Transformations:
+    -----------------------
+    """
+
+    # remember the normalisation factor
+
+    ctestPhys = load_hdf5_state(outputdir + "testPhysicalT.h5")[:Mf]
+
+    actualPhys = backward_cheb_transform(actualSpec, CNSTS)
+
+    print "Physical Transform: C transform is the same as python transform?"
+    test_arrays_equal(actualPhys, ctestPhys)
+
+    ctestSpec = load_hdf5_state(outputdir + "testSpectralT.h5")
+    python2spec = forward_cheb_transform(actualPhys, CNSTS)
+
+    print "Spectral Transform: C transform is the same as python transform?"
+    test_arrays_equal(python2spec, ctestSpec)
+
+    phystest = zeros((Mf, 2*Nf+1), dtype='complex')
+
+    for i in range(2*Nf+1):
+        for j in range(Mf):
+	    phystest[j,i] =  cos(i*pi/(2.*Nf)) * tanh(j*pi/(Mf-1.))
+
+    pythonSpec3 = forward_cheb_transform(phystest, CNSTS)
+    ctestSpec3 = load_hdf5_state(outputdir + "testSpectralT2.h5") 
+    cphystest = load_hdf5_state(outputdir + "phystest2.h5")[:Mf]
+
+    print 'Spectral Transform: '
+    print 'c code has same physical space array to test ?'
+    test_arrays_equal(cphystest, phystest)
+
+    print 'From real space problem to spectral space, comparision of python and C'
+    test_arrays_equal(pythonSpec3, ctestSpec3)
+
+    print 'Spectral Transform: '
+    pythonPhys4 = backward_cheb_transform(pythonSpec3, CNSTS)
+    ctestPhys4 = load_hdf5_state(outputdir + "testPhysT4.h5")[:Mf] 
+    print 'From real space problem to spectral space and back again, comparision of python and C'
+    test_arrays_equal(pythonPhys4, ctestPhys4)
+
+
+    python2specR = copy(python2spec)
+    for i in range(100):
+        pythonPhys = backward_cheb_transform(python2specR, CNSTS)
+        python2specR = forward_cheb_transform(pythonPhys, CNSTS)
+    del i
+
+    test_arrays_equal(python2spec, python2specR)
+
+    print 'checking python fft products are equal to matrix method products'
+    print 'vdyypsi'
+
+    matvdyypsi = dot(tsm.cheb_prod_mat(-matdx), matdyypsi)
+
+
+    physv = backward_cheb_transform(-dxSpec, CNSTS)
+    physdyy = backward_cheb_transform(single_dy(single_dy(actualSpec, CNSTS), CNSTS), CNSTS)
+    vdyypsi = forward_cheb_transform(physv*physdyy, CNSTS)
+
+    matdx =copy(dxSpec)
+    matdyypsi = single_dy(single_dy(actualSpec, CNSTS), CNSTS)
+    matvdyypsi = dot(tsm.cheb_prod_mat(-matdx), matdyypsi)
+
+    test_arrays_equal(matvdyypsi, vdyypsi)
+
+
+    print 'Check matrix and python fft methods both convolve the same: psipsi'
+    psiR = backward_cheb_transform(actualSpec, CNSTS)
+    psipsi = forward_cheb_transform(psiR*psiR, CNSTS)
+    matpsipsi = dot(tsm.prod_mat(flatspec), flatspec)
+
+    test_arrays_equal(matpsipsi, psipsi)
+
+    psipsic = load_hdf5_state(outputdir + "fft_convolve.h5")
+
+    print 'Checking c products are the same as python products'
+    test_arrays_equal(psipsic, psipsi)
+
+    ctestSpecR = load_hdf5_state(outputdir + "testSpectralTR.h5")
+
+    print "Repeated Transforms: C field is stable after 100 transforms?"
+    test_arrays_equal(ctestSpecR, ctestSpec)
+
+    print """
+    ==============================================================================
+
+        1D FIELDS TESTS PASSED! 
+
+    ==============================================================================
+    """
 
 ### MAIN ###
 
@@ -1532,5 +1683,7 @@ if __name__ == "__main__":
 
     #test_prods(CNSTS)
 
-    test_c_version(CNSTS)
+    #test_c_version(CNSTS)
+
+    test_c_version_1D(CNSTS)
 

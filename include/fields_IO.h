@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 30 Sep 15:46:43 2015
+// Last modified: Thu  1 Oct 15:32:35 2015
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -18,10 +18,12 @@
 #include<complex.h>
 #include"hdf5.h"
 #include"fftw3.h"
-#include"fields_2D.h"
+
+#define complex_d _Complex double
 
 // Prototypes
 
+typedef struct flow_params flow_params;
 typedef struct complex_hdf complex_hdf;
 
 void save_hdf5_state(char *filename, fftw_complex *arr, flow_params cnsts);
@@ -41,6 +43,8 @@ void save_state(FILE *fp, fftw_complex *arr, flow_params cnsts);
 void save_hdf5_state_visco(hid_t *file_id, hid_t *filetype_id, hid_t *datatype_id,
 	complex_d *psi, complex_d *cxx, complex_d *cyy, complex_d *cxy, flow_params cnsts);
 
+void load_hdf5_arr(char *filename, fftw_complex *arr, int size);
+
 void load_hdf5_state(char *filename, fftw_complex *arr, flow_params cnsts);
 
 void load_hdf5_state_visco(char *filename, complex_d *psi, complex_d *cxx, complex_d *cyy, complex_d *cxy, flow_params cnsts);
@@ -50,6 +54,20 @@ void load_state(FILE *fp, fftw_complex *arr, flow_params cnsts);
 void load_operator(FILE *fp, fftw_complex *arr, flow_params cnsts);
 
 void load_hdf5_operator(char *filename, fftw_complex *arr, flow_params cnsts);
+
+struct flow_params {
+    int N;
+    int M;
+    int dealiasing;
+    int Nf;
+    int Mf;
+    double kx;
+    double U0;
+    double Re;
+    double Wi;
+    double beta;
+    double Omega;
+};
 
 struct complex_hdf {
     double r;

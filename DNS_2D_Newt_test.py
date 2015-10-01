@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Tue 29 Sep 15:23:27 2015
+#   Last modified: Thu  1 Oct 11:38:29 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -55,16 +55,12 @@ import h5py
 import TobySpectralMethods as tsm
 
 # SETTINGS---------------------------------------------------------------------
-
-config = ConfigParser.RawConfigParser()
-fp = open('config.cfg')
-config.readfp(fp)
-N = config.getint('General', 'N')
-M = config.getint('General', 'M')
-Re = config.getfloat('General', 'Re')
+N = 5
+M = 40
+Re = 3000.0
 Wi = 0.0
 beta = 1.0
-kx = config.getfloat('General', 'kx')
+kx = 1.31
 
 dealiasing = True
 
@@ -75,10 +71,9 @@ else:
     Nf = N
     Mf = M
 
-dt = 1e-6#config.getfloat('Time Iteration', 'dt')
-totTime = 2e-6#config.getfloat('Time Iteration', 'totTime')
-numFrames = 1#config.getint('Time Iteration', 'numFrames')
-fp.close()
+dt = 1e-6
+totTime = 2e-6
+numFrames = 1
 
 numTimeSteps = int(totTime / dt)
 assert not (totTime % dt), "non-integer number of time steps!"
@@ -296,6 +291,26 @@ def form_operators(dt):
     opinvlist = array(opinvlist)
     return opinvlist
 
+def test_arrays_equal(arr1, arr2, tol=1e-12):
+    testBool = allclose(arr1, arr2)
+    print testBool
+    if not testBool:
+        print 'difference', linalg.norm(arr1-arr2)
+        if linalg.norm(arr1-arr2)>tol:
+            print 'relative difference', linalg.norm(arr1-arr2)
+
+            print "max difference", amax(arr1-arr2)
+            print "max difference arg", argmax(arr1-arr2)
+
+            print "mode 0", linalg.norm(arr1[N*M:(N+1)*M]-arr2[N*M:(N+1)*M])
+            for n in range(1,N+1):
+                print "mode", n, linalg.norm(arr1[(N+n)*M:(N+n+1)*M]-arr2[(N+n)*M:(N+n+1)*M])
+                print "mode", -n,linalg.norm(arr1[(N-n)*M:(N+1-n)*M]-arr2[(N-n)*M:(N+1-n)*M])
+        print 'FAIL'
+        exit(1)
+
+
+
 # -----------------------------------------------------------------------------
 # MAIN
 # -----------------------------------------------------------------------------
@@ -426,13 +441,20 @@ PSI = PSI.reshape(2*N+1, M).T
 # put PSI into FFT ordering.
 PSI = ifftshift(PSI, axes=1)
 
-# savetxt("initial.dat", PSI.T, fmt='%.18e')
 
 print "writing initial state to initial.h5"
 
 f = h5py.File("initial.h5", "w")
 dset = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
 dset[...] = PSI.T.flatten()
+f.close()
+
+print "writing forcing to forcing.h5"
+forcing = zeros((M,2*N+1), dtype='complex')
+forcing[0,0] = 2.0/Re
+f = h5py.File("forcing.h5", "w")
+dset = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
+dset[...] = forcing.T.flatten()
 f.close()
 
 #### TIME ITERATE 
@@ -484,19 +506,19 @@ subprocess.call(cargs)
 
 # Read in data from the C code
 
-print "check variables are properly calculated in c code"
 
+print """
+-------------
+Input psi
+-------------
+"""
 print shape(load_hdf5_state("./output/psi.h5"))
 print shape(PSI)
 psic = load_hdf5_state("./output/psi.h5").reshape(2*N+1, M).T 
 
-print 'initial streamfunction?', allclose(PSI,psic)
-print 'difference', linalg.norm(psic-PSI)
-if linalg.norm(psic-PSI) > 0.0:
-    print ( PSI)[0,:]
-    print (psic)[0,:]
-    print "FAIL"
-    exit(1)
+print 'initial streamfunction?'
+test_arrays_equal(PSI, psic)
+
 #print 'zeroth mode c-python', psic[:M]- PSI[:M]
 
 # switch PSI back to normal ordering for F modes
@@ -504,6 +526,11 @@ PSI = fftshift(PSI, axes=1)
 PSI = PSI.T.flatten()
 PSIbkp = copy(PSI)
 
+print """
+---------------------
+derivatives and terms 
+---------------------
+"""
 # u
 U = dot(MDY, PSI)
 USQ = dot(tsm.prod_mat(U), U)
@@ -517,13 +544,8 @@ Uc = load_hdf5_state("./output/u.h5").reshape(2*N+1, M).T
 Uc = fftshift(Uc, axes=1)
 Uc = Uc.T.flatten()
 
-print 'U ?', allclose(U, Uc)
-print 'difference', linalg.norm(U-Uc)
-if linalg.norm(U-Uc) > 1e-12:
-    print 'U0', U[N*M: (N+1)*M]
-    print 'U0c', Uc[N*M: (N+1)*M]
-    print 'FAIL'
-    exit(1)
+print 'U ?'
+test_arrays_equal(U, Uc)
 
 # v
 V = -dot(MDX, PSI)
@@ -533,15 +555,8 @@ pickle.dump(Vc, open('testVc.pickle','w'))
 Vc = fftshift(Vc, axes=1)
 Vc = Vc.T.flatten()
 
-print 'V ?', allclose(V, Vc)
-print 'difference', linalg.norm(V-Vc)
-
-if not allclose(V, Vc):
-    print 'difference', linalg.norm(V-Vc)
-    #print 'V1', V[M: 2*M]
-    #print 'V1c', Vc[M: 2*M]
-    print 'difference', (V-Vc)[N*M+38::M]
-    
+print 'V ?'
+test_arrays_equal(V, Vc)
 
 lplc = load_hdf5_state("./output/lplpsi.h5").reshape(2*N+1, M).T 
 lplc = fftshift(lplc, axes=1)
@@ -551,12 +566,8 @@ lplc = lplc.T.flatten()
 #LPLPSI = dot(dot(MDY,MDY) + dot(MDX,MDX), PSI)
 LPLPSI = dot(dot(MDY,MDY), PSI) + dot(dot(MDX,MDX), PSI)
 
-print 'laplacian psi ?', allclose(LPLPSI, lplc)
-print 'difference', linalg.norm(LPLPSI-lplc)
-if not allclose(LPLPSI, lplc):
-    #print 'LPLPSI1', LPLPSI[M: 2*M]
-    #print 'LPLPSI1c', lplc[M: 2*M]
-    print 'difference', (LPLPSI-lplc)[N*M+38::M]
+print 'laplacian psi ?'
+test_arrays_equal(LPLPSI,lplc)
 
 d2yc = load_hdf5_state("./output/d2ypsi.h5").reshape(2*N+1, M).T 
 d2yc = fftshift(d2yc, axes=1)
@@ -565,9 +576,8 @@ d2yc = d2yc.T.flatten()
 D2YPSI = dot(MDY, dot(MDY,PSI) )
 D2YPSIud = dot(MDY[:, ::-1], dot(MDY[:, ::-1],PSI[::-1])[::-1] )
 
-print 'd2y psi ?', allclose(D2YPSI, d2yc)
-print 'difference', linalg.norm(D2YPSI-d2yc)
-print 'ud difference', linalg.norm(D2YPSIud-d2yc)
+print 'd2y psi ?'
+test_arrays_equal(D2YPSI, d2yc)
 
 d3yc = load_hdf5_state("./output/d3ypsi.h5").reshape(2*N+1, M).T 
 d3yc = fftshift(d3yc, axes=1)
@@ -575,13 +585,8 @@ d3yc = d3yc.T.flatten()
 
 D3YPSI = dot(MDY, dot(MDY, dot(MDY,PSI) ) )
 
-print 'd3y psi ?', allclose(D3YPSI, d3yc)
-print 'difference', linalg.norm(D3YPSI-d3yc)
-if linalg.norm(D3YPSI-d3yc) > 1e-12:
-    #print 'd3y0', D3YPSI[N*M:(N+1)*M]
-    #print 'd3yc0', d3yc[N*M:(N+1)*M]
-    print 'FAIL'
-    exit(1)
+print 'd3y psi ?'
+test_arrays_equal(D3YPSI, d3yc)
 
 d4yc = load_hdf5_state("./output/d4ypsi.h5").reshape(2*N+1, M).T 
 d4yc = fftshift(d4yc, axes=1)
@@ -589,12 +594,8 @@ d4yc = d4yc.T.flatten()
 
 D4YPSI = dot(MDY, dot(MDY, dot(MDY, dot(MDY,PSI) ) ) )
 
-print 'd4y psi ?', allclose(D4YPSI, d4yc)
-print 'difference', linalg.norm(D4YPSI-d4yc)
-print "mode 0", linalg.norm(D4YPSI[N*M:(N+1)*M]-d4yc[N*M:(N+1)*M])
-for n in range(1,N+1):
-    print "mode", n, linalg.norm(D4YPSI[(N+n)*M:(N+n+1)*M]-d4yc[(N+n)*M:(N+n+1)*M])
-    print "mode", -n,linalg.norm(D4YPSI[(N-n)*M:(N+1-n)*M]-d4yc[(N-n)*M:(N+1-n)*M])
+print 'd4y psi ?'
+test_arrays_equal(D4YPSI, d4yc)
     
 d2xc = load_hdf5_state("./output/d2xpsi.h5").reshape(2*N+1, M).T 
 d2xc = fftshift(d2xc, axes=1)
@@ -603,13 +604,8 @@ d2xc = d2xc.T.flatten()
 D2XPSI = dot(MDX, dot(MDX,PSI) )
 #print 'difference', linalg.norm(D2XPSI-PSIbkp)
 
-print 'd2x psi ?', allclose(D2XPSI, d2xc)
-print 'difference', linalg.norm(D2XPSI-d2xc)
-
-print "mode 0", linalg.norm(D2XPSI[N*M:(N+1)*M]-d2xc[N*M:(N+1)*M])
-for n in range(1,N+1):
-    print "mode", n, linalg.norm(D2XPSI[(N+n)*M:(N+n+1)*M]-d2xc[(N+n)*M:(N+n+1)*M])
-    print "mode", -n,linalg.norm(D2XPSI[(N-n)*M:(N+1-n)*M]-d2xc[(N-n)*M:(N+1-n)*M])
+print 'd2x psi ?'
+test_arrays_equal(D2XPSI, d2xc)
 
 d4xc = load_hdf5_state("./output/d4xpsi.h5").reshape(2*N+1, M).T 
 d4xc = fftshift(d4xc, axes=1)
@@ -617,22 +613,17 @@ d4xc = d4xc.T.flatten()
 
 D4XPSI = dot(MDX, dot(MDX, dot(MDX, dot(MDX,PSI) ) ) )
 
-print 'd4x psi ?', allclose(D4XPSI, d4xc)
-print 'difference', linalg.norm(D4XPSI-d4xc)
+print 'd4x psi ?'
+test_arrays_equal(D4XPSI, d4xc)
 
-print "mode 0", linalg.norm(D4XPSI[N*M:(N+1)*M]-d4xc[N*M:(N+1)*M])
-for n in range(1,N+1):
-    print "mode", n, linalg.norm(D4XPSI[(N+n)*M:(N+n+1)*M]-d4xc[(N+n)*M:(N+n+1)*M])
-    print "mode", -n,linalg.norm(D4XPSI[(N-n)*M:(N+1-n)*M]-d4xc[(N-n)*M:(N+1-n)*M])
-    
 d2xd2yc = load_hdf5_state("./output/d2xd2ypsi.h5").reshape(2*N+1, M).T 
 d2xd2yc = fftshift(d2xd2yc, axes=1)
 d2xd2yc = d2xd2yc.T.flatten()
 
 D2XD2YPSI = dot(MDX, dot(MDX, dot(MDY, dot(MDY,PSI) ) ) )
 
-print 'd2xd2y psi ?', allclose(D2XD2YPSI, d2xd2yc)
-print 'difference', linalg.norm(D2XD2YPSI-d2xd2yc)
+print 'd2xd2y psi ?'
+test_arrays_equal(D2XD2YPSI, d2xd2yc)
     
 biharmc = load_hdf5_state("./output/biharmpsi.h5").reshape(2*N+1, M).T 
 biharmc = fftshift(biharmc, axes=1)
@@ -643,12 +634,8 @@ biharmc = biharmc.T.flatten()
 #BIHARMPSI = dot(dot(MDY,MDY), LPLPSI) + dot(dot(MDX,MDX), LPLPSI)
 BIHARMPSI = D4XPSI + D4YPSI + 2*D2XD2YPSI 
 
-print 'biharm psi ?', allclose(BIHARMPSI, biharmc)
-print 'difference', linalg.norm(BIHARMPSI-biharmc)
-if not allclose(BIHARMPSI, biharmc):
-    #print 'BIHARMPSI1', BIHARMPSI[M: 2*M]
-    #print 'BIHARMPSI1c', biharmc[M: 2*M]
-    print 'difference', (BIHARMPSI-biharmc)[N*M+38::M]
+print 'biharm psi ?'
+test_arrays_equal(BIHARMPSI, biharmc)
 
 dxlplc = load_hdf5_state("./output/dxlplpsi.h5").reshape(2*N+1, M).T 
 dxlplc = fftshift(dxlplc, axes=1)
@@ -656,20 +643,8 @@ dxlplc = dxlplc.T.flatten()
 
 DXLPLPSI = dot(MDX, LPLPSI)
 
-print "dxlplpsi ", allclose(DXLPLPSI, dxlplc)
-print 'difference', linalg.norm(DXLPLPSI-dxlplc)
-
-if not allclose(DXLPLPSI, dxlplc):
-
-    print "mode 0", linalg.norm(DXLPLPSI[N*M:(N+1)*M]-dxlplc[N*M:(N+1)*M])
-    for n in range(1,N+1):
-        print "mode", n, linalg.norm(DXLPLPSI[(N+n)*M:(N+n+1)*M]-dxlplc[(N+n)*M:(N+n+1)*M])
-        print "mode", -n,linalg.norm(DXLPLPSI[(N-n)*M:(N+1-n)*M]-dxlplc[(N-n)*M:(N+1-n)*M])
-
-    print "mode 0", linalg.norm(dxlplc[N*M:(N+1)*M])
-    for n in range(1,N+1):
-        print "mode", n, linalg.norm(dxlplc[(N+n)*M:(N+n+1)*M])
-        print "mode", -n,linalg.norm(dxlplc[(N-n)*M:(N+1-n)*M])
+print "dxlplpsi ?"
+test_arrays_equal(DXLPLPSI, dxlplc)
 
 udxlplc = load_hdf5_state("./output/udxlplpsi.h5").reshape(2*N+1, M).T 
 udxlplc = fftshift(udxlplc, axes=1)
@@ -677,27 +652,16 @@ udxlplc = udxlplc.T.flatten()
 
 UDXLPLPSI = dot(prod_mat(U), dot(MDX, LPLPSI))
 
-print 'udxlolpsi ?', allclose(UDXLPLPSI, udxlplc)
-print 'difference', linalg.norm(UDXLPLPSI-udxlplc)
-if not allclose(UDXLPLPSI, udxlplc):
-    print 'relative difference', linalg.norm(UDXLPLPSI-udxlplc)
-
-    print "max difference", amax(UDXLPLPSI-udxlplc)
-    print "max difference arg", argmax(UDXLPLPSI-udxlplc)
-
-    print "mode 0", linalg.norm(UDXLPLPSI[N*M:(N+1)*M]-udxlplc[N*M:(N+1)*M])
-    for n in range(1,N+1):
-        print "mode", n, linalg.norm(UDXLPLPSI[(N+n)*M:(N+n+1)*M]-udxlplc[(N+n)*M:(N+n+1)*M])
-        print "mode", -n,linalg.norm(UDXLPLPSI[(N-n)*M:(N+1-n)*M]-udxlplc[(N-n)*M:(N+1-n)*M])
+print 'udxlplpsi ?'
+test_arrays_equal(UDXLPLPSI, udxlplc)
 
 dylplc = load_hdf5_state("./output/dylplpsi.h5").reshape(2*N+1, M).T 
 dylplc = fftshift(dylplc, axes=1)
 dylplc = dylplc.T.flatten()
 
 DYLPLPSI = dot(MDY, LPLPSI)
-
-print "dylplpsi ", allclose(DYLPLPSI, dylplc)
-print 'difference', linalg.norm(DYLPLPSI-dylplc)
+print "dylplpsi ?" 
+test_arrays_equal(DYLPLPSI, dylplc)
 
 vdylplc = load_hdf5_state("./output/vdylplpsi.h5").reshape(2*N+1, M).T 
 vdylplc = fftshift(vdylplc, axes=1)
@@ -705,13 +669,8 @@ vdylplc = vdylplc.T.flatten()
 
 VDYLPLPSI = dot(prod_mat(V), dot(MDY, LPLPSI))
 
-print 'vdylplpsi ?', allclose(VDYLPLPSI, vdylplc)
-print 'difference', linalg.norm(VDYLPLPSI-vdylplc)
-if not allclose(VDYLPLPSI, vdylplc):
-    print 'relative difference', linalg.norm(VDYLPLPSI-vdylplc)
-    #print 'VDYLPLPSI1', VDYLPLPSI[M: 2*M]
-    #print 'VDYLPLPSI1c', vdylplc[M: 2*M]
-    print 'difference', (VDYLPLPSI-vdylplc)[N*M+38::M]
+print 'vdylplpsi ?' 
+test_arrays_equal(VDYLPLPSI, vdylplc)
 
 vdyyc = load_hdf5_state("./output/vdyypsi.h5").reshape(2*N+1, M).T 
 vdyyc = fftshift(vdyyc, axes=1)
@@ -719,12 +678,8 @@ vdyyc = vdyyc.T.flatten()
 
 VDYU = dot(prod_mat(V), dot(MDY, dot(MDY, PSI))) 
 
-print 'vdyypsi ?', allclose(VDYU, vdyyc)
-print 'difference', linalg.norm(VDYU-vdyyc)
-if not allclose(VDYU, vdyyc):
-    #print 'VDYU1', VDYU[M: 2*M]
-    #print 'VDYU1c', vdyyc[M: 2*M]
-    print ' high mode difference', (VDYU-vdyyc)[N*M+38::M]
+print 'vdyypsi ?'
+test_arrays_equal(VDYU, vdyyc)
 
 print """
 --------------
@@ -733,22 +688,22 @@ Operator check
 """
 op0c = load_hdf5_state("./output/op0.h5")#.reshape(M, M).T 
 
-print 'operator 0', linalg.norm(op0c-PsiOpInvList[0].flatten())
+print 'operator 0'
+test_arrays_equal(op0c, PsiOpInvList[0].flatten())
 
 for i in range(1,N+1):
     opc = load_hdf5_state("./output/op{0}.h5".format(i))
-    print 'operator ',i, linalg.norm(opc - PsiOpInvList[i].flatten())
-    if linalg.norm(opc - PsiOpInvList[i].flatten()) > 0.0 :
-        exit(1)
+    print 'operator ',i
+    test_arrays_equal(opc, PsiOpInvList[i].flatten())
 
 hop0c = load_hdf5_state("./output/hOp0.h5")#.reshape(M, M).T 
-print 'half operator 0', linalg.norm(hop0c-PsiOpInvListHalf[0].flatten())
+print 'half operator 0'
+test_arrays_equal(hop0c, PsiOpInvListHalf[0].flatten())
 
 for i in range(1,N+1):
     hopc = load_hdf5_state("./output/hOp{0}.h5".format(i))
-    print 'half operator ',i, linalg.norm(hopc - PsiOpInvListHalf[i].flatten())
-    if linalg.norm(hopc - PsiOpInvListHalf[i].flatten()) > 0.0 :
-        exit(1)
+    print 'half operator ',i
+    test_arrays_equal(hopc, PsiOpInvListHalf[i].flatten())
 
 DYYYPSI = dot(MDY, dot(MDY, dot(MDY, PSI)))
 
@@ -757,24 +712,13 @@ RHSVec = dt*0.5*oneOverRe*BIHARMPSI \
         - dt*UDXLPLPSI \
         - dt*VDYLPLPSI 
 
-#RHSVec = dt*0.5*oneOverRe*biharmc \
-#        + lplc \
-#        - dt*udxlplc \
-#        - dt*vdylplc 
 
-
-# Zeroth mode
+# Zeroth mode (dt/2 because that is how it appears in the method)
 RHSVec[N*M:(N+1)*M] = 0
-RHSVec[N*M:(N+1)*M] = dt*0.5*oneOverRe*DYYYPSI[N*M:(N+1)*M] \
+RHSVec[N*M:(N+1)*M] = dt*0.25*oneOverRe*DYYYPSI[N*M:(N+1)*M] \
         + U[N*M:(N+1)*M] \
-        - dt*VDYU[N*M:(N+1)*M]
-RHSVec[N*M] += dt*2*oneOverRe
-
-#RHSVec[N*M:(N+1)*M] = 0
-#RHSVec[N*M:(N+1)*M] = dt*0.5*oneOverRe*d3yc[N*M:(N+1)*M] \
-#        + Uc[N*M:(N+1)*M] \
-#        - dt*vdyyc[N*M:(N+1)*M]
-#RHSVec[N*M] += dt*2*oneOverRe
+        - 0.5*dt*VDYU[N*M:(N+1)*M]
+RHSVec[N*M] += dt*oneOverRe
 
 # Apply BC's
 
@@ -796,39 +740,17 @@ RHSVec[N*M + M-1] = 0
 
 for i in range(0,N+1):
     RHSvecc = load_hdf5_state("./output/RHSVec{0}.h5".format(i))
-    print "RHSvec for mode ", i, allclose(RHSVec[(N+i)*M:(N+1+i)*M], RHSvecc)
-    print 'difference', linalg.norm(RHSVec[(N+i)*M:(N+1+i)*M]- RHSvecc)
-    print 'max difference', amax(RHSVec[(N+i)*M:(N+1+i)*M]- RHSvecc)
-    maxarg_ = argmax(RHSVec[(N+i)*M:(N+1+i)*M]- RHSvecc)
-    print 'argmax difference', maxarg_
-    #print RHSVec[(N+i)*M+maxarg_]
-    #print RHSvecc[maxarg_]
+    print "RHSvec for mode ", i
+    test_arrays_equal(RHSVec[(N+i)*M:(N+1+i)*M], RHSvecc)
 
-    #if i ==0:
-    #    print 'c', RHSvecc
-    #    print 'mat', RHSVec[N*M:(N+1)*M]
-    #    print RHSvecc - RHSVec[N*M:(N+1)*M]
-    #    print 'RHSVecC - RHSvec components'
-    #    print RHSvecc - Uc[N*M:(N+1)*M] - 0.5*dt*oneOverRe*d3yc[N*M:(N+1)*M] \
-    #            -2*dt*oneOverRe
-    #    print RHSvecc - U[N*M:(N+1)*M] - 0.5*dt*oneOverRe*D3YPSI[N*M:(N+1)*M] \
-    #            -2*dt*oneOverRe
-    #    print 'RHSVec - RHSvec components'
-    #    print RHSVec[N*M:(N+1)*M] - U[N*M:(N+1)*M] - 0.5*dt*oneOverRe*D3YPSI[N*M:(N+1)*M] \
-    #           -2*dt*oneOverRe
 
-psi2c = load_hdf5_state("./output/psi2.h5").reshape(2*N+1, M).T 
-
-#PSI[N*M:(N+1)*M] = dot(PsiOpInvList[0], RHSVec[N*M:(N+1)*M])
+# calculate the updated psi
 for i in range(M):
     PSI[(N)*M + i] = 0
     #for j in range(M-1,-1,-1):
     for j in range(M):
         PSI[(N)*M + i] += PsiOpInvList[0][i,j] * RHSVec[(N)*M + j]
 
-#for n in range(1,N+1):
-#    PSI[(N+n)*M:(N+n+1)*M] = dot(PsiOpInvList[n], RHSVec[(N+n)*M:(N+n+1)*M])
-#    del n  
 for n in range(1,N+1):
     for i in range(M):
         PSI[(N+n)*M + i] = 0
@@ -839,28 +761,10 @@ for n in range(1,N+1):
 for n in range(0,N):
     PSI[n*M:(n+1)*M] = conj(PSI[(2*N-n)*M:(2*N+1-n)*M])
 
-#PSI = pickle.load(open('./output/PSI10test.pickle', 'r')) 
+print """
+==============================================================================
 
-PSI22D = PSI.reshape(2*N+1, M).T
-PSI22D = ifftshift(PSI22D, axes=-1)
+ALL TESTS PASSED! 
 
-print 'psi2 = psi2c?', allclose(PSI22D, psi2c)
-
-print 'mode', 0, allclose(PSI22D[:, 0], psi2c[:, 0])
-print 'difference', linalg.norm(PSI22D[:, 0]-psi2c[:, 0])
-print 'max difference', amax(PSI22D[:, 0]-psi2c[:, 0])
-maxarg_ = argmax(PSI22D[:, 0]-psi2c[:, 0])
-print 'argmax difference', maxarg_
-print PSI22D[maxarg_, 0]
-print psi2c[maxarg_, 0]
-
-#if not allclose(PSI22D, psi2c):
-for i in range(1,N+1):
-    print 'mode', i, allclose(PSI22D[:, i], psi2c[:, i])
-    print 'difference', linalg.norm(PSI22D[:, i]-psi2c[:, i])
-    print 'mode', -i, allclose(PSI22D[:, 2*N+1-i], psi2c[:, 2*N+1-i])
-    print 'difference', linalg.norm(PSI22D[:, 2*N+1-i]-psi2c[:, 2*N+1-i])
-
-    print 'conjugation', allclose(PSI22D[:,i], conj(PSI22D[:, 2*N+1-i]))
-    print 'conjugation', allclose(psi2c[:,i], conj(psi2c[:, 2*N+1-i]))
-
+==============================================================================
+"""

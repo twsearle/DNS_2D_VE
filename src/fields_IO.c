@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 30 Sep 15:49:23 2015
+// Last modified: Thu  1 Oct 15:32:52 2015
 
 #include"fields_2D.h"
 #include"fields_IO.h"
@@ -459,6 +459,57 @@ void save_hdf5_snapshot_visco(hid_t *file_id, hid_t *filetype_id, hid_t *datatyp
     status = H5Sclose(dataspace_id);
     status = H5Gclose(group_id);
     free(wdata);
+
+}
+
+void load_hdf5_arr(char *filename, fftw_complex *arr, int size)
+{
+    int i, ndims;
+
+    hid_t  file_id, dataset_id, dataspace_id, datatype_id;
+    herr_t status;
+    complex_hdf *rdata;
+
+    hsize_t arr_size[1];
+    arr_size[0] = size;
+
+    // create the datatype for scipy complex numbers
+    datatype_id = H5Tcreate(H5T_COMPOUND, sizeof (complex_hdf));
+    status = H5Tinsert(datatype_id, "r",
+                HOFFSET(complex_hdf, r), H5T_NATIVE_DOUBLE);
+    status = H5Tinsert(datatype_id, "i",
+                HOFFSET(complex_hdf, i), H5T_NATIVE_DOUBLE);
+
+    // open the file
+    file_id = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT);
+
+    // open the dataset
+    dataset_id = H5Dopen2(file_id, "/psi", H5P_DEFAULT);
+
+    // get dataspace and allocate memory to read buffer
+    dataspace_id = H5Dget_space(dataset_id);
+    ndims = H5Sget_simple_extent_dims(dataspace_id, arr_size, NULL);
+
+    rdata = (complex_hdf *) malloc (arr_size[0] * sizeof (complex_hdf));
+    
+    // read the file 
+    status = H5Dread(dataset_id, datatype_id, H5S_ALL, H5S_ALL, 
+		      H5P_DEFAULT, rdata); 
+
+    // copy the result into the complex array
+    for (i=0; i<size; i++)
+    {
+	arr[i] = rdata[i].r + I * rdata[i].i;
+    }
+
+    // clean up 
+    status = H5Dclose(dataset_id);
+    status = H5Sclose(dataspace_id);
+    status = H5Tclose(datatype_id);
+    free(rdata);
+
+    // close the file
+    status = H5Fclose(file_id);
 
 }
 
