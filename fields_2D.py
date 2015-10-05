@@ -725,6 +725,7 @@ def forward_cheb_transform(GLcmplx, CNSTS):
     tmp = real(fftpack.rfft(tmp))
 
     out = zeros(M, dtype='complex')
+
     # Renormalise and divide by c_k to convert to Chebyshev polynomials
     out[0] = (0.5/(Mf-1.0)) * tmp[0]
     out[1:M-1] = (1.0/(Mf-1.0)) * tmp[1:M-1]
@@ -767,6 +768,7 @@ def backward_cheb_transform(cSpec, CNSTS):
 
     # Define the temporary vector for the transformation
     tmp = zeros(Mf)
+    out = zeros(Mf, dtype='complex')
 
     # The first half contains the vector on the Gauss-Labatto points * c_k
     tmp[0] = real(cSpec[0])
@@ -774,7 +776,7 @@ def backward_cheb_transform(cSpec, CNSTS):
     tmp[Mf-1] = 2*tmp[Mf-1]
 
     # Perform the transformation via a dct
-    out = real(dct(tmp, type=1))
+    out[:] = real(dct(tmp, type=1))
 
     # Define the temporary vector for the transformation
     tmp = zeros(Mf)
@@ -785,7 +787,7 @@ def backward_cheb_transform(cSpec, CNSTS):
     tmp[Mf-1] = 2*tmp[Mf-1]
 
     # Perform the transformation for the imaginary part via a dct
-    out += 1.j * real(dct(tmp, type=1))
+    out += 1.j*real(dct(tmp, type=1))
 
     return out[0:Mf]
 
@@ -1213,10 +1215,18 @@ def test_arrays_equal(arr1, arr2, tol=1e-12):
             print "max difference", amax(arr1-arr2)
             print "max difference arg", argmax(arr1-arr2)
 
-            print "mode 0", linalg.norm(arr1[N*M:(N+1)*M]-arr2[N*M:(N+1)*M])
-            for n in range(1,N+1):
-                print "mode", n, linalg.norm(arr1[(N+n)*M:(N+n+1)*M]-arr2[(N+n)*M:(N+n+1)*M])
-                print "mode", -n,linalg.norm(arr1[(N-n)*M:(N+1-n)*M]-arr2[(N-n)*M:(N+1-n)*M])
+            if shape(arr1) == (M, 2*N+1):
+                print "mode 0", linalg.norm(arr1[:,0]-arr2[:,0])
+                for n in range(1,N+1):
+                    print "mode", n, linalg.norm(arr1[:, n]-arr2[:, n])
+                    print "mode", -n,linalg.norm(arr1[:, n]-arr2[:, n])
+
+            if shape(arr1) == ((2*N+1)*M):
+                print "mode 0", linalg.norm(arr1[N*M:(N+1)*M]-arr2[N*M:(N+1)*M])
+                for n in range(1,N+1):
+                    print "mode", n, linalg.norm(arr1[(N+n)*M:(N+n+1)*M]-arr2[(N+n)*M:(N+n+1)*M])
+                    print "mode", -n,linalg.norm(arr1[(N-n)*M:(N+1-n)*M]-arr2[(N-n)*M:(N+1-n)*M])
+
 
             imshow(real(ctestSpec3), origin='lower')
             colorbar()
@@ -1594,14 +1604,22 @@ def test_c_version_1D(CNSTS):
     ctestSpec = load_hdf5_state(outputdir + "testSpectralT.h5")
     python2spec = forward_cheb_transform(actualPhys, CNSTS)
 
+    tmp = zeros((Mf,2*Nf+1), dtype='complex')
+    tmp[:,0] = actualPhys
+    python2spec2 = to_spectral_2(real(tmp), CNSTS)[:,0]
+    python2spec2 += 1.j*to_spectral_2(imag(tmp), CNSTS)[:,0]
+    python2spec2 *= (2*Nf+1)
+    
+    print "Spectral Transform: Python transforms are consistent?"
+    test_arrays_equal(python2spec2, python2spec)
+
     print "Spectral Transform: C transform is the same as python transform?"
     test_arrays_equal(python2spec, ctestSpec)
 
-    phystest = zeros((Mf, 2*Nf+1), dtype='complex')
+    phystest = zeros(Mf, dtype='complex')
 
-    for i in range(2*Nf+1):
-        for j in range(Mf):
-	    phystest[j,i] =  cos(i*pi/(2.*Nf)) * tanh(j*pi/(Mf-1.))
+    for j in range(Mf):
+        phystest[j] =  tanh(j*pi/(Mf-1.))
 
     pythonSpec3 = forward_cheb_transform(phystest, CNSTS)
     ctestSpec3 = load_hdf5_state(outputdir + "testSpectralT2.h5") 
@@ -1649,7 +1667,7 @@ def test_c_version_1D(CNSTS):
     print 'Check matrix and python fft methods both convolve the same: psipsi'
     psiR = backward_cheb_transform(actualSpec, CNSTS)
     psipsi = forward_cheb_transform(psiR*psiR, CNSTS)
-    matpsipsi = dot(tsm.prod_mat(flatspec), flatspec)
+    matpsipsi = dot(tsm.cheb_prod_mat(flatspec), flatspec)
 
     test_arrays_equal(matpsipsi, psipsi)
 

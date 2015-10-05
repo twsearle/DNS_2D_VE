@@ -10,23 +10,18 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 30 Sep 12:01:53 2015
+// Last modified: Fri  2 Oct 17:09:25 2015
 
-#include<stdio.h>
-#include<stdlib.h>
-#include<unistd.h>
-#include<math.h>
-#include<complex.h>
-#include"fftw3.h"
+#include"fields_1D.h"
+#include"fields_IO.h"
 
 //prototypes
 
 void step_sf_linear_SI_Crank_Nicolson(
-	complex *psi, complex *psi2, double dt, int timeStep, complex
-	*forcing, complex *opsList, flow_scratch scr, flow_params params)
+	complex_d *psi, complex_d *psi2, double dt, int timeStep, complex_d
+	*forcing, complex_d *opsList, lin_flow_scratch scr, flow_params params)
 {
-    int i, j, l;
-    int N = params.N;
+    int j, l;
     int M = params.M;
     double oneOverRe = 1. / params.Re;
 
@@ -42,7 +37,7 @@ void step_sf_linear_SI_Crank_Nicolson(
     single_dy(&psi2[ind(1,0)], scr.u, params);
 
     // v = -dydpsi
-    single_dx(&psi2[ind(1,0)], scr.v, params);
+    single_dx(&psi2[ind(1,0)], scr.v, 1, params);
     for(j=0; j<M; j++)
     {
 	scr.v[j] = -scr.v[j];
@@ -50,21 +45,19 @@ void step_sf_linear_SI_Crank_Nicolson(
 
 
     // lpldpsi = dyy(dpsi) + dxx(dpsi)
-    single_d2x(&psi2[ind(1,0)], scr.scratch, params);
+    single_d2x(&psi2[ind(1,0)], scr.scratch, 1, params);
     single_dy(scr.u, scr.lplpsi, params);
-    for(i=0; i<N+1; i++)
+
+    for(j=0; j<M; j++)
     {
-	for(j=0; j<M; j++)
-	{
-	    scr.lplpsi[ind(i,j)] = scr.lplpsi[ind(i,j)] + scr.scratch[ind(i,j)];
-	}
+	scr.lplpsi[j] = scr.lplpsi[j] + scr.scratch[j];
     }
 
     // lplPSI0 = dyy(PSI0)
-    single_dy(scr.U0, scr.dyyPSI0, params);
+    single_dy(scr.U0, scr.d2yPSI0, params);
 
     // udxlplpsi = U0dxlpldpsi 
-    single_dx(scr.lplpsi, scr.udxlplpsi, params);
+    single_dx(scr.lplpsi, scr.udxlplpsi, 1,  params);
     #ifdef MYDEBUG
     if(timeStep==0)
     {
@@ -72,11 +65,16 @@ void step_sf_linear_SI_Crank_Nicolson(
     }
     #endif
 
-    fft_cheb_convolve_r(scr.udxlplpsi, scr.U0, scr.udxlplpsi, 
+    fft_cheby_convolve(scr.udxlplpsi, scr.U0, scr.udxlplpsi, 
 	    scr, params);
 
     // vdylplpsi = vdylplPSI0 = vdyyyPSI0
-    single_dy(scr.dyyPSI0, scr.vdylplpsi, params);
+    single_dy(scr.d2yPSI0, scr.d3yPSI0, params);
+
+    for (j=0; j<M; j++)
+    {
+        scr.vdylplpsi[j] = scr.d3yPSI0[j];
+    }
 
     #ifdef MYDEBUG
     if(timeStep==0)
@@ -86,26 +84,14 @@ void step_sf_linear_SI_Crank_Nicolson(
     #endif
 
 
-    fft_cheb_convolve_r(scr.vdylplpsi, scr.v, scr.vdylplpsi, 
+    fft_cheby_convolve(scr.vdylplpsi, scr.v, scr.vdylplpsi, 
 	    scr, params);
-
-    //vdyypsi = vdyu = vdyyPSI0
-
-    fft_cheb_convolve_r(scr.dyyPSI0, scr.v, scr.vdyypsi, 
-	    scr, params);
-
-#ifdef MYDEBUG
-    if(timeStep==0)
-    {
-	save_hdf5_arr("./output/vdyypsi.h5", &scr.vdyypsi[0], M);
-    }
-#endif
 
     // ----------- linear Terms --------------
     
     // lplpsi dyy(psi) + dxx(psi)
 
-    single_d2x(&psi[ind(1,0)], scr.scratch, params);
+    single_d2x(&psi[ind(1,0)], scr.scratch, 1, params);
     single_dy(&psi[ind(1,0)], scr.u, params);
     single_dy(scr.u, scr.lplpsi, params);
 
@@ -114,13 +100,20 @@ void step_sf_linear_SI_Crank_Nicolson(
 	scr.lplpsi[j] = scr.lplpsi[j] + scr.scratch[j];
     }
 
+    // d3yPSI0
+    
+    single_dy(&psi[ind(0,0)], scr.U0, params);
+    single_dy(scr.U0, scr.d2yPSI0, params);
+    single_dy(scr.d2yPSI0, scr.d3yPSI0, params);
+
     // biharmpsi (dyy + dxx)lplpsi
 
-    single_dy(scr.u, scr.dyu, params);
-    single_dy(scr.dyu, scr.dyyypsi, params);
-    single_dy(scr.dyyypsi, scr.d4ypsi, params);
+    single_dy(scr.u, scr.d2ypsi, params);
+    single_dy(scr.d2ypsi, scr.d3ypsi, params);
+    single_dy(scr.d3ypsi, scr.d4ypsi, params);
 
-    single_d2x(&psi[ind(1,0)], scr.scratch, params);
+    single_d2x(&psi[ind(1,0)], scr.scratch, 1, params);
+
 
 #ifdef MYDEBUG
     if(timeStep==0)
@@ -133,7 +126,7 @@ void step_sf_linear_SI_Crank_Nicolson(
     single_dy(scr.scratch2, scr.d2xd2ypsi, params);
 
 
-    single_d4x(psi, scr.d4xpsi, params);
+    single_d4x(&psi[ind(1,0)], scr.d4xpsi, 1, params);
 
     for(j=0; j<M; j++)
     {
@@ -149,11 +142,14 @@ void step_sf_linear_SI_Crank_Nicolson(
 #ifdef MYDEBUG
     if(timeStep==0)
     {
+	save_hdf5_arr("./output/U0.h5",  &scr.U0[0], M);
 	save_hdf5_arr("./output/u.h5",  &scr.u[0], M);
 	save_hdf5_arr("./output/v.h5", &scr.v[0], M);
 	save_hdf5_arr("./output/lplpsi.h5", &scr.lplpsi[0], M);
-	save_hdf5_arr("./output/d2ypsi.h5", &scr.dyu[0], M);
-	save_hdf5_arr("./output/d3ypsi.h5", &scr.dyyypsi[0], M);
+	save_hdf5_arr("./output/d2yPSI0.h5", &scr.d2yPSI0[0], M);
+	save_hdf5_arr("./output/d3yPSI0.h5", &scr.d3yPSI0[0], M);
+	save_hdf5_arr("./output/d2ypsi.h5", &scr.d2ypsi[0], M);
+	save_hdf5_arr("./output/d3ypsi.h5", &scr.d3ypsi[0], M);
 	save_hdf5_arr("./output/d4ypsi.h5", &scr.d4ypsi[0], M);
 	save_hdf5_arr("./output/d2xd2ypsi.h5", &scr.d2xd2ypsi[0], M);
 	save_hdf5_arr("./output/d4xpsi.h5", &scr.d4xpsi[0], M);
@@ -165,13 +161,10 @@ void step_sf_linear_SI_Crank_Nicolson(
 
     for (j=0; j<M; j++)
     {
-
 	scr.RHSvec[j] = 0.5*dt*oneOverRe*scr.biharmpsi[j];
 	scr.RHSvec[j] += + scr.lplpsi[j];
 	scr.RHSvec[j] += - dt*scr.udxlplpsi[j];
 	scr.RHSvec[j] += - dt*scr.vdylplpsi[j];
-	scr.RHSvec[j] += dt*forcing[j]; 
-
     }
 
     //impose BCs
@@ -183,8 +176,7 @@ void step_sf_linear_SI_Crank_Nicolson(
     if(timeStep==0)
     {
 	char fn[30];
-	fn = "./output/RHSVec1.h5";
-	printf("writing %s\n", fn);
+	sprintf(fn, "./output/RHSVec%d.h5", 1);
 	save_hdf5_arr(fn, &scr.RHSvec[0], M);
     }
 #endif
@@ -201,18 +193,17 @@ void step_sf_linear_SI_Crank_Nicolson(
     }
 
 
-    // Zeroth mode
+    // Zeroth mode linearised
     //
     // RHSVec[N*M:(N+1)*M] = 0
     // RHSVec[N*M:(N+1)*M] = dt*0.5*oneOverRe*dot(MDYYY, PSI)[N*M:(N+1)*M] 
     // 	+ dot(MDY, PSI)[N*M:(N+1)*M] 
-    // 	- dt*dot(dot(MMV, MDYY), PSI)[N*M:(N+1)*M]
     // RHSVec[N*M] += dt*2*oneOverRe
 
     for (j=0; j<M; j++)
     {
-	scr.RHSvec[j] = dt*0.5*oneOverRe*scr.dyyyPSI0[j];
-	scr.RHSvec[j] += scr.U0[ind(0,j)]; 
+	scr.RHSvec[j] = dt*0.5*oneOverRe*scr.d3yPSI0[j];
+	scr.RHSvec[j] += scr.U0[j]; 
 	scr.RHSvec[j] += dt*forcing[ind(0,j)]; 
     }
 

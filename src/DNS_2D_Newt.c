@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu  1 Oct 11:23:43 2015
+// Last modified: Fri  2 Oct 12:28:09 2015
 
 /* Program Description:
  *
@@ -350,6 +350,7 @@ int main(int argc, char **argv)
 	#ifdef MYDEBUG
 	exit(1);
 	#endif
+
 	#ifdef OSCIL_FLOW
 	forcing[ind(0,0)] = cos(params.Omega*(time+0.5*dt)) / params.Re;
 	#endif

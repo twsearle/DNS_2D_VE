@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu  1 Oct 14:37:21 2015
+// Last modified: Fri  2 Oct 13:35:56 2015
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -49,8 +49,10 @@ double calc_cheby_KE_mode(fftw_complex *u, fftw_complex *v, int n, flow_params c
 struct lin_flow_scratch {
     complex_d *scratch, *scratch2, *scratch3, *scratch4, *scratch5;
     complex_d *U0, *u, *v, *udxlplpsi, *vdylplpsi, *biharmpsi, *lplpsi;
-    complex_d *d2ypsi;
-    complex_d *dyyyPSI0, *dypsi, *vdyypsi;
+
+    complex_d *d2yPSI0, *d3yPSI0;
+
+    complex_d *d2ypsi, *d3ypsi;
     complex_d *d4ypsi, *d4xpsi, *d2xd2ypsi;
     complex_d *dxu, *dyu, *dxv, *dyv;
 
@@ -66,8 +68,6 @@ struct lin_flow_scratch {
 
     fftw_complex *RHSvec;
     
-    fftw_complex *opsList, *hopsList, *tmpop;
-
     fftw_plan *phys_plan, *spec_plan;
 };
 

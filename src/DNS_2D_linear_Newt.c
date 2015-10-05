@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu  1 Oct 13:43:50 2015
+// Last modified: Mon  5 Oct 10:26:41 2015
 
 /* Program Description:
  *
@@ -57,6 +57,7 @@
 
 int main(int argc, char **argv) 
 {
+
     flow_params params;
     int stepsPerFrame = 0;
     int numTimeSteps = 0;
@@ -65,9 +66,7 @@ int main(int argc, char **argv)
     double time = 0;
     double KE0 = 1.0;
     double KE1 = 0.0;
-    double KE2 = 0.0;
     double KE_tot = 0.0;
-    double KE_xdepend = 0.0;
 
     opterr = 0;
     int shortArg;
@@ -85,9 +84,13 @@ int main(int argc, char **argv)
 
     // Read in parameters from cline args.
 
+
     while ((shortArg = getopt (argc, argv, "dN:M:U:k:R:W:b:w:t:s:T:")) != -1)
 	switch (shortArg)
 	  {
+	  case 'N':
+	    params.N = atoi(optarg);
+	    break;
 	  case 'M':
 	    params.M = atoi(optarg);
 	    break;
@@ -143,6 +146,8 @@ int main(int argc, char **argv)
 	params.Mf = params.M;
     }
 
+
+
     printf("PARAMETERS: ");
     printf("\nN                   \t %d ", params.N);
     printf("\nM                   \t %d ", params.M);
@@ -156,18 +161,18 @@ int main(int argc, char **argv)
     printf("\nNumber of Time Steps\t %d ", numTimeSteps);
     printf("\nTime Steps per frame\t %d \n", stepsPerFrame);
 
-    FILE *tracefp, *traceU, *trace1mode;
+    FILE *tracefp, *tracePSI, *trace1mode;
     char *trace_fn, *traj_fn;
     int i, j;
-    int N = 1;
+    int N = params.N;
     int M = params.M;
     int Mf = params.Mf;
 
+
     trace_fn = "./output/trace.dat";
     traj_fn = "./output/traj_psi.h5";
-
     tracefp = fopen(trace_fn, "w");
-    traceU = fopen("./output/traceU.dat", "w");
+    tracePSI = fopen("./output/tracePSI.dat", "w");
     trace1mode = fopen("./output/traceMode.dat", "w");
 
     // Variables for HDF5 output
@@ -206,6 +211,8 @@ int main(int argc, char **argv)
     fftwFlag = FFTW_MEASURE;
     #endif
 
+
+
     // dynamically malloc array of complex numbers.
     tmpop = (complex_d*) fftw_malloc(M*M * sizeof(complex_d));
     opsList = (complex_d*) fftw_malloc((N+1)*M*M * sizeof(complex_d));
@@ -224,15 +231,15 @@ int main(int argc, char **argv)
     scr.v = (complex_d*) fftw_malloc(M * sizeof(complex_d));
     scr.udxlplpsi = (complex_d*) fftw_malloc(M * sizeof(complex_d));
     scr.vdylplpsi = (complex_d*) fftw_malloc(M * sizeof(complex_d));
-    scr.lplpsi = (complex_d*) fftw_malloc(M * sizeof(complex_d));
     scr.biharmpsi = (complex_d*) fftw_malloc(M * sizeof(complex_d));
+    scr.lplpsi = (complex_d*) fftw_malloc(M * sizeof(complex_d));
+    scr.d2yPSI0 = (complex_d*) fftw_malloc(M * sizeof(complex_d));
+    scr.d3yPSI0 = (complex_d*) fftw_malloc(M * sizeof(complex_d));
     scr.d2ypsi = (complex_d*) fftw_malloc(M * sizeof(complex_d));
-    scr.dyyypsi = (complex_d*) fftw_malloc(M * sizeof(complex_d));
+    scr.d3ypsi = (complex_d*) fftw_malloc(M * sizeof(complex_d));
     scr.d4ypsi = (complex_d*) fftw_malloc(M * sizeof(complex_d));
     scr.d4xpsi = (complex_d*) fftw_malloc(M * sizeof(complex_d));
     scr.d2xd2ypsi = (complex_d*) fftw_malloc(M * sizeof(complex_d));
-    scr.dypsi = (complex_d*) fftw_malloc(M * sizeof(complex_d));
-    scr.vdyypsi = (complex_d*) fftw_malloc(M * sizeof(complex_d));
 
     scr.scratchin = (fftw_complex*) fftw_malloc((2*Mf-2) * sizeof(fftw_complex));
     scr.scratchout = (fftw_complex*) fftw_malloc((2*Mf-2) * sizeof(fftw_complex));
@@ -310,8 +317,7 @@ int main(int argc, char **argv)
     
     // perform the time iteration
     printf("\n------\nperforming the time iteration\n------\n");
-    printf("\nTime:\t\tKE0:\n");
-
+    printf("\nTime:\t\tKE_tot:\t\tKE0:\t\tKE1:\n");
     for (timeStep=0; timeStep<=numTimeSteps; timeStep++)
     {
 
@@ -327,18 +333,23 @@ int main(int argc, char **argv)
 	    }
 	}
 
+
 	#ifdef OSCIL_FLOW
 	forcing[ind(0,0)] = cos(params.Omega*time) / params.Re;
 	#endif
 
-	step_sf_SI_Crank_Nicolson( psi2, psi, dt/2., timeStep, forcing, hopsList, scr, params);
+	step_sf_linear_SI_Crank_Nicolson( psi2, psi, dt/2., timeStep, forcing, hopsList, scr, params);
 
 	#ifdef OSCIL_FLOW
 	forcing[ind(0,0)] = cos(params.Omega*(time+0.5*dt)) / params.Re;
 	#endif
+	#ifdef MYDEBUG 
+	printf("\nFORCE END THE DEBUGGING RUN\n");
+	break;
+	#endif
 
 	// 'corrector' step to calculate full step based on nonlinear terms from predictor step
-	step_sf_SI_Crank_Nicolson( psi, psi2, dt, timeStep, forcing, opsList, scr, params);
+	step_sf_linear_SI_Crank_Nicolson( psi, psi2, dt, timeStep, forcing, opsList, scr, params);
 
 	if (timeStep==0)
 	{
@@ -349,8 +360,8 @@ int main(int argc, char **argv)
 	if ((timeStep % stepsPerFrame) == 0 )
 	{
 
-	    double normU1 = 0;
-	    double normU0 = 0;
+	    double normPSI1 = 0;
+	    double normPSI0 = 0;
 
 	    for (j=0; j<M; j++)
 	    {
@@ -364,14 +375,14 @@ int main(int argc, char **argv)
 
 	    for (j=M-1; j>=0; j=j-1)
 	    {
-		normU0 += creal(scr.U0[j]*conj(scr.U0[j])); 
-		normU1 += creal(scr.u[j]*conj(scr.u[j])); 
+		normPSI0 += creal(psi[ind(0,j)]*conj(psi[ind(0,j)])); 
+		normPSI1 += creal(psi[ind(1,j)]*conj(psi[ind(1,j)])); 
 	    }
 
-	    fprintf(traceU, "%e\t%e\t%e\n", time, normU0, normU1);
+	    fprintf(tracePSI, "%e\t%e\t%e\n", time, normPSI0, normPSI1);
 
-	    KE0 = calc_KE_mode(scr.U0, scr.U0, 0, params) * (15.0/ 8.0) * 0.5;
-	    KE1 = calc_KE_mode(scr.u, scr.v, 1, params) * (15.0/ 8.0);
+	    KE0 = calc_cheby_KE_mode(scr.U0, scr.U0, 0, params) * (15.0/ 8.0) * 0.5;
+	    KE1 = calc_cheby_KE_mode(scr.u, scr.v, 1, params) * (15.0/ 8.0);
     
 	    KE_tot = KE0 + KE1;
 
@@ -382,10 +393,12 @@ int main(int argc, char **argv)
 	    
 	    fprintf(tracefp, "%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1);
 
-	    fflush(traceU);
+	    fflush(tracePSI);
 	    fflush(trace1mode);
 	    fflush(tracefp);
 	    H5Fflush(hdf5fp, H5F_SCOPE_GLOBAL);
+
+
 
 	}
 
@@ -395,7 +408,7 @@ int main(int argc, char **argv)
     save_hdf5_state("./output/final.h5", &psi[0], params);
 
     fclose(tracefp);
-    fclose(traceU);
+    fclose(tracePSI);
     fclose(trace1mode);
 
     // clean up hdf5
@@ -419,6 +432,8 @@ int main(int argc, char **argv)
     fftw_free(scr.scratch3);
     fftw_free(scr.scratch4);
     fftw_free(scr.U0);
+    fftw_free(scr.d2yPSI0);
+    fftw_free(scr.d3yPSI0);
     fftw_free(scr.u);
     fftw_free(scr.v);
     fftw_free(scr.udxlplpsi);
@@ -430,12 +445,10 @@ int main(int argc, char **argv)
     fftw_free(scr.scratchp1);
     fftw_free(scr.scratchp2);
     fftw_free(scr.d2ypsi);
-    fftw_free(scr.dyyypsi);
+    fftw_free(scr.d3ypsi);
     fftw_free(scr.d4ypsi);
     fftw_free(scr.d4xpsi);
     fftw_free(scr.d2xd2ypsi);
-    fftw_free(scr.dypsi);
-    fftw_free(scr.vdyypsi);
     fftw_free(scr.RHSvec);
 
     printf("quitting c program\n");

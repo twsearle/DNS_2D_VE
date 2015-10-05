@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Mon  5 Oct 09:52:55 2015
+#   Last modified: Mon  5 Oct 09:37:39 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -45,6 +45,7 @@ import subprocess
 import h5py
 
 import fields_2D as f2d
+import TobySpectralMethods as tsm
 
 # SETTINGS---------------------------------------------------------------------
 
@@ -283,6 +284,42 @@ def stupid_transform_i(GLspec, CNSTS):
 
     return out
 
+def test_arrays_equal(arr1, arr2, tol=1e-12):
+    testBool = allclose(arr1, arr2)
+    print testBool
+    if not testBool:
+        print 'difference', linalg.norm(arr1-arr2)
+
+        if linalg.norm(arr1-arr2)>tol:
+            print 'relative difference', linalg.norm(arr1-arr2)
+
+            print "max difference", amax(arr1-arr2)
+            print "max difference arg", argmax(arr1-arr2)
+
+            if shape(arr1) == (M, 2*N+1):
+                print "mode 0", linalg.norm(arr1[:,0]-arr2[:,0])
+                for n in range(1,N+1):
+                    print "mode", n, linalg.norm(arr1[:, n]-arr2[:, n])
+                    print "mode", -n,linalg.norm(arr1[:, n]-arr2[:, n])
+
+            if shape(arr1) == ((2*N+1)*M):
+                print "mode 0", linalg.norm(arr1[N*M:(N+1)*M]-arr2[N*M:(N+1)*M])
+                for n in range(1,N+1):
+                    print "mode", n, linalg.norm(arr1[(N+n)*M:(N+n+1)*M]-arr2[(N+n)*M:(N+n+1)*M])
+                    print "mode", -n,linalg.norm(arr1[(N-n)*M:(N+1-n)*M]-arr2[(N-n)*M:(N+1-n)*M])
+
+
+            imshow(real(ctestSpec3), origin='lower')
+            colorbar()
+            show()
+            imshow(real(pythonSpec3), origin='lower')
+            colorbar()
+            show()
+
+            print 'FAIL'
+
+            exit(1)
+
 # -----------------------------------------------------------------------------
 # MAIN
 # -----------------------------------------------------------------------------
@@ -348,89 +385,16 @@ PSI = zeros((2*N+1)*M, dtype='complex')
 
 plugAmp = 0.00 #* (M/32.0)
 
-PSI[N*M]   += (1.-plugAmp) * 2.0/3.0
-PSI[N*M+1] += (1.-plugAmp) * 3.0/4.0
-PSI[N*M+2] += (1.-plugAmp) * 0.0
-PSI[N*M+3] += (1.-plugAmp) * -1.0/12.0
+PSI[N*M]   +=  2.0/3.0
+PSI[N*M+1] +=  3.0/4.0
+PSI[N*M+2] +=  0.0
+PSI[N*M+3] +=  -1.0/12.0
 
-
-# --------------- PLUG  -----------------
-
-#PSI[N*M]   += (plugAmp) * (5.0/8.0) * 4.0/5.0
-#PSI[N*M+1] += (plugAmp) * (5.0/8.0) * 7.0/8.0
-#PSI[N*M+3] += (plugAmp) * (5.0/8.0) * -1.0/16.0
-#PSI[N*M+5] += (plugAmp) * (5.0/8.0) * -1.0/80.0
-
-#PSI[N*M:] = 0
-#PSI[:(N+1)*M] = 0
-perAmp = 1e-7
-
-rn = (10.0**(-1))*(0.5-rand(5))
-rSpace = zeros(M, dtype='complex')
-y = 2.0*arange(M)/(M-1.0) -1.0
-
-## sinusoidal
-rSpace =  perAmp*sin(1.0 * 2.0*pi * y) * rn[0]
-rSpace += perAmp*sin(2.0 * 2.0*pi * y) * rn[1]
-rSpace += perAmp*sin(3.0 * 2.0*pi * y) * rn[2]
-## cosinusoidal 
-rSpace += perAmp*cos(1.0 * 2.0*pi * y) * rn[3]
-rSpace += perAmp*cos(2.0 * 2.0*pi * y) * rn[4]
-
-## low order eigenfunction of biharmonic operator
-#rSpace = (sin(pscale * y)/(pscale*cos(pscale)) - sinh(gam*y)/(gam*cosh(gam))) * rn[0]
-
-PSI[(N+1)*M:(N+2)*M] =stupid_transform(rSpace, CNSTS)
+PSI[(N+1)*M:(N+2)*M] = rand(M) + 1.j*rand(M)
 PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
 
 forcing = zeros((M,3), dtype='complex')
 forcing[0,0] = 2.0/Re
-
-
-# --------------- SHEAR LAYER -----------------
-#
-#y_points = cos(pi*arange(Mf)/(Mf-1))
-#delta = 0.1
-#
-## Set initial streamfunction
-#PSI = zeros((Mf, 2*Nf+1), dtype='d')
-#
-#for i in range(Mf):
-#    y =y_points[i]
-#    for j in range(2*Nf+1):
-#        PSI[i,j] = delta * (1./tanh(1./delta)) * log(cosh(y/delta))
-#
-#del y, i, j
-#
-#PSI = f2d.to_spectral(PSI, CNSTS)
-#
-##test = f2d.dy(PSI, CNSTS) 
-##test = f2d.to_physical(test, CNSTS)
-##savetxt('U.dat', vstack((y_points,test[:,0])).T)
-##PSI = f2d.to_physical(PSI, CNSTS)
-##savetxt('PSI.dat', vstack((y_points,PSI[:,0])).T)
-##exit(1)
-#
-#PSI = fftshift(PSI, axes=1)
-#PSI = PSI.T.flatten()
-#
-## set forcing
-#forcing = zeros((Mf, 2*Nf+1), dtype='d')
-#test = zeros((Mf, 2*Nf+1), dtype='d')
-#
-#for i in range(Mf):
-#    y =y_points[i]
-#    for j in range(2*Nf+1):
-#        forcing[i,j] = ( 2.0/tanh(1.0/delta)) * (1.0/cosh(y/delta)**2) * tanh(y/delta)
-#        forcing[i,j] *= 1.0/(Re * delta**2) 
-#
-#del y, i, j
-#forcing = f2d.to_spectral(forcing, CNSTS)
-#
-## set BC
-#CNSTS['U0'] = 1.0
-
-# ----------------------------------------------------------------------------
 
 
 f = h5py.File("forcing.h5", "w")
@@ -527,5 +491,245 @@ else:
 subprocess.call(cargs)
 
 # Read in data from the C code
-print 'done'
 
+tsm.initTSM(N_=N,M_=M,kx_=kx)
+MDY = tsm.mk_diff_y()
+MDX = tsm.mk_diff_x()
+
+print """
+-------------
+Input psi
+-------------
+"""
+print shape(load_hdf5_state("./output/psi.h5"))
+print shape(PSI)
+psic = load_hdf5_state("./output/psi.h5").reshape(2*N+1, M).T 
+
+print 'initial streamfunction?'
+test_arrays_equal(PSI, psic)
+
+#print 'zeroth mode c-python', psic[:M]- PSI[:M]
+
+# switch PSI back to normal ordering for F modes
+PSI = fftshift(PSI, axes=1)
+PSI = PSI.T.flatten()
+PSIbkp = copy(PSI)
+
+print """
+---------------------
+derivatives and terms 
+---------------------
+"""
+# u
+U = dot(MDY, PSI)
+USQ = dot(tsm.prod_mat(U), U)
+
+INTY = mk_cheb_int()
+print 'KE0 (U^2 only): ', (15.0/16.0)*dot(INTY, USQ[N*M:(N+1)*M])
+
+# read in and make it 2D to get rid of the junk Cheby modes.
+# Then take transpose and flatten to return to 2*N+1 chunks of M length.
+U0c = load_hdf5_state("./output/U0.h5") 
+
+print 'U0 ?'
+test_arrays_equal(U[N*M:(N+1)*M], U0c)
+
+uc = load_hdf5_state("./output/u.h5") 
+print 'u ?'
+test_arrays_equal(U[(N+1)*M:(N+2)*M], uc)
+
+# v
+V = -dot(MDX, PSI)
+
+vc = load_hdf5_state("./output/v.h5")
+
+print 'V ?'
+test_arrays_equal(V[(N+1)*M:(N+2)*M], vc)
+
+lplc = load_hdf5_state("./output/lplpsi.h5")
+
+# THE ORDER OF OPERATIONS HERE MATTERS!
+#LPLPSI = dot(dot(MDY,MDY) + dot(MDX,MDX), PSI)
+LPLPSI = dot(dot(MDY,MDY), PSI) + dot(dot(MDX,MDX), PSI)
+
+print 'laplacian psi ?'
+test_arrays_equal(LPLPSI[(N+1)*M:(N+2)*M], lplc)
+
+
+d2yc = load_hdf5_state("./output/d2ypsi.h5")
+
+D2YPSI = dot(MDY, dot(MDY,PSI) )
+D2YPSIud = dot(MDY[:, ::-1], dot(MDY[:, ::-1],PSI[::-1])[::-1] )
+
+print 'd2y psi ?'
+test_arrays_equal(D2YPSI[(N+1)*M:(N+2)*M], d2yc)
+
+d3ypsi0c = load_hdf5_state("./output/d2ypsi0.h5")
+print 'd2y PSI0 ?'
+test_arrays_equal(D2YPSI[(N)*M:(N+1)*M], d3ypsi0c)
+
+d3yc = load_hdf5_state("./output/d3ypsi.h5")
+
+D3YPSI = dot(MDY, dot(MDY, dot(MDY,PSI) ) )
+
+print 'd3y psi ?'
+test_arrays_equal(D3YPSI[(N+1)*M:(N+2)*M], d3yc)
+
+d3ypsi0c = load_hdf5_state("./output/d3ypsi0.h5")
+print 'd3yPSI0 ?'
+test_arrays_equal(D3YPSI[(N)*M:(N+1)*M], d3ypsi0c)
+
+d4yc = load_hdf5_state("./output/d4ypsi.h5")
+
+D4YPSI = dot(MDY, dot(MDY, dot(MDY, dot(MDY,PSI) ) ) )
+
+print 'd4y psi ?'
+test_arrays_equal(D4YPSI[(N+1)*M:(N+2)*M], d4yc)
+    
+d2xc = load_hdf5_state("./output/d2xpsi.h5")
+
+D2XPSI = dot(MDX, dot(MDX,PSI) )
+
+print 'd2x psi ?'
+test_arrays_equal(D2XPSI[(N+1)*M:(N+2)*M], d2xc)
+
+d4xc = load_hdf5_state("./output/d4xpsi.h5")
+
+D4XPSI = dot(MDX, dot(MDX, dot(MDX, dot(MDX,PSI) ) ) )
+
+print 'd4x psi ?'
+test_arrays_equal(D4XPSI[(N+1)*M:(N+2)*M], d4xc)
+
+d2xd2yc = load_hdf5_state("./output/d2xd2ypsi.h5")
+
+D2XD2YPSI = dot(MDX, dot(MDX, dot(MDY, dot(MDY,PSI) ) ) )
+
+print 'd2xd2y psi ?'
+test_arrays_equal(D2XD2YPSI[(N+1)*M:(N+2)*M], d2xd2yc)
+    
+biharmc = load_hdf5_state("./output/biharmpsi.h5")
+
+# ORDER OF OPERATIONS MATTERS!!!!!
+# BIHARMPSI = dot(dot(MDY,MDY) + dot(MDX,MDX), LPLPSI)
+#BIHARMPSI = dot(dot(MDY,MDY), LPLPSI) + dot(dot(MDX,MDX), LPLPSI)
+BIHARMPSI = D4XPSI + D4YPSI + 2*D2XD2YPSI 
+
+print 'biharm psi ?'
+test_arrays_equal(BIHARMPSI[(N+1)*M:(N+2)*M], biharmc)
+
+dxlplc = load_hdf5_state("./output/dxlplpsi.h5")
+
+DXLPLPSI = dot(MDX, LPLPSI)
+
+print "dxlplpsi ?"
+test_arrays_equal(DXLPLPSI[(N+1)*M:(N+2)*M], dxlplc)
+
+udxlplc = load_hdf5_state("./output/udxlplpsi.h5")
+
+UDXLPLPSI = dot(tsm.prod_mat(U), dot(MDX, LPLPSI))
+
+print 'udxlplpsi ?'
+test_arrays_equal(UDXLPLPSI[(N+1)*M:(N+2)*M], udxlplc)
+
+dylplc = load_hdf5_state("./output/dylplpsi.h5")
+
+DYLPLPSI = dot(MDY, LPLPSI)
+print "dylplPSI0 ?" 
+test_arrays_equal(DYLPLPSI[(N)*M:(N+1)*M], dylplc)
+
+vdylplc = load_hdf5_state("./output/vdylplpsi.h5")
+
+VDYLPLPSI = dot(tsm.cheb_prod_mat(V[(N+1)*M:(N+2)*M]), dot(SMDY, LPLPSI[(N)*M:(N+1)*M]))
+
+print 'vdylplPSI0 ?' 
+test_arrays_equal(VDYLPLPSI, vdylplc)
+
+
+print """
+--------------
+Operator check
+--------------
+"""
+op0c = load_hdf5_state("./output/op0.h5")#.reshape(M, M).T 
+
+print 'operator 0'
+test_arrays_equal(op0c, PsiOpInvList[0].flatten())
+
+for i in range(1,N+1):
+    opc = load_hdf5_state("./output/op{0}.h5".format(i))
+    print 'operator ',i
+    test_arrays_equal(opc, PsiOpInvList[i].flatten())
+
+hop0c = load_hdf5_state("./output/hOp0.h5")#.reshape(M, M).T 
+print 'half operator 0'
+test_arrays_equal(hop0c, PsiOpInvListHalf[0].flatten())
+
+for i in range(1,N+1):
+    hopc = load_hdf5_state("./output/hOp{0}.h5".format(i))
+    print 'half operator ',i
+    test_arrays_equal(hopc, PsiOpInvListHalf[i].flatten())
+
+DYYYPSI = dot(MDY, dot(MDY, dot(MDY, PSI)))
+
+RHSVec = zeros((2*N+1)*M, dtype='complex')
+
+RHSVec[(N+1)*M:(N+2)*M] = dt*0.25*oneOverRe*BIHARMPSI[(N+1)*M:(N+2)*M] \
+                        + LPLPSI[(N+1)*M:(N+2)*M] \
+                        - dt*0.5*UDXLPLPSI[(N+1)*M:(N+2)*M] \
+                        - dt*0.5*VDYLPLPSI 
+
+
+# Zeroth mode (dt/2 because that is how it appears in the method)
+RHSVec[N*M:(N+1)*M] = 0
+RHSVec[N*M:(N+1)*M] = dt*0.25*oneOverRe*D3YPSI[N*M:(N+1)*M] \
+        + U[N*M:(N+1)*M]
+RHSVec[N*M] += dt*oneOverRe
+
+# Apply BC's
+
+for n in range (N+1): 
+    # dyPsi(+-1) = 0  
+    # Only impose the BC which is actually present in the inverse operator
+    # we are dealing with. Remember that half the Boundary Conditions were
+    # imposed on phi, which was accounted for implicitly when we ignored it.
+    RHSVec[(N+n)*M + M-2] = 0
+    RHSVec[(N+n)*M + M-1] = 0
+del n
+
+# dyPsi0(+-1) = 0
+RHSVec[N*M + M-3] = 0
+RHSVec[N*M + M-2] = 0
+
+# Psi0(-1) = 0
+RHSVec[N*M + M-1] = 0
+
+for i in range(0,N+1):
+    RHSvecc = load_hdf5_state("./output/RHSVec{0}.h5".format(i))
+    print "RHSvec for mode ", i
+    test_arrays_equal(RHSVec[(N+i)*M:(N+1+i)*M], RHSvecc)
+
+
+# calculate the updated psi
+for i in range(M):
+    PSI[(N)*M + i] = 0
+    #for j in range(M-1,-1,-1):
+    for j in range(M):
+        PSI[(N)*M + i] += PsiOpInvList[0][i,j] * RHSVec[(N)*M + j]
+
+for n in range(1,N+1):
+    for i in range(M):
+        PSI[(N+n)*M + i] = 0
+        for j in range(M):
+            PSI[(N+n)*M + i] += PsiOpInvList[n][i,j] * RHSVec[(N+n)*M + j]
+    del n  
+
+for n in range(0,N):
+    PSI[n*M:(n+1)*M] = conj(PSI[(2*N-n)*M:(2*N+1-n)*M])
+
+print """
+==============================================================================
+
+ALL TESTS PASSED! 
+
+==============================================================================
+"""

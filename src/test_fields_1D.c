@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu  1 Oct 15:33:25 2015
+// Last modified: Fri  2 Oct 10:50:57 2015
 
 /* Program Description:
  *
@@ -140,7 +140,7 @@ int main()
 
     // test transform to spectral space
     to_cheby_spectral(physout, specout, scr, params);
-    save_hdf5_arr("./output/testSpectralT.h5", specout, shapefft);
+    save_hdf5_arr("./output/testSpectralT.h5", specout, M);
 
     // Test a convolution
     fft_cheby_convolve(arrin, arrin, specout, scr, params);
