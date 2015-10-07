@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Mon  5 Oct 09:52:55 2015
+#   Last modified: Wed  7 Oct 14:20:38 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -283,6 +283,84 @@ def stupid_transform_i(GLspec, CNSTS):
 
     return out
 
+def poiseuille_flow():
+    PSI = zeros((2*N+1)*M, dtype='complex')
+
+    PSI[N*M]   += * 2.0/3.0
+    PSI[N*M+1] += * 3.0/4.0
+    PSI[N*M+2] += * 0.0
+    PSI[N*M+3] += * -1.0/12.0
+
+    return PSI
+
+def plug_like_flow():
+    PSI = zeros((2*N+1)*M, dtype='complex')
+
+    PSI[N*M]   += (5.0/8.0) * 4.0/5.0
+    PSI[N*M+1] += (5.0/8.0) * 7.0/8.0
+    PSI[N*M+3] += (5.0/8.0) * -1.0/16.0
+    PSI[N*M+5] += (5.0/8.0) * -1.0/80.0
+
+    PSI[N*M:] = 0
+    PSI[:(N+1)*M] = 0
+    return PSI
+
+def shear_layer_flow(delta=0.1):
+    
+    y_points = cos(pi*arange(Mf)/(Mf-1))
+
+    # Set initial streamfunction
+    PSI = zeros((Mf, 2*Nf+1), dtype='d')
+
+    for i in range(Mf):
+        y =y_points[i]
+        for j in range(2*Nf+1):
+            PSI[i,j] = delta * (1./tanh(1./delta)) * log(cosh(y/delta))
+
+    del y, i, j
+
+    PSI = f2d.to_spectral(PSI, CNSTS)
+    PSI = fftshift(PSI, axes=1)
+    PSI = PSI.T.flatten()
+
+    # set forcing
+    forcing = zeros((Mf, 2*Nf+1), dtype='d')
+    
+    for i in range(Mf):
+        y =y_points[i]
+        for j in range(2*Nf+1):
+            forcing[i,j] = ( 2.0/tanh(1.0/delta)) * (1.0/cosh(y/delta)**2) * tanh(y/delta)
+            forcing[i,j] *= 1.0/(Re * delta**2) 
+    
+    del y, i, j
+    forcing = f2d.to_spectral(forcing, CNSTS)
+
+    return PSI, forcing
+
+def oscillatory_flow(Omega):
+
+    y_points = cos(pi*arange(Mf)/(Mf-1))
+
+    alpha = ( 1.0/sqrt(2) ) * (1+1.j) * sqrt( Re * Omega )
+
+    PSI = zeros((Mf, 2*Nf+1), dtype='d')
+
+    for i in range(Mf):
+        y =y_points[i]
+        for j in range(2*Nf+1):
+            PSI[i,j] = real(1.0/(Re*1.j*Omega) *
+                 (1.-cosh(alpha*y)/cosh(alpha)))
+    del y, i, j
+
+    PSI = f2d.to_spectral(PSI, CNSTS)
+    PSI = fftshift(PSI, axes=1)
+    PSI = PSI.T.flatten()
+
+    forcing = zeros((M,2*N+1), dtype='complex')
+    forcing[0,0] = Omega / Re
+
+    return PSI, forcing
+
 # -----------------------------------------------------------------------------
 # MAIN
 # -----------------------------------------------------------------------------
@@ -341,28 +419,42 @@ PSI = zeros((2*N+1)*M, dtype='complex')
 
 # Read in stream function from file
 #(PSI, Nu) = pickle.load(open(inFileName,'r'))
+#psiLam = copy(PSI)
 
 
 # --------------- POISEUILLE -----------------
 
-
-plugAmp = 0.00 #* (M/32.0)
-
-PSI[N*M]   += (1.-plugAmp) * 2.0/3.0
-PSI[N*M+1] += (1.-plugAmp) * 3.0/4.0
-PSI[N*M+2] += (1.-plugAmp) * 0.0
-PSI[N*M+3] += (1.-plugAmp) * -1.0/12.0
-
+#PSI = poiseuille_flow()
+#psiLam = copy(PSI)
 
 # --------------- PLUG  -----------------
 
-#PSI[N*M]   += (plugAmp) * (5.0/8.0) * 4.0/5.0
-#PSI[N*M+1] += (plugAmp) * (5.0/8.0) * 7.0/8.0
-#PSI[N*M+3] += (plugAmp) * (5.0/8.0) * -1.0/16.0
-#PSI[N*M+5] += (plugAmp) * (5.0/8.0) * -1.0/80.0
+#PSI = plug_like_flow()
+#psiLam = copy(PSI)
 
-#PSI[N*M:] = 0
-#PSI[:(N+1)*M] = 0
+#forcing = zeros((M,2*N+1), dtype='complex')
+#forcing[0,0] = 2.0/Re
+
+# --------------- SHEAR LAYER -----------------
+#
+#
+
+#PSI, forcing = shear_layer_flow()
+
+## set BC
+#CNSTS['U0'] = 1.0
+
+# --------------- OSCILLATORY FLOW -----------------
+#
+
+# PSI
+
+PSI, forcing = oscillatory_flow(Omega)
+psiLam = copy(PSI)
+
+
+# --------------- PERTURBATION -----------------
+#
 perAmp = 1e-7
 
 rn = (10.0**(-1))*(0.5-rand(5))
@@ -382,53 +474,6 @@ rSpace += perAmp*cos(2.0 * 2.0*pi * y) * rn[4]
 
 PSI[(N+1)*M:(N+2)*M] =stupid_transform(rSpace, CNSTS)
 PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
-
-forcing = zeros((M,3), dtype='complex')
-forcing[0,0] = 2.0/Re
-
-
-# --------------- SHEAR LAYER -----------------
-#
-#y_points = cos(pi*arange(Mf)/(Mf-1))
-#delta = 0.1
-#
-## Set initial streamfunction
-#PSI = zeros((Mf, 2*Nf+1), dtype='d')
-#
-#for i in range(Mf):
-#    y =y_points[i]
-#    for j in range(2*Nf+1):
-#        PSI[i,j] = delta * (1./tanh(1./delta)) * log(cosh(y/delta))
-#
-#del y, i, j
-#
-#PSI = f2d.to_spectral(PSI, CNSTS)
-#
-##test = f2d.dy(PSI, CNSTS) 
-##test = f2d.to_physical(test, CNSTS)
-##savetxt('U.dat', vstack((y_points,test[:,0])).T)
-##PSI = f2d.to_physical(PSI, CNSTS)
-##savetxt('PSI.dat', vstack((y_points,PSI[:,0])).T)
-##exit(1)
-#
-#PSI = fftshift(PSI, axes=1)
-#PSI = PSI.T.flatten()
-#
-## set forcing
-#forcing = zeros((Mf, 2*Nf+1), dtype='d')
-#test = zeros((Mf, 2*Nf+1), dtype='d')
-#
-#for i in range(Mf):
-#    y =y_points[i]
-#    for j in range(2*Nf+1):
-#        forcing[i,j] = ( 2.0/tanh(1.0/delta)) * (1.0/cosh(y/delta)**2) * tanh(y/delta)
-#        forcing[i,j] *= 1.0/(Re * delta**2) 
-#
-#del y, i, j
-#forcing = f2d.to_spectral(forcing, CNSTS)
-#
-## set BC
-#CNSTS['U0'] = 1.0
 
 # ----------------------------------------------------------------------------
 
