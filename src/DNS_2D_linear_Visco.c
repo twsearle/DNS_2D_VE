@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed  7 Oct 11:56:43 2015
+// Last modified: Wed  7 Oct 14:25:24 2015
 
 /* Program Description:
  *
@@ -68,6 +68,7 @@ int main(int argc, char **argv)
     double KE0 = 1.0;
     double KE1 = 0.0;
     double KE_tot = 0.0;
+    double periods, phase;
 
     opterr = 0;
     int shortArg;
