@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri  2 Oct 13:35:56 2015
+// Last modified: Tue  6 Oct 17:00:38 2015
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -56,10 +56,11 @@ struct lin_flow_scratch {
     complex_d *d4ypsi, *d4xpsi, *d2xd2ypsi;
     complex_d *dxu, *dyu, *dxv, *dyv;
 
-    complex_d *d2ycxy, *d2xcxy, *dxycyy_cxx, *dycxy;
-    complex_d *d2ycxyN, *d2xcxyN, *dxycyy_cxxN, *dycxyN;
+    complex_d *d2ycxy, *d2xcxy, *dxycyy_cxx, *dycxy, *dycxy0;
+    complex_d *d2ycxyN, *d2xcxyN, *dxycyy_cxxN, *dycxyN, *dycxy0N;
 
     complex_d *cxxdxu, *cxydyu, *vgradcxx, *cxydxv, *cyydyv;
+    complex_d *cxy0dyU0, *cyy0dyU0;
     complex_d *vgradcyy, *cxxdxv, *cyydyu, *vgradcxy;
 
     fftw_complex *scratchin, *scratchout;
