@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Wed  7 Oct 14:20:38 2015
+#   Last modified: Wed  7 Oct 14:39:02 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -57,6 +57,8 @@ Wi = 0.0
 beta = 1.0
 kx = config.getfloat('General', 'kx')
 
+Omega = config.getfloat('Oscillatory Flow', 'Omega')
+
 dt = config.getfloat('Time Iteration', 'dt')
 totTime = config.getfloat('Time Iteration', 'totTime')
 numFrames = config.getint('Time Iteration', 'numFrames')
@@ -79,7 +81,8 @@ assert (totTime / dt) - float(numTimeSteps) == 0, "Non-integer number of timeste
 NOld = N 
 MOld = M
 kwargs = {'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0, 'Re': Re, 'Wi': Wi, 'beta': beta,
-          'kx': kx,'time': totTime, 'dt':dt, 'dealiasing':dealiasing}
+          'kx': kx,'time': totTime, 'dt':dt, 'dealiasing':dealiasing,
+          'Omega':Omega}
 baseFileName  = "-N{N}-M{M}-kx{kx}-Re{Re}.pickle".format(**kwargs)
 outFileName  = "pf{0}".format(baseFileName)
 outFileNameTrace = "trace{0}.dat".format(baseFileName[:-7])
@@ -286,10 +289,10 @@ def stupid_transform_i(GLspec, CNSTS):
 def poiseuille_flow():
     PSI = zeros((2*N+1)*M, dtype='complex')
 
-    PSI[N*M]   += * 2.0/3.0
-    PSI[N*M+1] += * 3.0/4.0
-    PSI[N*M+2] += * 0.0
-    PSI[N*M+3] += * -1.0/12.0
+    PSI[N*M]   += 2.0/3.0
+    PSI[N*M+1] += 3.0/4.0
+    PSI[N*M+2] += 0.0
+    PSI[N*M+3] += -1.0/12.0
 
     return PSI
 
@@ -541,6 +544,7 @@ if dealiasing:
     cargs = ["./DNS_2D_linear_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M",
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
+             "-w", "{0:e}".format(CNSTS["Omega"]),
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
              "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),
              "-s", "{0:d}".format(stepsPerFrame), "-T",
@@ -548,6 +552,7 @@ if dealiasing:
     print "./DNS_2D_linear_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M", \
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
+             "-w", "{0:e}".format(CNSTS["Omega"]),\
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
              "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),\
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
@@ -557,6 +562,7 @@ else:
     cargs = ["./DNS_2D_linear_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M",
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
+             "-w", "{0:e}".format(CNSTS["Omega"]),
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
              "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),
              "-s", "{0:d}".format(stepsPerFrame), "-T",
@@ -564,6 +570,7 @@ else:
     print "./DNS_2D_linear_Newt", "-N", "{0:d}".format(CNSTS["N"]), "-M", \
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
+             "-w", "{0:e}".format(CNSTS["Omega"]),\
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
              "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),\
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
