@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral linear time stepping code
 #
-#   Last modified: Wed  7 Oct 09:39:04 2015
+#   Last modified: Wed  7 Oct 15:50:20 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -305,142 +305,6 @@ def stupid_transform_i(GLspec, CNSTS):
 
     return out
 
-def perturb(psi_, totEnergy, perKEestimate, sigma, gam):
-    """
-    calculate the KE for a perturbation of amplitude 1 and then choose a
-    perturbation amplitude which gives the desired perturbation KE.
-    Then use this perturbation KE to calculate a reduction in the base profile
-    such that there is the correct total energy
-    """
-
-    SMDY =  mk_single_diffy()
-
-    pscale = optimize.fsolve(lambda pscale: pscale*tan(pscale) + gam*tanh(gam), 2)
-
-    perAmp = 1.0
-    
-    rn = zeros((N,5))
-    for n in range(N):
-        rn[n,:] = (10.0**(-n))*(0.5-rand(5))
-
-    for j in range(2):
-
-        for n in range(1,N+1):
-            if (n % 2) == 0:
-
-                ##------------- PERTURBATIONS WHICH SATISFY BCS -------------------
-                rSpace = zeros(M, dtype='complex')
-                y = 2.0*arange(M)/(M-1.0) -1.0
-                ## exponentially decaying sinusoid
-                #rSpace = cos(1.0 * 2.0*pi * y) * exp(-(sigma*pi*y)**2)#  * rn[0]
-                #rSpace += cos(2.0 * 2.0*pi * y) * exp(-(sigma*pi*y)**2) * rn[1]
-                #rSpace += cos(3.0 * 2.0*pi * y) * exp(-(sigma*pi*y)**2) * rn[2]
-                #rSpace += cos(4.0 * 2.0*pi * y) * exp(-(sigma*pi*y)**2) * rn[3]
-                #rSpace += cos(5.0 * 2.0*pi * y) * exp(-(sigma*pi*y)**2) * rn[4]
-
-                ## sinusoidal
-                rSpace = perAmp*cos(1.0 * 2.0*pi * y) * rn[n-1,0]
-                rSpace += perAmp*cos(2.0 * 2.0*pi * y) * rn[n-1,1]
-                rSpace += perAmp*cos(3.0 * 2.0*pi * y) * rn[n-1,2]
-
-                ## low order eigenfunction of biharmonic operator
-                #rSpace = (cos(pscale*y)/cos(pscale) - cosh(gam*y)/(cosh(gam))) * rn[0]
-
-                #savetxt('p{0}.dat'.format(n), vstack((y,real(rSpace))).T)
-
-                psi_[(N+n)*M:(N+n+1)*M] = stupid_transform(rSpace, CNSTS)*1.j
-
-
-            else:
-                ##------------- PURE RANDOM PERTURBATIONS -------------------
-                ## Make sure you satisfy the optimum symmetry for the
-                ## perturbation
-                #psi_[(N-n)*M:(N-n)*M + M/2 - 1 :2] = (10.0**(-n+1))*perAmp*0.5*(1-rand(M/4) + 1.j*rand(M/4))
-                #psi_[(N-n)*M:(N-n)*M + 6 - 1 :2] =\
-                #(10.0**((n+1)))*perAmp*0.5*(1-rand(3) + 1.j*rand(3))
-                #psi_[(N-n)*M:(N-n)*M + M/2 - 1 :2] = perAmp*0.5*(rand(M/4) + 1.j*rand(M/4))
-
-                ##------------- PERTURBATIONS WHICH SATISFY BCS -------------------
-                rSpace = zeros(M, dtype='complex')
-                y = 2.0*arange(M)/(M-1.0) -1.0
-                ## exponentially decaying sinusoid
-                #rSpace = sin(1.0 * 2.0*pi * y) * exp(-(sigma*pi*y)**2)#  * rn[0]
-                #rSpace += sin(2.0 * 2.0*pi * y) * exp(-(sigma*pi*y)**2) * rn[1]
-                #rSpace += sin(3.0 * 2.0*pi * y) * exp(-(sigma*pi*y)**2) * rn[2]
-                #rSpace += sin(4.0 * 2.0*pi * y) * exp(-(sigma*pi*y)**2) * rn[3]
-                #rSpace += sin(5.0 * 2.0*pi * y) * exp(-(sigma*pi*y)**2) * rn[4]
-
-                ## sinusoidal
-                rSpace =  perAmp*sin(1.0 * 2.0*pi * y) * rn[n-1,0]
-                rSpace += perAmp*sin(2.0 * 2.0*pi * y) * rn[n-1,1]
-                rSpace += perAmp*sin(3.0 * 2.0*pi * y) * rn[n-1,2]
-
-                ## low order eigenfunction of biharmonic operator
-                #rSpace = (sin(pscale * y)/(pscale*cos(pscale)) - sinh(gam*y)/(gam*cosh(gam))) * rn[0]
-
-                #savetxt('p{0}.dat'.format(n), vstack((y,real(rSpace))).T)
-
-                psi_[(N+n)*M:(N+n+1)*M] =stupid_transform(rSpace, CNSTS)
-
-            psi_[(N-n)*M:(N-n+1)*M] = conj(psi_[(N+n)*M:(N+n+1)*M])
-            del y
-
-
-        KERest = 0
-        KERest2 = 0
-        for i in range(1,N+1):
-            u = dot(SMDY, psi_[(N+i)*M: (N+i+1)*M])
-            KE = 0
-            for n in range(0,M,2):
-                usq = 0
-                for m in range(n-M+1, M):
-
-                    p = abs(n-m)
-                    if (p==0):
-                        tmp = 2.0*u[p]
-                    else:
-                        tmp = u[p]
-
-                    if (abs(m)==0):
-                        tmp *= 2.0*conj(u[abs(m)])
-                    else:
-                        tmp *= conj(u[abs(m)])
-
-                    if (n==0):
-                        usq += 0.25*tmp
-                    else:
-                        usq += 0.5*tmp
-
-                KE += (2. / (1.-n*n)) * usq;
-
-            KERest += (15.0/8.0) * KE 
-            u = dot(cheb_prod_mat(u), conj(u))
-            KERest2 += (15.0/8.0) * dot(INTY, u) 
-
-        # Want KERest = 0.3
-        # perAmp^2 ~ 0.3/KERest
-        if j==0:
-            perAmp = real(sqrt(perKEestimate/KERest))
-            print 'perAmp = ', perAmp
-
-
-    print 'Initial Energy of the perturbation, ', KERest
-
-    # KE_tot = KE_0 + KE_Rest
-    # KE_0 = KE_tot - KE_Rest
-    # scale_fac^2 = 0.5*(KE_tot-KERest)
-    # scale_fac^2 = 0.5*(1/2-KERest) 
-
-    energy_rescale = sqrt((totEnergy - real(KERest)))
-    psi_[N*M:(N+1)*M] = energy_rescale*psi_[N*M:(N+1)*M]
-    u = dot(SMDY, psi_[N*M: (N+1)*M])
-    u = dot(cheb_prod_mat(u), u)
-    KE0 = 0.5*(15./8.)*dot(INTY, u)
-    print 'Rescaled zeroth KE = ', KE0
-    print 'total KE = ', KE0 + KERest2
-
-    return psi_
-
 def x_independent_profile(PSI):
     """
      I think these are the equations for the x independent stresses from the base
@@ -471,6 +335,110 @@ def cheb_prod_mat(velA):
     del m, n, itr
     return D
 
+def poiseuille_flow():
+    PSI = zeros((2*N+1)*M, dtype='complex')
+
+    PSI[N*M]   += 2.0/3.0
+    PSI[N*M+1] += 3.0/4.0
+    PSI[N*M+2] += 0.0
+    PSI[N*M+3] += -1.0/12.0
+    Cxx, Cyy, Cxy = x_independent_profile(PSI)
+    return PSI, Cxx, Cyy, Cxy
+
+def plug_like_flow():
+    PSI = zeros((2*N+1)*M, dtype='complex')
+
+    PSI[N*M]   += (5.0/8.0) * 4.0/5.0
+    PSI[N*M+1] += (5.0/8.0) * 7.0/8.0
+    PSI[N*M+3] += (5.0/8.0) * -1.0/16.0
+    PSI[N*M+5] += (5.0/8.0) * -1.0/80.0
+
+    PSI[N*M:] = 0
+    PSI[:(N+1)*M] = 0
+    Cxx, Cyy, Cxy = x_independent_profile(PSI)
+    return PSI, Cxx, Cyy, Cxy
+
+def shear_layer_flow(delta=0.1):
+    
+    y_points = cos(pi*arange(Mf)/(Mf-1))
+
+    # Set initial streamfunction
+    PSI = zeros((Mf, 2*Nf+1), dtype='d')
+
+    for i in range(Mf):
+        y =y_points[i]
+        for j in range(2*Nf+1):
+            PSI[i,j] = delta * (1./tanh(1./delta)) * log(cosh(y/delta))
+
+    del y, i, j
+
+    PSI = f2d.to_spectral(PSI, CNSTS)
+    PSI = fftshift(PSI, axes=1)
+    PSI = PSI.T.flatten()
+
+    # set forcing
+    forcing = zeros((Mf, 2*Nf+1), dtype='d')
+    
+    for i in range(Mf):
+        y =y_points[i]
+        for j in range(2*Nf+1):
+            forcing[i,j] = ( 2.0/tanh(1.0/delta)) * (1.0/cosh(y/delta)**2) * tanh(y/delta)
+            forcing[i,j] *= 1.0/(Re * delta**2) 
+    
+    del y, i, j
+    forcing = f2d.to_spectral(forcing, CNSTS)
+
+    Cxx, Cyy, Cxy = x_independent_profile(PSI)
+
+    return PSI, Cxx, Cyy, Cxy, forcing
+
+def oscillatory_flow():
+    """
+    Some flow variables must be calculated in realspace and then transformed
+    spectral space, Cyy =1.0 so it is easy.
+    """
+
+    y_points = cos(pi*arange(Mf)/(Mf-1))
+
+    alpha = ( 1.0/sqrt(2) ) * (1+1.j) * sqrt( Re * Omega )
+
+    PSI = zeros((Mf, 2*Nf+1), dtype='d')
+    Cxx = zeros((Mf, 2*Nf+1), dtype='d')
+    Cxy = zeros((Mf, 2*Nf+1), dtype='d')
+
+    for i in range(Mf):
+        y =y_points[i]
+        for j in range(2*Nf+1):
+            psi_im = 1.0/(Re*1.j*Omega) *(y-sinh(alpha*y)/(alpha*cosh(alpha)))
+            PSI[i,j] = real(psi_im)
+
+            dyu_im = 1.0/(Re*1.j*Omega) *(-alpha*sinh(alpha*y)/(cosh(alpha)))
+            Cxy[i,j] = real( (1.0/(1.0+1.j*Wi*Omega)) * (Wi*dyu_im) )
+
+            #Cxx[i,j] = real( 2.0*(1.0/(1.0+1.j*Wi*Omega))**2 * (Wi*dyu_im)**2 + 1.0)
+            Cxx[i,j] = real( 2.0*((1.0/(1.0+1.j*Wi*Omega)) * (Wi*dyu_im))**2 + 1.0)
+
+
+    del y, i, j
+
+    # transform to spectral space.
+    PSI = f2d.to_spectral(PSI, CNSTS)
+    PSI = fftshift(PSI, axes=1)
+    PSI = PSI.T.flatten()
+    Cxx = f2d.to_spectral(Cxx, CNSTS)
+    Cxx = fftshift(Cxx, axes=1)
+    Cxx = Cxx.T.flatten()
+    Cxy = f2d.to_spectral(Cxy, CNSTS)
+    Cxy = fftshift(Cxy, axes=1)
+    Cxy = Cxy.T.flatten()
+
+    Cyy = zeros((2*N+1)*M, dtype='complex')
+    Cyy[N*M] = 1.0
+
+    forcing = zeros((M,2*N+1), dtype='complex')
+    forcing[0,0] = Omega / Re
+
+    return PSI, Cxx, Cyy, Cxy, forcing
 
 # -----------------------------------------------------------------------------
 # MAIN
@@ -539,97 +507,26 @@ Cxy = zeros((2*N+1)*M,dtype='complex')
 
 # --------------- POISEUILLE -----------------
 
-PSI[N*M]   += 2.0/3.0
-PSI[N*M+1] += 3.0/4.0
-PSI[N*M+2] += 0.0
-PSI[N*M+3] += -1.0/12.0
 
-## set initial stress guess based on laminar flow
-Cxx, Cyy, Cxy = x_independent_profile(PSI)
-psiLam = copy(PSI)
+#PSI, Cxx, Cyy, Cxy, forcing = poiseuille_flow()
 
-forcing = zeros((M,2*N+1), dtype='complex')
-forcing[0,0] = 2.0/Re
 
 # --------------- SHEAR LAYER -----------------
 #
-#y_points = cos(pi*arange(Mf)/(Mf-1))
-#
-## Set initial streamfunction
-#PSI = zeros((Mf, 2*Nf+1), dtype='d')
-#
-#for i in range(Mf):
-#    y =y_points[i]
-#    for j in range(2*Nf+1):
-#        PSI[i,j] = delta * (1./tanh(1./delta)) * log(cosh(y/delta))
-#
-#del y, i, j
-#
-#PSI = f2d.to_spectral(PSI, CNSTS)
-#
-#
-#
-#
-#PSI = fftshift(PSI, axes=1)
-#PSI = PSI.T.flatten()
-#psiLam = copy(PSI)
-#Cxx, Cyy, Cxy = x_independent_profile(PSI)
-#
-##perKEestimate = 1e-12
-##totEnergy = 1.687501 
-##sigma = 0.1
-##gam = 2
-##
-##PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
-#
-## WARNING THIS DOESN'T SATISFY THE BCS??
-#PSI[(N+1)*M:(N+1)*M + M/2] = 1e-12*(1*rand(M/2) + 1.j*rand(M/2))
-#PSI[(N-1)*M:N*M] = conj(PSI[(N+1)*M:(N+2)*M])
-#
-#
-## set forcing
-#forcing = zeros((Mf, 2*Nf+1), dtype='d')
-##test = zeros((Mf, 2*Nf+1), dtype='d')
-#
-#for i in range(Mf):
-#    y =y_points[i]
-#    for j in range(2*Nf+1):
-#        forcing[i,j] = ( 2.0/tanh(1.0/delta)) * (1.0/cosh(y/delta)**2) * tanh(y/delta)
-#        forcing[i,j] *= 1.0/(Re * delta**2) 
-#
-#del y, i, j
-#forcing = f2d.to_spectral(forcing, CNSTS)
-#forcing[:, 1:] = 0
+
+#PSI, Cxx, Cyy, Cxy, forcing = shear_layer_flow()
+
 ## set BC
 #CNSTS['U0'] = 1.0
 
 # --------------- OSCILLATORY FLOW -----------------
 #
 
-# PSI
-#y_points = cos(pi*arange(Mf)/(Mf-1))
-#
-## Set initial streamfunction
-#PSI = zeros((Mf, 2*Nf+1), dtype='d')
-#
-#for i in range(Mf):
-#    y =y_points[i]
-#    for j in range(2*Nf+1):
-#        PSI[i,j] = 
-#
-#del y, i, j
-#
-#PSI = f2d.to_spectral(PSI, CNSTS)
-#
-#PSI = fftshift(PSI, axes=1)
-#PSI = PSI.T.flatten()
-#psiLam = copy(PSI)
-#
-#forcing = zeros((M,2*N+1), dtype='complex')
-#forcing[0,0] = Omega / Re
+PSI, Cxx, Cyy, Cxy, forcing = oscillatory_flow()
 
 
 # ---------------------PERTURBATION-----------------------------------------
+psiLam = copy(PSI)
 
 perAmp = 1e-7
 

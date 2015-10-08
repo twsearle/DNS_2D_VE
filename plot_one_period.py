@@ -3,9 +3,7 @@ from scipy import linalg
 from scipy import fftpack
 from numpy.fft import fftshift, ifftshift
 from scipy.fftpack import dct as dct
-import matplotlib
-matplotlib.use('tkAgg')
-import matplotlib.animation
+import matplotlib.pyplot as plt
 
 import cPickle as pickle
 
@@ -24,10 +22,10 @@ Re = config.getfloat('General', 'Re')
 Wi = config.getfloat('General', 'Wi')
 beta = config.getfloat('General', 'beta')
 kx = config.getfloat('General', 'kx')
-Nf = 50
-Mf = 100
+Omega = config.getfloat('Oscillatory Flow', 'Omega')
+Nf = 4*N
+Mf = 2*M
 
-n = 0 #None
 varName = 'cxx'
 
 dt = config.getfloat('Time Iteration', 'dt')
@@ -40,7 +38,7 @@ fp.close()
 
 numTimeSteps = int(totTime / dt)
 
-kwargs = {'N': N, 'M': M, 'Nf': Nf, 'Mf':Mf, 
+kwargs = {'N': N, 'M': M, 'Nf': Nf, 'Mf':Mf, 'Omega':Omega,
           'Re': Re,'Wi': Wi, 'beta': beta, 'kx': kx,'time':
           totTime, 'dt':dt, 'dealiasing':dealiasing }
 
@@ -177,8 +175,8 @@ def animate(i):
 
     # plot graph
     time = i*(totTime/numFrames)
-    matplotlib.pyplot.title('$\psi_{0}$ red real part, green imaginary, t ={1}'.format(n, time))
-    matplotlib.pyplot.draw()
+    plt.title('$\psi_{0}$ red real part, green imaginary, t ={1}'.format(n, time))
+    plt.draw()
 
     line1.set_data(y, ti_mode_r)
     line2.set_data(y, ti_mode_i)
@@ -211,8 +209,8 @@ def animate_all(i):
 
     # plot graph
     #time = i*(totTime/numFrames)
-    #matplotlib.pyplot.title('$\psi_{0}$ red real part, green imaginary, t ={1}'.format(n, time))
-    #matplotlib.pyplot.draw()
+    #plt.title('$\psi_{0}$ red real part, green imaginary, t ={1}'.format(n, time))
+    #plt.draw()
 
     return line0r, line0i, line1r, line1i, line2r, line2i, timetext
 
@@ -233,105 +231,38 @@ NumTimeSteps\t= {NT}
 
 f = h5py.File(inFileName, "r")
 
-time = 0.0
 y = cos(pi*arange(Mf)/(Mf-1))
 
 # Compare mode by mode
-if n != None:
-    fig = matplotlib.pyplot.figure()
-    matplotlib.pyplot.title('$u_{0}$ red real part, green imaginary, t ={1}'.format(n, time))
-    matplotlib.pyplot.xlabel('y')
-    matplotlib.pyplot.ylabel('$u_{0}$'.format(n))
+fig = plt.figure()
+plt.title('{0} red real part, green imaginary, dots after one period'.format(varName))
+plt.xlabel('y')
+plt.ylabel('{0}'.format(varName))
 
-    subplot_indices= {0:321, 1:322, 2:323, 3:324, 4:325, 5:326}
+tmp = load_hdf5_snapshot(f, 0.0, varName).reshape((N+1, M)).T
+init_var_ti = zeros((M,2*N+1), dtype='complex')
+init_var_ti[:, :N+1] = tmp
+init_var_ti[:, N+1:] = conj(fliplr(tmp[:,1:]))
 
-    ax = matplotlib.pyplot.axes(xlim=(-1., 1.), ylim=(-0.1,0.1))
+period = 2*pi / Omega
+dt_frame = (totTime/numFrames)
+frameNum = floor(period/dt_frame)
+time = frameNum*dt_frame
 
-    line1, = ax.plot([], [], 'r', lw=1 )
-    line2, = ax.plot([], [], 'g', lw=1 )
+tmp = load_hdf5_snapshot(f, time, varName).reshape((N+1, M)).T
+final_var_ti = zeros((M,2*N+1), dtype='complex')
+final_var_ti[:, :N+1] = tmp
+final_var_ti[:, N+1:] = conj(fliplr(tmp[:,1:]))
 
+# convert to real space
+init_r = backward_cheb_transform(real(init_var_ti[:, 0]), CNSTS)
+init_i = backward_cheb_transform(imag(init_var_ti[:, 0]), CNSTS)
 
-    tmp = load_hdf5_snapshot(f, time, varName).reshape((N+1, M)).T
-    var_ti = zeros((M,2*N+1), dtype='complex')
-    var_ti[:, :N+1] = tmp
-    var_ti[:, N+1:] = conj(fliplr(tmp[:,1:]))
+final_r = backward_cheb_transform(real(final_var_ti[:, 0]), CNSTS)
+final_i = backward_cheb_transform(imag(final_var_ti[:, 0]), CNSTS)
 
-
-    # Match phase and convert to real space
-    ti_mode_r = backward_cheb_transform(real(var_ti[:, n]), CNSTS)
-    ti_mode_i = backward_cheb_transform(imag(var_ti[:, n]), CNSTS)
-    psi_data = [ti_mode_r, ti_mode_i]
-
-    for i in range(1, numFrames):
-        time = i*(totTime/numFrames)
-        tmp = load_hdf5_snapshot(f, time, varName).reshape((N+1, M)).T
-        var_ti = zeros((M,2*N+1), dtype='complex')
-        var_ti[:, :N+1] = tmp
-        var_ti[:, N+1:] = conj(fliplr(tmp[:,1:]))
-
-        u_ti =  f2d.dy(var_ti, CNSTS)
-
-        # Match phase and convert to real space
-        ti_mode_r = backward_cheb_transform(real(u_ti[:,n]), CNSTS)
-        ti_mode_i = backward_cheb_transform(imag(u_ti[:,n]), CNSTS)
-        psi_data.append([ti_mode_r, ti_mode_i])
-
-    anim = matplotlib.animation.FuncAnimation(fig, animate, init_func=init,
-                                              frames=numFrames,
-                                  interval=1, blit=True)
-
-else:
-    fig = matplotlib.pyplot.figure(figsize=(15,4.5), tight_layout=True)
-
-    # Set up the plot
-
-    # mode 0
-    ax0 = fig.add_subplot(131)
-    ax0.set_xlim([-1., 1.])
-    ax0.set_ylim([-1.1, 1.1])
-    ax0.set_xlabel('y')
-    ax0.set_ylabel('$u_{n}$'.format(n=0))
-
-    line0r, = ax0.plot([], [], 'r', lw=1 )
-    line0i, = ax0.plot([], [], 'g', lw=1 )
-
-    # mode 1
-    ax1 = fig.add_subplot(132)
-    ax1.set_xlim([-1., 1.])
-    ax1.set_ylim([-0.01, 0.01])
-    ax1.set_xlabel('y')
-    ax1.set_ylabel('$u_{n}$'.format(n=1))
-    timetext = ax1.text(0.0,0.05,'')
-
-    line1r, = ax1.plot([], [], 'r', lw=1 )
-    line1i, = ax1.plot([], [], 'g', lw=1 )
-
-    # mode 2
-    ax2 = fig.add_subplot(133)
-    ax2.set_xlim([-1., 1.])
-    ax2.set_ylim([-0.01, 0.01])
-    ax2.set_xlabel('y')
-    ax2.set_ylabel('$u_{n}$'.format(n=2))
-
-    line2r, = ax2.plot([], [], 'r', lw=1 )
-    line2i, = ax2.plot([], [], 'g', lw=1 )
-
-    matplotlib.pyplot.suptitle(
-        '$u$ red real part, green, imaginary'.format(time))
-
-    #### Convert the time series to real space
-
-    u_data0 = convert_series(f, 0)
-    u_data1 = convert_series(f, 1)
-    u_data2 = convert_series(f, 2)
-
-    # animate
-    anim = matplotlib.animation.FuncAnimation(fig, animate_all,
-                                              init_func=init_all,
-                                              frames=numFrames,
-                                  interval=1, blit=True)
-
-f.close()
-
-matplotlib.pyplot.show(block='True')
-
+plt.plot(y,  init_r, 'r-')
+#plt.plot(y,  init_i, 'g-')
+plt.plot(y,  final_r, 'ro')
+#plt.plot(y,  final_i, 'go')
+plt.show(block='True')

@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed  7 Oct 14:25:24 2015
+// Last modified: Wed  7 Oct 15:23:20 2015
 
 /* Program Description:
  *
@@ -176,7 +176,7 @@ int main(int argc, char **argv)
 
 
     trace_fn = "./output/trace.dat";
-    traj_fn = "./output/traj_psi.h5";
+    traj_fn = "./output/traj.h5";
     tracefp = fopen(trace_fn, "w");
     tracePSI = fopen("./output/tracePSI.dat", "w");
     trace1mode = fopen("./output/traceMode.dat", "w");
@@ -466,8 +466,9 @@ int main(int argc, char **argv)
 
 	    printf("%e\t%e\t%e\t%e\t\n", time, KE_tot, KE0, KE1);
 	    
-	    save_hdf5_snapshot(&hdf5fp, &filetype_id, &datatype_id,
-		    psi, time, params);
+            save_hdf5_snapshot_visco(&hdf5fp, &filetype_id, &datatype_id,
+		 psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], time, params);
+             
 	    
 	    fprintf(tracefp, "%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1);
 
