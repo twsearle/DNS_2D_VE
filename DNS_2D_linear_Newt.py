@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Wed  7 Oct 14:39:02 2015
+#   Last modified: Thu  8 Oct 10:16:07 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -351,8 +351,8 @@ def oscillatory_flow(Omega):
     for i in range(Mf):
         y =y_points[i]
         for j in range(2*Nf+1):
-            PSI[i,j] = real(1.0/(Re*1.j*Omega) *
-                 (1.-cosh(alpha*y)/cosh(alpha)))
+            psi_im = 1.0/(Re*1.j*Omega) *(y-sinh(alpha*y)/(alpha*cosh(alpha)))
+            PSI[i,j] = real(psi_im)
     del y, i, j
 
     PSI = f2d.to_spectral(PSI, CNSTS)
