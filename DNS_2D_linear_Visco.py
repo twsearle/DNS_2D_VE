@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral linear time stepping code
 #
-#   Last modified: Wed  7 Oct 15:50:20 2015
+#   Last modified: Mon 12 Oct 11:12:40 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -99,6 +99,8 @@ argparser.add_argument("-Wi", type=float, default=Wi,
                 help='Override Weissenberg number of the config file')
 argparser.add_argument("-kx", type=float, default=kx, 
                 help='Override wavenumber of the config file')
+argparser.add_argument("-Omega", type=float, default=Omega, 
+                help='Override angular frequency of piston from the config file')
 argparser.add_argument("-initTime", type=float, default=0.0, 
                 help='Start simulation from a different time')
 
@@ -124,13 +126,14 @@ assert Wi != 0.0, "cannot have Wi = 0!"
 
 NOld = 3 
 MOld = 40
-kwargs = {'NOld': NOld, 'MOld': MOld, 'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0,
+CNSTS = {'NOld': NOld, 'MOld': MOld, 'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0,
           'Re': Re, 'Wi': Wi, 'beta': beta, 'Omega':Omega, 'kx': kx,'time': totTime, 'dt':dt,
           'dealiasing':dealiasing}
 
-inFileName = "pf-N{NOld}-M{MOld}-kx{kx}-Re{Re}-b{beta}-Wi{Wi}.pickle".format(**kwargs)
-
-CNSTS = kwargs
+#outPath1 = "./Re{Re}_b{beta}_Wi{Wi}/".format(**CNSTS)
+#outPath2 = "kx_{kx}_M{M}_dt{dt}".format(**CNSTS)
+#subprocess.call(["mkdir", outPath1])
+#subprocess.call(["mkdir", outPath1+outPath2])
 
 # -----------------------------------------------------------------------------
 
@@ -663,7 +666,7 @@ else:
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
              "{0:e}".format(CNSTS["beta"]), "-w",\
-    "{0:e}".format(CNSTS["Omega"]),\
+            "{0:e}".format(CNSTS["Omega"]),\
              "-t", "{0:e}".format(CNSTS["dt"]),\
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
              "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime)
