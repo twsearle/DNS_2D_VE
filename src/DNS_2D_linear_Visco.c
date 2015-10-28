@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 12 Oct 11:11:35 2015
+// Last modified: Wed 21 Oct 15:24:26 2015
 
 /* Program Description:
  *
@@ -81,13 +81,14 @@ int main(int argc, char **argv)
     params.Re = 400;
     params.Wi = 1e-05;
     params.beta = 1.0;
-    params.Omega = 1.0;
+    params.De = 1.0;
+    params.P = 1.0;
     params.dealiasing = 0;
 
     // Read in parameters from cline args.
 
 
-    while ((shortArg = getopt (argc, argv, "dN:M:U:k:R:W:b:w:t:s:T:i:")) != -1)
+    while ((shortArg = getopt (argc, argv, "dN:M:U:k:R:W:b:D:P:t:s:T:i:")) != -1)
 	switch (shortArg)
 	  {
 	  case 'N':
@@ -111,8 +112,11 @@ int main(int argc, char **argv)
 	  case 'b':
 	    params.beta = atof(optarg);
 	    break;
-	  case 'w':
-	    params.Omega = atof(optarg);
+	  case 'D':
+	    params.De = atof(optarg);
+	    break;
+	  case 'P':
+	    params.P = atof(optarg);
 	    break;
 	  case 't':
 	    dt = atof(optarg);
@@ -161,7 +165,7 @@ int main(int argc, char **argv)
     printf("\nRe                  \t %e ", params.Re);
     printf("\nWi                  \t %e ", params.Wi);
     printf("\nbeta                \t %e ", params.beta);
-    printf("\nOmega               \t %e ", params.Omega);
+    printf("\nDe                  \t %e ", params.De);
     printf("\nTime Step           \t %e ", dt);
     printf("\nNumber of Time Steps\t %d ", numTimeSteps);
     printf("\nTime Steps per frame\t %d ", stepsPerFrame);
@@ -218,8 +222,6 @@ int main(int argc, char **argv)
     #else
     fftwFlag = FFTW_MEASURE;
     #endif
-
-
 
     // dynamically malloc array of complex numbers.
     tmpop = (complex_d*) fftw_malloc(M*M * sizeof(complex_d));
@@ -396,28 +398,39 @@ int main(int argc, char **argv)
         }
 
 
+	// OSCILLATING PRESSURE GRADIENT
 	#ifdef OSCIL_FLOW
-	periods = floor(params.Omega*initTime/(2.0*M_PI));
-	phase = params.Omega*initTime - 2.0*M_PI*periods;
+	periods = floor(initTime/(2.0*M_PI));
+	phase = initTime - 2.0*M_PI*periods;
 
-	forcing[ind(0,0)] = cos(params.Omega*time) / params.Re;
-	forcingN[ind(0,0)] = cos(params.Omega*(timeStep+0.5)*dt + phase) / params.Re;
+	forcing[ind(0,0)] = params.P*cos(time + phase);
+	forcingN[ind(0,0)] = params.P*cos((timeStep+0.5)*dt + phase);
+
+	step_conformation_linear_oscil(cijOld, cijNL, psiOld, cijOld,
+					    0.5*dt, scr, params);
+
+	step_sf_linear_SI_oscil_visco(psiOld, psiNL, cijOld, cijNL, psiOld,
+			forcing, forcingN, 0.5*dt, timeStep, hopsList, scr, params);
+
+	forcing[ind(0,0)] = params.P*cos(time+0.5*dt + phase);
+	forcingN[ind(0,0)] = params.P*cos((timeStep+1.0)*dt + phase);
+
+	step_conformation_linear_oscil(cijOld, cij, psiNL, cijNL, dt, scr, params);
+
+	step_sf_linear_SI_oscil_visco(psiOld, psi, cijOld, cij, psiNL,
+			    forcing, forcingN, dt, timeStep, opsList, scr, params);
 	#endif
+	//------------------------------------
 
-	#ifndef MYDEBUG 
+
+	// TIME INDEPENDENT PRESSURE GRADIENT
+	#ifndef OSCIL_FLOW
 	step_conformation_linear_Crank_Nicolson(cijOld, cijNL, psiOld, cijOld,
 					    0.5*dt, scr, params);
-	#endif
+
 	step_sf_linear_SI_Crank_Nicolson_visco(psiOld, psiNL, cijOld, cijNL, psiOld,
 			forcing, forcingN, 0.5*dt, timeStep, hopsList, scr, params);
 
-	#ifdef OSCIL_FLOW
-	periods = floor(params.Omega*initTime / (2.0*M_PI));
-	phase = params.Omega*initTime - 2.0*M_PI*periods;
-
-	forcing[ind(0,0)] = cos(params.Omega*(time+0.5*dt)) / params.Re;
-	forcingN[ind(0,0)] = cos(params.Omega*(timeStep+1.0)*dt + phase) / params.Re;
-	#endif
 	#ifdef MYDEBUG 
 	printf("\nFORCE END THE DEBUGGING RUN\n");
 	break;
@@ -428,6 +441,8 @@ int main(int argc, char **argv)
 
 	step_sf_linear_SI_Crank_Nicolson_visco(psiOld, psi, cijOld, cij, psiNL,
 			    forcing, forcingN, dt, timeStep, opsList, scr, params);
+	#endif
+	//------------------------------------
 
 	if (timeStep==0)
 	{

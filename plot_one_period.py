@@ -22,11 +22,10 @@ Re = config.getfloat('General', 'Re')
 Wi = config.getfloat('General', 'Wi')
 beta = config.getfloat('General', 'beta')
 kx = config.getfloat('General', 'kx')
-Omega = config.getfloat('Oscillatory Flow', 'Omega')
 Nf = 4*N
 Mf = 2*M
 
-varName = 'cxx'
+varName = 'cxy'
 
 dt = config.getfloat('Time Iteration', 'dt')
 totTime = config.getfloat('Time Iteration', 'totTime')
@@ -38,7 +37,7 @@ fp.close()
 
 numTimeSteps = int(totTime / dt)
 
-kwargs = {'N': N, 'M': M, 'Nf': Nf, 'Mf':Mf, 'Omega':Omega,
+kwargs = {'N': N, 'M': M, 'Nf': Nf, 'Mf':Mf, 
           'Re': Re,'Wi': Wi, 'beta': beta, 'kx': kx,'time':
           totTime, 'dt':dt, 'dealiasing':dealiasing }
 
@@ -244,7 +243,7 @@ init_var_ti = zeros((M,2*N+1), dtype='complex')
 init_var_ti[:, :N+1] = tmp
 init_var_ti[:, N+1:] = conj(fliplr(tmp[:,1:]))
 
-period = 2*pi / Omega
+period = 2*pi 
 dt_frame = (totTime/numFrames)
 frameNum = floor(period/dt_frame)
 time = frameNum*dt_frame

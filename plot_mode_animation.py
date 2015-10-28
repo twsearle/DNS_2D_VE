@@ -24,11 +24,11 @@ Re = config.getfloat('General', 'Re')
 Wi = config.getfloat('General', 'Wi')
 beta = config.getfloat('General', 'beta')
 kx = config.getfloat('General', 'kx')
-Nf = 50
-Mf = 100
+Nf = 2*N
+Mf = 2*M
 
 n = 0 #None
-varName = 'cxx'
+varName = 'psi'
 
 dt = config.getfloat('Time Iteration', 'dt')
 totTime = config.getfloat('Time Iteration', 'totTime')
@@ -245,7 +245,7 @@ if n != None:
 
     subplot_indices= {0:321, 1:322, 2:323, 3:324, 4:325, 5:326}
 
-    ax = matplotlib.pyplot.axes(xlim=(-1., 1.), ylim=(-0.1,0.1))
+    ax = matplotlib.pyplot.axes(xlim=(-1., 1.), ylim=(-5,5))
 
     line1, = ax.plot([], [], 'r', lw=1 )
     line2, = ax.plot([], [], 'g', lw=1 )
@@ -269,11 +269,11 @@ if n != None:
         var_ti[:, :N+1] = tmp
         var_ti[:, N+1:] = conj(fliplr(tmp[:,1:]))
 
-        u_ti =  f2d.dy(var_ti, CNSTS)
+        #u_ti =  f2d.dy(var_ti, CNSTS)
 
         # Match phase and convert to real space
-        ti_mode_r = backward_cheb_transform(real(u_ti[:,n]), CNSTS)
-        ti_mode_i = backward_cheb_transform(imag(u_ti[:,n]), CNSTS)
+        ti_mode_r = backward_cheb_transform(real(var_ti[:,n]), CNSTS)
+        ti_mode_i = backward_cheb_transform(imag(var_ti[:,n]), CNSTS)
         psi_data.append([ti_mode_r, ti_mode_i])
 
     anim = matplotlib.animation.FuncAnimation(fig, animate, init_func=init,

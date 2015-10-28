@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral linear time stepping code
 #
-#   Last modified: Mon 12 Oct 11:12:40 2015
+#   Last modified: Wed 28 Oct 12:23:07 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -76,7 +76,7 @@ kx = config.getfloat('General', 'kx')
 
 delta = config.getfloat('Shear Layer', 'delta')
 
-Omega = config.getfloat('Oscillatory Flow', 'Omega')
+De = config.getfloat('Oscillatory Flow', 'De')
 
 dt = config.getfloat('Time Iteration', 'dt')
 totTime = config.getfloat('Time Iteration', 'totTime')
@@ -95,14 +95,20 @@ argparser.add_argument("-Re", type=float, default=Re,
                 help="Override Reynold's number in the config file") 
 argparser.add_argument("-b", type=float, default=beta, 
                 help='Override beta of the config file')
+argparser.add_argument("-De", type=float, default=De, 
+                help='Override Deborah number of the config file')
 argparser.add_argument("-Wi", type=float, default=Wi, 
                 help='Override Weissenberg number of the config file')
 argparser.add_argument("-kx", type=float, default=kx, 
                 help='Override wavenumber of the config file')
-argparser.add_argument("-Omega", type=float, default=Omega, 
-                help='Override angular frequency of piston from the config file')
 argparser.add_argument("-initTime", type=float, default=0.0, 
                 help='Start simulation from a different time')
+tmp = """simulation type, 
+            0: Poiseuille
+            1: Shear Layer
+            2: Oscillatory"""
+argparser.add_argument("-flow_type", type=int, default=3, 
+                       help=tmp)
 
 args = argparser.parse_args()
 N = args.N 
@@ -110,6 +116,7 @@ M = args.M
 Re = args.Re
 beta = args.b
 Wi = args.Wi
+De = args.De
 kx = args.kx
 initTime = args.initTime
 
@@ -123,11 +130,13 @@ else:
 numTimeSteps = int(ceil(totTime / dt))
 assert (totTime / dt) - float(numTimeSteps) == 0, "Non-integer number of timesteps"
 assert Wi != 0.0, "cannot have Wi = 0!"
+assert args.flow_type < 3, "flow type unspecified!" 
 
 NOld = 3 
 MOld = 40
 CNSTS = {'NOld': NOld, 'MOld': MOld, 'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0,
-          'Re': Re, 'Wi': Wi, 'beta': beta, 'Omega':Omega, 'kx': kx,'time': totTime, 'dt':dt,
+          'Re': Re, 'Wi': Wi, 'beta': beta, 'De':De, 'kx': kx,'time': totTime,
+         'dt':dt, 'P': 1.0,
           'dealiasing':dealiasing}
 
 #outPath1 = "./Re{Re}_b{beta}_Wi{Wi}/".format(**CNSTS)
@@ -268,6 +277,57 @@ def form_operators(dt):
     PsiOpInvList = array(PsiOpInvList)
     return PsiOpInvList
 
+def form_oscil_operators(dt):
+    PsiOpInvList = []
+
+    B = (pi*Re*De) / (2*Wi)
+
+    # zeroth mode
+    Psi0thOp = zeros((M,M), dtype='complex')
+    Psi0thOp = B*SMDY - 0.5*dt*beta*SMDYYY + 0j
+
+    # Apply BCs
+
+    # dypsi0(+-1) = 0
+    Psi0thOp[M-3, :] = DERIVTOP
+    Psi0thOp[M-2, :] = DERIVBOT
+    # psi0(-1) =  0
+    Psi0thOp[M-1, :] = BBOT
+
+    PsiOpInvList.append(linalg.inv(Psi0thOp))
+
+    for i in range(1, N+1):
+        n = i
+
+        PSIOP = zeros((2*M, 2*M), dtype='complex')
+        SLAPLAC = -n*n*kx*kx*SII + SMDYY
+
+        PSIOP[0:M, 0:M] = 0
+        PSIOP[0:M, M:2*M] = B*SII - 0.5*oneOverRe*beta*dt*SLAPLAC
+
+        PSIOP[M:2*M, 0:M] = SLAPLAC
+        PSIOP[M:2*M, M:2*M] = -SII
+
+        # Apply BCs
+        # dypsi(+-1) = 0
+        PSIOP[M-2, :] = concatenate((DERIVTOP, zeros(M, dtype='complex')))
+        PSIOP[M-1, :] = concatenate((DERIVBOT, zeros(M, dtype='complex')))
+        
+        # dxpsi(+-1) = 0
+        PSIOP[2*M-2, :] = concatenate((BTOP, zeros(M, dtype='complex')))
+        PSIOP[2*M-1, :] = concatenate((BBOT, zeros(M, dtype='complex')))
+
+        # store the inverse of the relevent part of the matrix
+        PSIOP = linalg.inv(PSIOP)
+        PSIOP = PSIOP[0:M, 0:M]
+
+        PsiOpInvList.append(PSIOP)
+
+    del PSIOP
+
+    PsiOpInvList = array(PsiOpInvList)
+    return PsiOpInvList
+
 def stupid_transform(GLreal, CNSTS):
     """
     apply the Chebyshev transform the stupid way.
@@ -346,7 +406,10 @@ def poiseuille_flow():
     PSI[N*M+2] += 0.0
     PSI[N*M+3] += -1.0/12.0
     Cxx, Cyy, Cxy = x_independent_profile(PSI)
-    return PSI, Cxx, Cyy, Cxy
+    forcing = zeros((M,2*N+1), dtype='complex')
+    forcing[0,0] = 2./Re
+
+    return PSI, Cxx, Cyy, Cxy, forcing
 
 def plug_like_flow():
     PSI = zeros((2*N+1)*M, dtype='complex')
@@ -359,7 +422,11 @@ def plug_like_flow():
     PSI[N*M:] = 0
     PSI[:(N+1)*M] = 0
     Cxx, Cyy, Cxy = x_independent_profile(PSI)
-    return PSI, Cxx, Cyy, Cxy
+
+    forcing = zeros((M,2*N+1), dtype='complex')
+    forcing[0,0] = 2./Re
+
+    return PSI, Cxx, Cyy, Cxy, forcing
 
 def shear_layer_flow(delta=0.1):
     
@@ -403,7 +470,13 @@ def oscillatory_flow():
 
     y_points = cos(pi*arange(Mf)/(Mf-1))
 
-    alpha = ( 1.0/sqrt(2) ) * (1+1.j) * sqrt( Re * Omega )
+    tmp = beta + (1-beta) / (1 + 1.j*De)
+    alpha = sqrt( (1.j*pi*Re*De) / (2*Wi*tmp) )
+
+    Chi = real( (1-1.j)*(1 - tanh(alpha) / alpha) )
+
+    # the coefficient for the forcing
+    P = (0.5*pi)**2 * (Re*De) / (Chi*Wi)
 
     PSI = zeros((Mf, 2*Nf+1), dtype='d')
     Cxx = zeros((Mf, 2*Nf+1), dtype='d')
@@ -412,15 +485,21 @@ def oscillatory_flow():
     for i in range(Mf):
         y =y_points[i]
         for j in range(2*Nf+1):
-            psi_im = 1.0/(Re*1.j*Omega) *(y-sinh(alpha*y)/(alpha*cosh(alpha)))
+            psi_im = pi/(2.j*Chi) *(y-sinh(alpha*y)/(alpha*cosh(alpha))\
+                                     + sinh(alpha*-1)/(alpha*cosh(alpha)) )
             PSI[i,j] = real(psi_im)
 
-            dyu_im = 1.0/(Re*1.j*Omega) *(-alpha*sinh(alpha*y)/(cosh(alpha)))
-            Cxy[i,j] = real( (1.0/(1.0+1.j*Wi*Omega)) * (Wi*dyu_im) )
+            dyu_cmplx = pi/(2.j*Chi) *(-alpha*sinh(alpha*y)/(cosh(alpha)))
+            cxy_cmplx = (1.0/(1.0+1.j*De)) * ((2*Wi/pi) * dyu_cmplx) 
 
-            #Cxx[i,j] = real( 2.0*(1.0/(1.0+1.j*Wi*Omega))**2 * (Wi*dyu_im)**2 + 1.0)
-            Cxx[i,j] = real( 2.0*((1.0/(1.0+1.j*Wi*Omega)) * (Wi*dyu_im))**2 + 1.0)
+            Cxy[i,j] = real( cxy_cmplx )
 
+            Cxx[i,j] = (1.0/(1.0+2.j*De))*(Wi/pi)*(cxy_cmplx*dyu_cmplx)
+            Cxx[i,j] += (1.0/(1.0-2.j*De))*(Wi/pi)*(conj(cxy_cmplx)*conj(dyu_cmplx)) 
+
+            Cxx[i,j] += 1. + (Wi/pi)*( cxy_cmplx*conj(dyu_cmplx) +
+                                       conj(cxy_cmplx)*dyu_cmplx ) 
+            Cxx[i,j] = real(Cxx[i,j])
 
     del y, i, j
 
@@ -436,12 +515,12 @@ def oscillatory_flow():
     Cxy = Cxy.T.flatten()
 
     Cyy = zeros((2*N+1)*M, dtype='complex')
-    Cyy[N*M] = 1.0
+    Cyy[N*M] = 1
 
     forcing = zeros((M,2*N+1), dtype='complex')
-    forcing[0,0] = Omega / Re
+    forcing[0,0] = P
 
-    return PSI, Cxx, Cyy, Cxy, forcing
+    return PSI, Cxx, Cyy, Cxy, forcing, P
 
 # -----------------------------------------------------------------------------
 # MAIN
@@ -457,13 +536,13 @@ beta \t\t= {beta}
 Wi \t\t= {Wi}         
 kx \t\t= {kx}
 dt\t\t= {dt}
-Omega\t\t={Omega}
+De\t\t={De}
 delta\t\t={delta}
 totTime\t\t= {t}
 NumTimeSteps\t= {NT}
 ------------------------------------
         """.format(N=N, M=M, kx=kx, Re=Re, beta=beta, Wi=Wi,
-                   Omega=Omega, delta=delta,
+                   De=De, delta=delta,
                    dt=dt, NT=numTimeSteps, t=totTime)
 
 # SET UP
@@ -502,34 +581,30 @@ for j in range(M):
 del j
 
 #### The initial stream-function
-PSI = zeros((2*N+1)*M,dtype='complex')
-Cxx = zeros((2*N+1)*M,dtype='complex')
-Cyy = zeros((2*N+1)*M,dtype='complex')
-Cxy = zeros((2*N+1)*M,dtype='complex')
 
+if args.flow_type==0:
+    # --------------- POISEUILLE -----------------
+    PSI, Cxx, Cyy, Cxy, forcing = poiseuille_flow()
 
-# --------------- POISEUILLE -----------------
+elif args.flow_type==1:
+    # --------------- SHEAR LAYER -----------------
+    PSI, Cxx, Cyy, Cxy, forcing = shear_layer_flow()
+    # set BC
+    CNSTS['U0'] = 1.0
 
+elif args.flow_type==2:
+    # --------------- OSCILLATORY FLOW -----------------
+    PSI, Cxx, Cyy, Cxy, forcing, CNSTS['P'] = oscillatory_flow()
 
-#PSI, Cxx, Cyy, Cxy, forcing = poiseuille_flow()
-
-
-# --------------- SHEAR LAYER -----------------
-#
-
-#PSI, Cxx, Cyy, Cxy, forcing = shear_layer_flow()
-
-## set BC
-#CNSTS['U0'] = 1.0
-
-# --------------- OSCILLATORY FLOW -----------------
-#
-
-PSI, Cxx, Cyy, Cxy, forcing = oscillatory_flow()
+else:
+    print "flow type unspecified"
+    exit(1)
 
 
 # ---------------------PERTURBATION-----------------------------------------
+
 psiLam = copy(PSI)
+
 
 perAmp = 1e-7
 
@@ -568,8 +643,12 @@ dset[...] = forcing.T.flatten()
 f.close()
 
 # Form the operators
-PsiOpInvList = form_operators(dt)
-PsiOpInvListHalf = form_operators(dt/2.0)
+if args.flow_type==2:
+    PsiOpInvList = form_oscil_operators(dt)
+    PsiOpInvListHalf = form_oscil_operators(dt/2.0)
+else:
+    PsiOpInvList = form_operators(dt)
+    PsiOpInvListHalf = form_operators(dt/2.0)
 
 #### SAVE THE OPERATORS AND INITIAL STATE FOR THE C CODE
 
@@ -631,32 +710,36 @@ stepsPerFrame = numTimeSteps/numFrames
 
 # pass the flow variables and the time iteration settings to the C code
 if dealiasing:
-    cargs = ["./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
-             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
-             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
-             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-w",
-             "{0:e}".format(CNSTS["Omega"]),
-             "-t", "{0:e}".format(CNSTS["dt"]),
-             "-s", "{0:d}".format(stepsPerFrame), "-T",
-             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime), "-d"]
 
     print "./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
-             "{0:e}".format(CNSTS["beta"]), "-w", "{0:e}".format(CNSTS["Omega"]),\
+             "{0:e}".format(CNSTS["beta"]), "-D", "{0:e}".format(CNSTS["De"]),\
+             "-P", "{0:e}".format(CNSTS["P"]), \
              "-t", "{0:e}".format(CNSTS["dt"]),\
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
              "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime), "-d"
+
+    cargs = ["./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
+             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
+             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
+             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
+             "{0:e}".format(CNSTS["beta"]), "-D",
+             "{0:e}".format(CNSTS["De"]),
+             "-P", "{0:e}".format(CNSTS["P"]),
+             "-t", "{0:e}".format(CNSTS["dt"]),
+             "-s", "{0:d}".format(stepsPerFrame), "-T",
+             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime), "-d"]
 
 else:
     cargs = ["./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-w",
-             "{0:e}".format(CNSTS["Omega"]),
+             "{0:e}".format(CNSTS["beta"]), "-D",
+             "{0:e}".format(CNSTS["De"]),
+             "-P", "{0:e}".format(CNSTS["P"]),
              "-t", "{0:e}".format(CNSTS["dt"]),
              "-s", "{0:d}".format(stepsPerFrame), "-T",
              "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime)]
@@ -665,8 +748,9 @@ else:
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
-             "{0:e}".format(CNSTS["beta"]), "-w",\
-            "{0:e}".format(CNSTS["Omega"]),\
+             "{0:e}".format(CNSTS["beta"]), "-De",\
+            "{0:e}".format(CNSTS[""]),\
+             "-P", "{0:e}".format(CNSTS["P"]), \
              "-t", "{0:e}".format(CNSTS["dt"]),\
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
              "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime)

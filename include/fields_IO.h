@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu  1 Oct 15:32:35 2015
+// Last modified: Wed 21 Oct 15:24:33 2015
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -67,6 +67,8 @@ struct flow_params {
     double Wi;
     double beta;
     double Omega;
+    double De;
+    double P;
 };
 
 struct complex_hdf {
