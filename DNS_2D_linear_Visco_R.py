@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral linear time stepping code
 #
-#   Last modified: Thu 29 Oct 10:45:31 2015
+#   Last modified: Thu 29 Oct 11:12:55 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -49,6 +49,7 @@ Outline:
 from scipy import *
 from scipy import linalg
 from scipy import optimize
+import numpy as np
 from numpy.linalg import cond 
 from numpy.fft import fftshift, ifftshift
 from numpy.random import rand
@@ -69,11 +70,8 @@ fp = open('config.cfg')
 config.readfp(fp)
 N = 1
 M = config.getint('General', 'M')
-Re = config.getfloat('General', 'Re')
 Wi = config.getfloat('General', 'Wi')
 beta = config.getfloat('General', 'beta')
-kx = config.getfloat('General', 'kx')
-
 delta = config.getfloat('Shear Layer', 'delta')
 
 De = config.getfloat('Oscillatory Flow', 'De')
@@ -91,16 +89,12 @@ argparser.add_argument("-N", type=int, default=N,
                 help='Override Number of Fourier modes given in the config file')
 argparser.add_argument("-M", type=int, default=M, 
                 help='Override Number of Chebyshev modes in the config file')
-argparser.add_argument("-Re", type=float, default=Re, 
-                help="Override Reynold's number in the config file") 
 argparser.add_argument("-b", type=float, default=beta, 
                 help='Override beta of the config file')
 argparser.add_argument("-De", type=float, default=De, 
                 help='Override Deborah number of the config file')
 argparser.add_argument("-Wi", type=float, default=Wi, 
                 help='Override Weissenberg number of the config file')
-argparser.add_argument("-kx", type=float, default=kx, 
-                help='Override wavenumber of the config file')
 argparser.add_argument("-initTime", type=float, default=0.0, 
                 help='Start simulation from a different time')
 tmp = """simulation type, 
@@ -113,12 +107,15 @@ argparser.add_argument("-flow_type", type=int, default=3,
 args = argparser.parse_args()
 N = args.N 
 M = args.M
-Re = args.Re
 beta = args.b
 Wi = args.Wi
 De = args.De
-kx = args.kx
 initTime = args.initTime
+
+# From Laura's experiments we determine the Reynold's number.
+
+El = 1182.44
+Re = Wi / El 
 
 if dealiasing:
     Nf = (3*N)/2 + 1
@@ -134,15 +131,7 @@ assert args.flow_type < 3, "flow type unspecified!"
 
 NOld = 3 
 MOld = 40
-CNSTS = {'NOld': NOld, 'MOld': MOld, 'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0,
-          'Re': Re, 'Wi': Wi, 'beta': beta, 'De':De, 'kx': kx,'time': totTime,
-         'dt':dt, 'P': 1.0,
-          'dealiasing':dealiasing}
 
-#outPath1 = "./Re{Re}_b{beta}_Wi{Wi}/".format(**CNSTS)
-#outPath2 = "kx_{kx}_M{M}_dt{dt}".format(**CNSTS)
-#subprocess.call(["mkdir", outPath1])
-#subprocess.call(["mkdir", outPath1+outPath2])
 
 # -----------------------------------------------------------------------------
 
@@ -534,228 +523,265 @@ M \t\t= {M}
 Re \t\t= {Re}         
 beta \t\t= {beta}         
 Wi \t\t= {Wi}         
-kx \t\t= {kx}
 dt\t\t= {dt}
 De\t\t={De}
 delta\t\t={delta}
 totTime\t\t= {t}
 NumTimeSteps\t= {NT}
 ------------------------------------
-        """.format(N=N, M=M, kx=kx, Re=Re, beta=beta, Wi=Wi,
+        """.format(N=N, M=M, Re=Re, beta=beta, Wi=Wi,
                    De=De, delta=delta,
                    dt=dt, NT=numTimeSteps, t=totTime)
 
-# SET UP
+kxList = r_[0.5:16.5:0.5]
 
-vecLen = (2*N+1)*M
+stabOutStream = open('stability.dat', 'w')
 
-oneOverRe = 1. / Re
-assert oneOverRe != infty, "Can't set Reynold's to zero!"
+for kx in kxList:
+    print kx
+    CNSTS = {'NOld': NOld, 'MOld': MOld, 'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0,
+          'Re': Re, 'Wi': Wi, 'beta': beta, 'De':De, 'kx': kx,'time': totTime,
+         'dt':dt, 'P': 1.0,
+          'dealiasing':dealiasing}
 
-CFunc = ones(M)
-CFunc[0] = 2.0
-# Set the oneOverC function: 1/2 for m=0, 1 elsewhere:
-oneOverC = ones(M)
-oneOverC[0] = 1. / 2.
+    # SET UP
 
-# single mode Operators
-SMDY = mk_single_diffy()
-SMDYY = dot(SMDY, SMDY)
-SMDYYY = dot(SMDY, SMDYY)
+    vecLen = (2*N+1)*M
 
-INTY = mk_cheb_int()
+    oneOverRe = 1. / Re
+    assert oneOverRe != infty, "Can't set Reynold's to zero!"
 
-# Identity
-SII = eye(M, M, dtype='complex')
+    CFunc = ones(M)
+    CFunc[0] = 2.0
+    # Set the oneOverC function: 1/2 for m=0, 1 elsewhere:
+    oneOverC = ones(M)
+    oneOverC[0] = 1. / 2.
 
-# Boundary arrays
-BTOP = ones(M)
-BBOT = ones(M)
-BBOT[1:M:2] = -1
+    # single mode Operators
+    SMDY = mk_single_diffy()
+    SMDYY = dot(SMDY, SMDY)
+    SMDYYY = dot(SMDY, SMDYY)
 
-DERIVTOP = zeros((M), dtype='complex')
-DERIVBOT = zeros((M), dtype='complex')
-for j in range(M):
-    DERIVTOP[j] = dot(BTOP, SMDY[:,j]) 
-    DERIVBOT[j] = dot(BBOT, SMDY[:,j])
-del j
+    INTY = mk_cheb_int()
 
-#### The initial stream-function
+    # Identity
+    SII = eye(M, M, dtype='complex')
 
-if args.flow_type==0:
-    # --------------- POISEUILLE -----------------
-    PSI, Cxx, Cyy, Cxy, forcing = poiseuille_flow()
+    # Boundary arrays
+    BTOP = ones(M)
+    BBOT = ones(M)
+    BBOT[1:M:2] = -1
 
-elif args.flow_type==1:
-    # --------------- SHEAR LAYER -----------------
-    PSI, Cxx, Cyy, Cxy, forcing = shear_layer_flow()
-    # set BC
-    CNSTS['U0'] = 1.0
+    DERIVTOP = zeros((M), dtype='complex')
+    DERIVBOT = zeros((M), dtype='complex')
+    for j in range(M):
+        DERIVTOP[j] = dot(BTOP, SMDY[:,j]) 
+        DERIVBOT[j] = dot(BBOT, SMDY[:,j])
+    del j
 
-elif args.flow_type==2:
-    # --------------- OSCILLATORY FLOW -----------------
-    PSI, Cxx, Cyy, Cxy, forcing, CNSTS['P'] = oscillatory_flow()
+    #### The initial stream-function
 
-else:
-    print "flow type unspecified"
-    exit(1)
+    if args.flow_type==0:
+        # --------------- POISEUILLE -----------------
+        PSI, Cxx, Cyy, Cxy, forcing = poiseuille_flow()
 
+    elif args.flow_type==1:
+        # --------------- SHEAR LAYER -----------------
+        PSI, Cxx, Cyy, Cxy, forcing = shear_layer_flow()
+        # set BC
+        CNSTS['U0'] = 1.0
 
-# ---------------------PERTURBATION-----------------------------------------
+    elif args.flow_type==2:
+        # --------------- OSCILLATORY FLOW -----------------
+        PSI, Cxx, Cyy, Cxy, forcing, CNSTS['P'] = oscillatory_flow()
 
-psiLam = copy(PSI)
-
-
-perAmp = 1e-7
-
-rn = (10.0**(-1))*(0.5-rand(5))
-rSpace = zeros(M, dtype='complex')
-y = 2.0*arange(M)/(M-1.0) -1.0
-
-## sinusoidal
-rSpace =  perAmp*sin(1.0 * 2.0*pi * y) * rn[0]
-rSpace += perAmp*sin(2.0 * 2.0*pi * y) * rn[1]
-rSpace += perAmp*sin(3.0 * 2.0*pi * y) * rn[2]
-## cosinusoidal 
-rSpace += perAmp*cos(1.0 * 2.0*pi * y) * rn[3]
-rSpace += perAmp*cos(2.0 * 2.0*pi * y) * rn[4]
-
-## low order eigenfunction of biharmonic operator
-#rSpace = (sin(pscale * y)/(pscale*cos(pscale)) - sinh(gam*y)/(gam*cosh(gam))) * rn[0]
-
-PSI[(N+1)*M:(N+2)*M] =stupid_transform(rSpace, CNSTS)
-PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
-
-# ----------------------------------------------------------------------------
+    else:
+        print "flow type unspecified"
+        exit(1)
 
 
-##  output forcing and the streamfunction corresponding to the initial stress
-f = h5py.File("laminar.h5", "w")
-dset = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
-psiLam = psiLam.reshape(2*N+1, M).T
-psiLam = ifftshift(psiLam, axes=1)
-dset[...] = psiLam.T.flatten()
-f.close()
+    # ---------------------PERTURBATION-----------------------------------------
 
-f = h5py.File("forcing.h5", "w")
-dset = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
-dset[...] = forcing.T.flatten()
-f.close()
+    psiLam = copy(PSI)
 
-# Form the operators
-if args.flow_type==2:
-    PsiOpInvList = form_oscil_operators(dt)
-    PsiOpInvListHalf = form_oscil_operators(dt/2.0)
-else:
-    PsiOpInvList = form_operators(dt)
-    PsiOpInvListHalf = form_operators(dt/2.0)
 
-#### SAVE THE OPERATORS AND INITIAL STATE FOR THE C CODE
+    perAmp = 1e-7
 
-for i in range(N+1):
-    # operator order in list is 0->N
-    n = i
-    opFn = "./operators/op{0}.h5".format(n)
-    f = h5py.File(opFn, "w")
-    dset = f.create_dataset("op", (M*M,), dtype='complex')
-    dset[...] = PsiOpInvList[i].flatten()
+    rn = (10.0**(-1))*(0.5-rand(5))
+    rSpace = zeros(M, dtype='complex')
+    y = 2.0*arange(M)/(M-1.0) -1.0
+
+    ## sinusoidal
+    rSpace =  perAmp*sin(1.0 * 2.0*pi * y) * rn[0]
+    rSpace += perAmp*sin(2.0 * 2.0*pi * y) * rn[1]
+    rSpace += perAmp*sin(3.0 * 2.0*pi * y) * rn[2]
+    ## cosinusoidal 
+    rSpace += perAmp*cos(1.0 * 2.0*pi * y) * rn[3]
+    rSpace += perAmp*cos(2.0 * 2.0*pi * y) * rn[4]
+
+    ## low order eigenfunction of biharmonic operator
+    #rSpace = (sin(pscale * y)/(pscale*cos(pscale)) - sinh(gam*y)/(gam*cosh(gam))) * rn[0]
+
+    PSI[(N+1)*M:(N+2)*M] =stupid_transform(rSpace, CNSTS)
+    PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
+
+    # ----------------------------------------------------------------------------
+
+
+    ##  output forcing and the streamfunction corresponding to the initial stress
+    f = h5py.File("laminar.h5", "w")
+    dset = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
+    psiLam = psiLam.reshape(2*N+1, M).T
+    psiLam = ifftshift(psiLam, axes=1)
+    dset[...] = psiLam.T.flatten()
     f.close()
 
-    #savetxt("./operators/op{0}.dat".format(abs(n)),PsiOpInvList[n])
-del i
-
-for i in range(N+1):
-    # operator order in list is 0->N
-    n = i
-    opFn = "./operators/hOp{0}.h5".format(n)
-    f = h5py.File(opFn, "w")
-    dset = f.create_dataset("op", (M*M,), dtype='complex')
-    dset[...] = PsiOpInvListHalf[i].flatten()
-
+    f = h5py.File("forcing.h5", "w")
+    dset = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
+    dset[...] = forcing.T.flatten()
     f.close()
 
-    #savetxt("./operators/op{0}.dat".format(abs(n)),PsiOpInvList[n])
-del i
+    # Form the operators
+    if args.flow_type==2:
+        PsiOpInvList = form_oscil_operators(dt)
+        PsiOpInvListHalf = form_oscil_operators(dt/2.0)
+    else:
+        PsiOpInvList = form_operators(dt)
+        PsiOpInvListHalf = form_operators(dt/2.0)
+
+    #### SAVE THE OPERATORS AND INITIAL STATE FOR THE C CODE
+
+    for i in range(N+1):
+        # operator order in list is 0->N
+        n = i
+        opFn = "./operators/op{0}.h5".format(n)
+        f = h5py.File(opFn, "w")
+        dset = f.create_dataset("op", (M*M,), dtype='complex')
+        dset[...] = PsiOpInvList[i].flatten()
+        f.close()
+
+        #savetxt("./operators/op{0}.dat".format(abs(n)),PsiOpInvList[n])
+    del i
+
+    for i in range(N+1):
+        # operator order in list is 0->N
+        n = i
+        opFn = "./operators/hOp{0}.h5".format(n)
+        f = h5py.File(opFn, "w")
+        dset = f.create_dataset("op", (M*M,), dtype='complex')
+        dset[...] = PsiOpInvListHalf[i].flatten()
+
+        f.close()
+
+        #savetxt("./operators/op{0}.dat".format(abs(n)),PsiOpInvList[n])
+    del i
 
 
-PSI = PSI.reshape(2*N+1, M).T
-PSI = ifftshift(PSI, axes=1)
+    PSI = PSI.reshape(2*N+1, M).T
+    PSI = ifftshift(PSI, axes=1)
 
-Cxx = Cxx.reshape(2*N+1, M).T
-Cxx = ifftshift(Cxx, axes=1)
+    Cxx = Cxx.reshape(2*N+1, M).T
+    Cxx = ifftshift(Cxx, axes=1)
 
-Cyy = Cyy.reshape(2*N+1, M).T
-Cyy = ifftshift(Cyy, axes=1)
+    Cyy = Cyy.reshape(2*N+1, M).T
+    Cyy = ifftshift(Cyy, axes=1)
 
-Cxy = Cxy.reshape(2*N+1, M).T
-Cxy = ifftshift(Cxy, axes=1)
+    Cxy = Cxy.reshape(2*N+1, M).T
+    Cxy = ifftshift(Cxy, axes=1)
 
-f = h5py.File("initial_visco.h5", "w")
-psih = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
-psih[...] = PSI.T.flatten()
-cxxh = f.create_dataset("cxx", ((2*N+1)*M,), dtype='complex')
-cxxh[...] = Cxx.T.flatten()
-cyyh = f.create_dataset("cyy", ((2*N+1)*M,), dtype='complex')
-cyyh[...] = Cyy.T.flatten()
-cxyh = f.create_dataset("cxy", ((2*N+1)*M,), dtype='complex')
-cxyh[...] = Cxy.T.flatten()
-f.close()
+    f = h5py.File("initial_visco.h5", "w")
+    psih = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
+    psih[...] = PSI.T.flatten()
+    cxxh = f.create_dataset("cxx", ((2*N+1)*M,), dtype='complex')
+    cxxh[...] = Cxx.T.flatten()
+    cyyh = f.create_dataset("cyy", ((2*N+1)*M,), dtype='complex')
+    cyyh[...] = Cyy.T.flatten()
+    cxyh = f.create_dataset("cxy", ((2*N+1)*M,), dtype='complex')
+    cxyh[...] = Cxy.T.flatten()
+    f.close()
 
 
-#### TIME ITERATE 
+    #### TIME ITERATE 
 
-stepsPerFrame = numTimeSteps/numFrames
+    stepsPerFrame = numTimeSteps/numFrames
 
-# Run program in C
+    # Run program in C
 
-# pass the flow variables and the time iteration settings to the C code
-if dealiasing:
+    # pass the flow variables and the time iteration settings to the C code
+    if dealiasing:
 
-    print "./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
-             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
-             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
-             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
-             "{0:e}".format(CNSTS["beta"]), "-D", "{0:e}".format(CNSTS["De"]),\
-             "-P", "{0:e}".format(CNSTS["P"]), \
-             "-t", "{0:e}".format(CNSTS["dt"]),\
-             "-s", "{0:d}".format(stepsPerFrame), "-T",\
-             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime), "-d"
+        print "./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
+                 "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
+                 "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
+                 "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
+                 "{0:e}".format(CNSTS["beta"]), "-D", "{0:e}".format(CNSTS["De"]),\
+                 "-P", "{0:e}".format(CNSTS["P"]), \
+                 "-t", "{0:e}".format(CNSTS["dt"]),\
+                 "-s", "{0:d}".format(stepsPerFrame), "-T",\
+                 "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime), "-d"
 
-    cargs = ["./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
-             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
-             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
-             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-D",
-             "{0:e}".format(CNSTS["De"]),
-             "-P", "{0:e}".format(CNSTS["P"]),
-             "-t", "{0:e}".format(CNSTS["dt"]),
-             "-s", "{0:d}".format(stepsPerFrame), "-T",
-             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime), "-d"]
+        cargs = ["./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
+                 "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
+                 "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
+                 "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
+                 "{0:e}".format(CNSTS["beta"]), "-D",
+                 "{0:e}".format(CNSTS["De"]),
+                 "-P", "{0:e}".format(CNSTS["P"]),
+                 "-t", "{0:e}".format(CNSTS["dt"]),
+                 "-s", "{0:d}".format(stepsPerFrame), "-T",
+                 "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime), "-d"]
 
-else:
-    cargs = ["./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
-             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
-             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
-             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-D",
-             "{0:e}".format(CNSTS["De"]),
-             "-P", "{0:e}".format(CNSTS["P"]),
-             "-t", "{0:e}".format(CNSTS["dt"]),
-             "-s", "{0:d}".format(stepsPerFrame), "-T",
-             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime)]
+    else:
+        cargs = ["./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
+                 "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
+                 "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
+                 "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
+                 "{0:e}".format(CNSTS["beta"]), "-D",
+                 "{0:e}".format(CNSTS["De"]),
+                 "-P", "{0:e}".format(CNSTS["P"]),
+                 "-t", "{0:e}".format(CNSTS["dt"]),
+                 "-s", "{0:d}".format(stepsPerFrame), "-T",
+                 "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime)]
 
-    print "./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
-             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
-             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
-             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
-             "{0:e}".format(CNSTS["beta"]), "-De",\
-            "{0:e}".format(CNSTS[""]),\
-             "-P", "{0:e}".format(CNSTS["P"]), \
-             "-t", "{0:e}".format(CNSTS["dt"]),\
-             "-s", "{0:d}".format(stepsPerFrame), "-T",\
-             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime)
+        print "./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
+                 "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
+                 "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
+                 "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
+                 "{0:e}".format(CNSTS["beta"]), "-De",\
+                "{0:e}".format(CNSTS[""]),\
+                 "-P", "{0:e}".format(CNSTS["P"]), \
+                 "-t", "{0:e}".format(CNSTS["dt"]),\
+                 "-s", "{0:d}".format(stepsPerFrame), "-T",\
+                 "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime)
 
-subprocess.call(cargs)
+    subprocess.call(cargs)
 
-# Read in data from the C code
-print 'done'
+    # Read in data from the C code
+
+    tracePSInorm  = genfromtxt('./output/tracePSI.dat', 'double')
+
+    # calculate timestep 10 periods ago.
+    period = 2*pi
+    time_per_frame = ( totTime / numFrames )
+    frames_per_period = period / time_per_frame
+    frameIndex = floor(10.0*frames_per_period) +1
+
+    logPsiNorm1 = log(tracePSInorm[-frameIndex:, 2])
+
+    # calculate stability
+
+    if tracePSInorm[-1, 2] < 1e-200 or tracePSInorm[-frameIndex, 2] < 1e-200:
+        growthRate = 1.0
+    elif np.isnan(tracePSInorm[-1, 2]):
+        growthRate = float('nan')
+    else:
+        growthRate = 0.5 * (logPsiNorm1[-1]-logPsiNorm1[0]) / (tracePSInorm[-1,0] -
+                                                           tracePSInorm[0,0])
+        if np.isinf(growthRate):
+            growthRate = float('nan')
+
+    # append result to output file
+    stabOutStream.write('%f %e \n' % (kx, growthRate))
+    stabOutStream.flush()
+
+stabOutStream.close()
