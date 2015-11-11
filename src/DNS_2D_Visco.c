@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 30 Sep 13:02:08 2015
+// Last modified: Wed 11 Nov 10:52:57 2015
 
 /* Program Description:
  *
@@ -58,8 +58,8 @@
 
 // Headers
 
-#include"fields_2D.h"
 #include"fields_IO.h"
+#include"fields_2D.h"
 #include"time_steppers.h"
 
 // Main
@@ -102,12 +102,13 @@ int main(int argc, char **argv)
     params.Re = 400;
     params.Wi = 1e-05;
     params.beta = 1.0;
-    params.Omega = 1.0;
+    params.De = 1.0;
+    params.P = 1.0;
     params.dealiasing = 0;
 
     // Read in parameters from cline args.
 
-    while ((shortArg = getopt (argc, argv, "dN:M:U:k:R:W:b:w:t:s:T:i:")) != -1)
+    while ((shortArg = getopt (argc, argv, "dN:M:U:k:R:W:b:D:P:t:s:T:i:")) != -1)
 	switch (shortArg)
 	  {
 	  case 'N':
@@ -131,8 +132,11 @@ int main(int argc, char **argv)
 	  case 'b':
 	    params.beta = atof(optarg);
 	    break;
-	  case 'w':
-	    params.Omega = atof(optarg);
+	  case 'D':
+	    params.De = atof(optarg);
+	    break;
+	  case 'P':
+	    params.P = atof(optarg);
 	    break;
 	  case 't':
 	    dt = atof(optarg);
@@ -182,6 +186,7 @@ int main(int argc, char **argv)
     printf("\nRe                  \t %e ", params.Re);
     printf("\nWi                  \t %e ", params.Wi);
     printf("\nbeta                \t %e ", params.beta);
+    printf("\nDe                  \t %e ", params.De);
     printf("\nTime Step           \t %e ", dt);
     printf("\nNumber of Time Steps\t %d ", numTimeSteps);
     printf("\nTime Steps per frame\t %d ", stepsPerFrame);
@@ -440,6 +445,7 @@ int main(int argc, char **argv)
 
         }
         #endif
+
         // Step the stresses using 2nd order pc CN method
 
         // make the half step for the prediction of C and PSI for NL terms
@@ -456,16 +462,36 @@ int main(int argc, char **argv)
             psiNL[i] = psi[i];
         }
 
-	// calculate forcing 
+	// OSCILLATING PRESSURE GRADIENT
 	#ifdef OSCIL_FLOW
 
-	periods = floor(params.Omega*initTime/(2.0*M_PI));
-	phase = params.Omega*initTime - 2.0*M_PI*periods;
+	periods = floor(initTime/(2.0*M_PI));
+	phase = initTime - 2.0*M_PI*periods;
 
-	forcing[ind(0,0)] = cos(params.Omega*(timeStep)*dt + phase) / params.Re;
-	forcingN[ind(0,0)] = cos(params.Omega*(timeStep+0.5)*dt + phase) / params.Re;
+	forcing[ind(0,0)] = params.P*cos((timeStep)*dt + phase);
+	forcingN[ind(0,0)] = params.P*cos((timeStep+0.5)*dt + phase);
 
-	#endif
+	step_conformation_oscil(cijOld, cijNL, psiOld, cijOld,
+					    0.5*dt, scr, params);
+
+	step_sf_SI_oscil_visco(psiOld, psiNL, cijOld, cijNL, psiOld,
+			forcing, forcingN, 0.5*dt, timeStep, hopsList, scr, params);
+
+	// calculate forcing on the half step
+	periods = floor(initTime / (2.0*M_PI));
+	phase = initTime - 2.0*M_PI*periods;
+
+	forcing[ind(0,0)] = params.P*cos((timeStep)*dt + phase);
+	forcingN[ind(0,0)] = params.P*cos((timeStep+1.0)*dt + phase);
+
+	step_conformation_oscil(cijOld, cij, psiNL, cijNL, dt, scr, params);
+
+	step_sf_SI_oscil_visco(psiOld, psi, cijOld, cij, psiNL,
+			    forcing, forcingN, dt, timeStep, opsList, scr, params);
+
+	#endif // OSCIL_FLOW
+
+	#ifndef OSCIL_FLOW
 
 	step_conformation_Crank_Nicolson(cijOld, cijNL, psiOld, cijOld,
 					    0.5*dt, scr, params);
@@ -490,25 +516,18 @@ int main(int argc, char **argv)
             save_hdf5_state("./output/vgradcxy.h5", &scr.vgradcxy[0], params);
 
         }
-        #endif
+        #endif  // MY_DEBUG
 
 	step_sf_SI_Crank_Nicolson_visco(psiOld, psiNL, cijOld, cijNL, psiOld,
 			forcing, forcingN, 0.5*dt, timeStep, hopsList, scr, params);
 
-	// calculate forcing on the half step
-	#ifdef OSCIL_FLOW
-	periods = floor(params.Omega*initTime / (2.0*M_PI));
-	phase = params.Omega*initTime - 2.0*M_PI*periods;
-
-	forcing[ind(0,0)] = cos(params.Omega*(timeStep)*dt + phase) / params.Re;
-	forcingN[ind(0,0)] = cos(params.Omega*(timeStep+1.0)*dt + phase) / params.Re;
-	#endif
-
         // use the old values plus the values on the half step for the NL terms
 	step_conformation_Crank_Nicolson(cijOld, cij, psiNL, cijNL, dt, scr, params);
 
+
 	step_sf_SI_Crank_Nicolson_visco(psiOld, psi, cijOld, cij, psiNL,
 			    forcing, forcingN, dt, timeStep, opsList, scr, params);
+
 
         #ifdef MYDEBUG
         if (timeStep==0)
@@ -532,7 +551,8 @@ int main(int argc, char **argv)
             save_hdf5_state("./output/dxycyy_cxx.h5", &scr.dxycyy_cxx[0], params);
             save_hdf5_state("./output/dycxy.h5", &scr.dycxy[0], params);
         }
-        #endif
+        #endif // MY_DEBUG
+
 
 
         #ifdef MYDEBUG
@@ -543,7 +563,10 @@ int main(int argc, char **argv)
             save_hdf5_state("./output/cxy2.h5", &cij[2*(N+1)*M], params);
             save_hdf5_state("./output/psi2.h5", &psi[0], params);
         }
-        #endif
+        #endif // MY_DEBUG
+
+
+	#endif // not OSCIL_FLOW
 
 
         // output some information at every frame

@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 30 Sep 12:57:03 2015
+// Last modified: Wed 11 Nov 11:06:59 2015
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -33,11 +33,14 @@ void step_conformation_Crank_Nicolson(
 	 complex_d *cijOld, complex_d *cij, complex_d *psi, complex_d *cijNL, double
 	 dt, flow_scratch scr, flow_params params);
 
-void stress_time_derivative(
-	complex_d *psi, complex_d *cxx, complex_d *cyy, complex_d *cxy, complex_d *fxx,
-	complex_d *fyy, complex_d *fxy, complex_d *txx, complex_d *tyy, complex_d *txy,
-	flow_scratch scr, flow_params params
-	);
+void step_sf_SI_oscil_visco(
+	complex_d *psiOld, complex_d *psi, complex_d *cijOld, complex_d *cij, complex_d
+	*psiNL, complex_d *forcing, complex_d *forcingN, double dt, int timeStep,
+	complex_d *opsList, flow_scratch scr, flow_params params);
+
+void step_conformation_oscil(
+	 complex_d *cijOld, complex_d *cij, complex_d *psi, complex_d *cijNL, double
+	 dt, flow_scratch scr, flow_params params);
 
 void equilibriate_stress(
 	complex_d *psiOld, complex_d *psi_lam, complex_d *cijOld, complex_d *cij,

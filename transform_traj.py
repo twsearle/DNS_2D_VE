@@ -210,6 +210,7 @@ else:
         psi = psi.reshape((N+1, M)).T
         psi = hstack((psi, conj(psi[:, N:0:-1])))
 
+        psi[:,0] = 0
         tmp = to_physical_2(psi, CNSTS).T
         psiReal = zeros((2*Nf+1, Mf, 2))
         psiReal[:,:,0] = real(tmp)
@@ -217,6 +218,7 @@ else:
 
         cxx = cxx.reshape((N+1, M)).T
         cxx = hstack((cxx, conj(cxx[:, N:0:-1])))
+        cxx[:,0] = 0
 
         tmp = to_physical_2(cxx, CNSTS).T
         cxxReal = zeros((2*Nf+1, Mf, 2))
@@ -225,6 +227,7 @@ else:
 
         cyy = cyy.reshape((N+1, M)).T
         cyy = hstack((cyy, conj(cyy[:, N:0:-1])))
+        cyy[:,0] = 0
 
         tmp = to_physical_2(cyy, CNSTS).T
         cyyReal = zeros((2*Nf+1, Mf, 2))
@@ -233,6 +236,7 @@ else:
 
         cxy = cxy.reshape((N+1, M)).T
         cxy = hstack((cxy, conj(cxy[:, N:0:-1])))
+        cxy[:,0] = 0
 
         tmp = to_physical_2(cxy, CNSTS).T
         cxyReal = zeros((2*Nf+1, Mf, 2))

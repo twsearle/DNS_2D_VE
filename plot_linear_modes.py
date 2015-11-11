@@ -33,11 +33,13 @@ config.readfp(fp)
 N = config.getint('General', 'N')
 M = config.getint('General', 'M')
 Re = config.getfloat('General', 'Re')
-Wi = 0.0
-beta = 1.0
+Wi = config.getfloat('General', 'Wi')
+beta = config.getfloat('General', 'beta')
 kx = config.getfloat('General', 'kx')
 Nf = 2*N
 Mf = 2*M
+
+De = config.getfloat('Oscillatory Flow', 'De')
 
 dt = config.getfloat('Time Iteration', 'dt')
 totTime = config.getfloat('Time Iteration', 'totTime')
@@ -50,7 +52,7 @@ fp.close()
 numTimeSteps = int(totTime / dt)
 
 kwargs = {'N': N, 'M': M, 'Nf': Nf, 'Mf':Mf, 
-          'Re': Re,'Wi': Wi, 'beta': beta, 'kx': kx,'time':
+          'Re': Re,'Wi': Wi, 'De':De, 'beta': beta, 'kx': kx,'time':
           totTime, 'dt':dt, 'dealiasing':dealiasing }
 
 if args.path == '.':
@@ -60,6 +62,50 @@ else:
 
 
 CNSTS = kwargs
+
+
+class Flow(object):
+    def __init__(self, fig, data0, data1):
+
+        self.data0 = data0
+        self.data1 = data1
+
+        self.ax0 = fig.add_subplot(121)
+
+        self.ax0.set_xlim([-1, 1]) 
+        lo_lim = amin(data0[:,:])
+        up_lim = amax(data0[:,:])
+        if lo_lim == up_lim:
+            lo_lim = lo_lim - 0.5*up_lim
+            up_lim = up_lim + 0.5*up_lim
+
+        self.ax0.set_ylim([lo_lim, up_lim]) 
+
+        self.line0, = self.ax0.plot([], [], lw=2)
+        self.zeroline0 = self.ax0.plot([-1,1], [0,0], linewidth=0.5,
+                                       linestyle='--',color='gray')
+
+        self.line0.set_data([], [])
+
+        self.ax1 = fig.add_subplot(122)
+
+        self.ax1.set_xlim([-1, 1]) 
+        lo_lim = amin(data1[:,:])
+        up_lim = amax(data1[:,:])
+        self.ax1.set_ylim([lo_lim, up_lim]) 
+
+        self.line1, = self.ax1.plot([], [], lw=2)
+        self.zeroline1 = self.ax1.plot([-1,1], [0,0], linewidth=0.5,
+                                       linestyle='--',color='gray')
+
+        self.line1.set_data([], [])
+
+    def plot_step(self, i):
+
+        self.line0.set_data(y, self.data0[i, :])
+        self.line1.set_data(y, self.data1[i, :])
+
+
 
 def load_hdf5_snapshot(fp, time):
 
@@ -140,24 +186,80 @@ def to_physical_2(in2D, CNSTS):
     
     return out2D[0:Mf, :]
 
-# initialization function: plot the background of each frame
-def init():
-    line.set_data([], [])
-    return line,
+def calc_laminar_flow(y_points, t):
+    tmp = beta + (1-beta) / (1 + 1.j*De)
+    alpha = sqrt( (1.j*pi*Re*De) / (2*Wi*tmp) )
 
-# animation function.  This is called sequentially
-def animate_u(i):
-    line.set_data(y, uReal[i, :])
-    return line,
-def animate_cxx(i):
-    line.set_data(y, cxxReal[i, :])
-    return line,
-def animate_cxy(i):
-    line.set_data(y, cxyReal[i, :])
-    return line,
-def animate_cyy(i):
-    line.set_data(y, cyyReal[i, :])
-    return line,
+    Chi = real( (1-1.j)*(1 - tanh(alpha) / alpha) )
+
+    U0 = zeros((Mf), dtype='d')
+    Cxx0 = zeros((Mf), dtype='d')
+    Cxy0 = zeros((Mf), dtype='d')
+
+    for i in range(Mf):
+        y =y_points[i]
+
+        u_im = pi/(2.j*Chi) *(1-cosh(alpha*y)/(cosh(alpha)))*exp(1.j*t)
+
+        U0[i] = real(u_im)
+
+        dyu_cmplx = pi/(2.j*Chi) *(-alpha*sinh(alpha*y)/(cosh(alpha)))
+        cxy_cmplx = (1.0/(1.0+1.j*De)) * ((2*Wi/pi) * dyu_cmplx)*exp(1.j*t) 
+
+        Cxy0[i] = real( cxy_cmplx )
+
+        Cxx0tmp = (1.0/(1.0+2.j*De))*(Wi/pi)*(cxy_cmplx*dyu_cmplx)*exp(2.j*t)
+        Cxx0tmp += (1.0/(1.0-2.j*De))*(Wi/pi)*(conj(cxy_cmplx)*conj(dyu_cmplx))*exp(-2.j*t) 
+
+        Cxx0tmp += 1. + (Wi/pi)*( cxy_cmplx*conj(dyu_cmplx) + conj(cxy_cmplx)*dyu_cmplx ) 
+        Cxx0[i] = real(Cxx0tmp)
+
+    del y, i
+    return U0, Cxx0, Cxy0
+
+def plot_snapshot(data0, data1, tStep, varName):
+    fig = plt.figure(figsize=(5.0, 3.0))
+
+    data0 = data0
+    data1 = data1
+
+    ax0 = fig.add_subplot(121)
+
+    ax0.set_xlim([-1, 1]) 
+    lo_lim = amin(data0[:,:])
+    up_lim = amax(data0[:,:])
+    if lo_lim == up_lim:
+        lo_lim = lo_lim - 0.5*up_lim
+        up_lim = up_lim + 0.5*up_lim
+
+    ax0.set_ylim([lo_lim, up_lim]) 
+
+    line0, = ax0.plot([], [], lw=2)
+    zeroline0 = ax0.plot([-1,1], [0,0], linewidth=0.5,
+                                   linestyle='--',color='gray')
+
+    line0.set_data([], [])
+
+    ax1 = fig.add_subplot(122)
+
+    ax1.set_xlim([-1, 1]) 
+    lo_lim = amin(data1[:,:])
+    up_lim = amax(data1[:,:])
+    ax1.set_ylim([lo_lim, up_lim]) 
+
+    line1, = ax1.plot([], [], lw=2)
+    zeroline1 = ax1.plot([-1,1], [0,0], linewidth=0.5,
+                                   linestyle='--',color='gray')
+
+    line1.set_data([], [])
+
+    line0.set_data(y, data0[tstep, :])
+    line1.set_data(y, data1[tstep, :])
+
+    
+    plt.savefig('{varName}_snapshot.pdf'.format(varName=varName))
+    plt.close()
+
 
 ##### MAIN ######
 
@@ -182,13 +284,18 @@ f = h5py.File(inFileName, "r")
 y = cos(pi*arange(Mf)/(Mf-1))
 
 frames_per_t = numFrames / totTime
-low_frame = int(numFrames - floor(10*pi*frames_per_t))
+low_frame = int(numFrames - floor(2*pi*frames_per_t))
 numSteps = numFrames - low_frame
 
 uReal   = zeros((numSteps, Mf), dtype='double')
 cxxReal = zeros((numSteps, Mf), dtype='double')
 cxyReal = zeros((numSteps, Mf), dtype='double')
 cyyReal = zeros((numSteps, Mf), dtype='double')
+
+U0   = zeros((numSteps, Mf), dtype='double')
+Cxx0 = zeros((numSteps, Mf), dtype='double')
+Cxy0 = zeros((numSteps, Mf), dtype='double')
+Cyy0 = ones((numSteps, Mf), dtype='double')
 
 for frameNum in range(low_frame,numFrames):
     time = (totTime / numFrames) * frameNum
@@ -216,61 +323,44 @@ for frameNum in range(low_frame,numFrames):
     cxyReal[tstep,:] = real(to_physical_2(cxy, CNSTS).T)[0,:]
     cyyReal[tstep,:] = real(to_physical_2(cyy, CNSTS).T)[0,:]
 
+    U0[tstep,:], Cxx0[tstep,:], Cxy0[tstep,:] = calc_laminar_flow(y, time)
+
 f.close()
 
-# plot the result somehow
+# save plots of the first frame.
 
-# First set up the figure, the axis, and the plot element we want to animate
-fig = plt.figure()
-lo_lim = amin(uReal[:,:])
-up_lim = amax(uReal[:,:])
+plot_snapshot(U0, uReal, 0, varName='U')
+plot_snapshot(Cxx0, cxxReal, 0, varName='Cxx')
+plot_snapshot(Cxy0, cxyReal, 0, varName='Cxy')
+plot_snapshot(Cyy0, cyyReal, 0, varName='Cyy')
 
-ax = plt.axes(xlim=(-1, 1), ylim=(lo_lim, up_lim))
+# plot animations
 
-line, = ax.plot([], [], lw=2)
+fig = plt.figure(figsize=(5.0,3.0))
+Uobj = Flow(fig, U0, uReal)
+anim = animation.FuncAnimation(fig, Uobj.plot_step,
+                               frames=numSteps, interval=100, blit=True)
+anim.save('uReal.mp4', fps=20, extra_args=['-vcodec', 'libx264'])
+fig.clf()
 
-# call the animator.  blit=True means only re-draw the parts that have changed.
-anim = animation.FuncAnimation(fig, animate_u, init_func=init,
-                               frames=numSteps, interval=40, blit=True)
-anim.save('uReal.mp4', fps=30, extra_args=['-vcodec', 'libx264'])
+Cxxobj = Flow(fig, Cxx0, cxxReal)
+anim = animation.FuncAnimation(fig, Cxxobj.plot_step,
+                               frames=numSteps, interval=100, blit=True)
+anim.save('cxxReal.mp4', fps=20, extra_args=['-vcodec', 'libx264'])
+fig.clf()
 
-plt.close()
+Cxyobj = Flow(fig, Cxy0, cxyReal)
+anim = animation.FuncAnimation(fig, Cxyobj.plot_step,
+                               frames=numSteps, interval=100, blit=True)
+anim.save('cxyReal.mp4', fps=20, extra_args=['-vcodec', 'libx264'])
+fig.clf()
 
-fig = plt.figure()
-lo_lim = amin(cxxReal[:,:])
-up_lim = amax(cxxReal[:,:])
+Cyyobj = Flow(fig, Cyy0, cyyReal)
+anim = animation.FuncAnimation(fig, Cyyobj.plot_step,
+                               frames=numSteps, interval=100, blit=True)
+anim.save('cyyReal.mp4', fps=20, extra_args=['-vcodec', 'libx264'])
+fig.clf()
 
-ax = plt.axes(xlim=(-1, 1), ylim=(lo_lim, up_lim))
 
-line, = ax.plot([], [], lw=2)
 
-anim = animation.FuncAnimation(fig, animate_cxx, init_func=init,
-                               frames=numSteps, interval=40, blit=True)
-anim.save('cxxReal.mp4', fps=30, extra_args=['-vcodec', 'libx264'])
-
-plt.close()
-
-fig = plt.figure()
-lo_lim = amin(cxyReal[:,:])
-up_lim = amax(cxyReal[:,:])
-
-ax = plt.axes(xlim=(-1, 1), ylim=(lo_lim, up_lim))
-
-line, = ax.plot([], [], lw=2)
-
-anim = animation.FuncAnimation(fig, animate_cxy, init_func=init,
-                               frames=numSteps, interval=40, blit=True)
-anim.save('cxyReal.mp4', fps=30, extra_args=['-vcodec', 'libx264'])
-
-fig = plt.figure()
-lo_lim = amin(cyyReal[:,:])
-up_lim = amax(cyyReal[:,:])
-
-ax = plt.axes(xlim=(-1, 1), ylim=(lo_lim, up_lim))
-
-line, = ax.plot([], [], lw=2)
-
-anim = animation.FuncAnimation(fig, animate_cyy, init_func=init,
-                               frames=numSteps, interval=40, blit=True)
-anim.save('cyyReal.mp4', fps=30, extra_args=['-vcodec', 'libx264'])
 

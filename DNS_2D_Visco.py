@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Tue 15 Sep 12:06:28 2015
+#   Last modified: Wed 11 Nov 12:00:33 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -76,7 +76,7 @@ kx = config.getfloat('General', 'kx')
 
 delta = config.getfloat('Shear Layer', 'delta')
 
-Omega = config.getfloat('Oscillatory Flow', 'Omega')
+De = config.getfloat('Oscillatory Flow', 'De')
 
 dt = config.getfloat('Time Iteration', 'dt')
 totTime = config.getfloat('Time Iteration', 'totTime')
@@ -101,6 +101,12 @@ argparser.add_argument("-kx", type=float, default=kx,
                 help='Override wavenumber of the config file')
 argparser.add_argument("-initTime", type=float, default=0.0, 
                 help='Start simulation from a different time')
+tmp = """simulation type, 
+            0: Poiseuille
+            1: Shear Layer
+            2: Oscillatory"""
+argparser.add_argument("-flow_type", type=int, default=3, 
+                       help=tmp)
 
 args = argparser.parse_args()
 N = args.N 
@@ -121,16 +127,19 @@ else:
 numTimeSteps = int(ceil(totTime / dt))
 assert (totTime / dt) - float(numTimeSteps) == 0, "Non-integer number of timesteps"
 assert Wi != 0.0, "cannot have Wi = 0!"
+assert args.flow_type < 3, "flow type unspecified!" 
 
 NOld = 3 
 MOld = 40
-kwargs = {'NOld': NOld, 'MOld': MOld, 'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0,
-          'Re': Re, 'Wi': Wi, 'beta': beta, 'Omega':Omega, 'kx': kx,'time': totTime, 'dt':dt,
-          'dealiasing':dealiasing}
 
+CNSTS = {'NOld': NOld, 'MOld': MOld, 'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0,
+          'Re': Re, 'Wi': Wi, 'beta': beta, 'De':De, 'kx': kx,'time': totTime,
+         'dt':dt, 'P': 1.0,
+          'dealiasing':dealiasing}
+ 
+kwargs=CNSTS
 inFileName = "pf-N{NOld}-M{MOld}-kx{kx}-Re{Re}-b{beta}-Wi{Wi}.pickle".format(**kwargs)
 
-CNSTS = kwargs
 
 # -----------------------------------------------------------------------------
 
@@ -241,6 +250,57 @@ def form_operators(dt):
 
         PSIOP[0:M, 0:M] = 0
         PSIOP[0:M, M:2*M] = SII - 0.5*oneOverRe*beta*dt*SLAPLAC
+
+        PSIOP[M:2*M, 0:M] = SLAPLAC
+        PSIOP[M:2*M, M:2*M] = -SII
+
+        # Apply BCs
+        # dypsi(+-1) = 0
+        PSIOP[M-2, :] = concatenate((DERIVTOP, zeros(M, dtype='complex')))
+        PSIOP[M-1, :] = concatenate((DERIVBOT, zeros(M, dtype='complex')))
+        
+        # dxpsi(+-1) = 0
+        PSIOP[2*M-2, :] = concatenate((BTOP, zeros(M, dtype='complex')))
+        PSIOP[2*M-1, :] = concatenate((BBOT, zeros(M, dtype='complex')))
+
+        # store the inverse of the relevent part of the matrix
+        PSIOP = linalg.inv(PSIOP)
+        PSIOP = PSIOP[0:M, 0:M]
+
+        PsiOpInvList.append(PSIOP)
+
+    del PSIOP
+
+    PsiOpInvList = array(PsiOpInvList)
+    return PsiOpInvList
+
+def form_oscil_operators(dt):
+    PsiOpInvList = []
+
+    B = (pi*Re*De) / (2*Wi)
+
+    # zeroth mode
+    Psi0thOp = zeros((M,M), dtype='complex')
+    Psi0thOp = B*SMDY - 0.5*dt*beta*SMDYYY + 0j
+
+    # Apply BCs
+
+    # dypsi0(+-1) = 0
+    Psi0thOp[M-3, :] = DERIVTOP
+    Psi0thOp[M-2, :] = DERIVBOT
+    # psi0(-1) =  0
+    Psi0thOp[M-1, :] = BBOT
+
+    PsiOpInvList.append(linalg.inv(Psi0thOp))
+
+    for i in range(1, N+1):
+        n = i
+
+        PSIOP = zeros((2*M, 2*M), dtype='complex')
+        SLAPLAC = -n*n*kx*kx*SII + SMDYY
+
+        PSIOP[0:M, 0:M] = 0
+        PSIOP[0:M, M:2*M] = B*SII - 0.5*oneOverRe*beta*dt*SLAPLAC
 
         PSIOP[M:2*M, 0:M] = SLAPLAC
         PSIOP[M:2*M, M:2*M] = -SII
@@ -471,6 +531,129 @@ def cheb_prod_mat(velA):
     del m, n, itr
     return D
 
+def poiseuille_flow():
+    PSI = zeros((2*N+1)*M, dtype='complex')
+
+    PSI[N*M]   += 2.0/3.0
+    PSI[N*M+1] += 3.0/4.0
+    PSI[N*M+2] += 0.0
+    PSI[N*M+3] += -1.0/12.0
+    Cxx, Cyy, Cxy = x_independent_profile(PSI)
+    forcing = zeros((M,2*N+1), dtype='complex')
+    forcing[0,0] = 2./Re
+
+    return PSI, Cxx, Cyy, Cxy, forcing
+
+def plug_like_flow():
+    PSI = zeros((2*N+1)*M, dtype='complex')
+
+    PSI[N*M]   += (5.0/8.0) * 4.0/5.0
+    PSI[N*M+1] += (5.0/8.0) * 7.0/8.0
+    PSI[N*M+3] += (5.0/8.0) * -1.0/16.0
+    PSI[N*M+5] += (5.0/8.0) * -1.0/80.0
+
+    PSI[N*M:] = 0
+    PSI[:(N+1)*M] = 0
+    Cxx, Cyy, Cxy = x_independent_profile(PSI)
+
+    forcing = zeros((M,2*N+1), dtype='complex')
+    forcing[0,0] = 2./Re
+
+    return PSI, Cxx, Cyy, Cxy, forcing
+
+def shear_layer_flow(delta=0.1):
+    
+    y_points = cos(pi*arange(Mf)/(Mf-1))
+
+    # Set initial streamfunction
+    PSI = zeros((Mf, 2*Nf+1), dtype='d')
+
+    for i in range(Mf):
+        y =y_points[i]
+        for j in range(2*Nf+1):
+            PSI[i,j] = delta * (1./tanh(1./delta)) * log(cosh(y/delta))
+
+    del y, i, j
+
+    PSI = f2d.to_spectral(PSI, CNSTS)
+    PSI = fftshift(PSI, axes=1)
+    PSI = PSI.T.flatten()
+
+    # set forcing
+    forcing = zeros((Mf, 2*Nf+1), dtype='d')
+    
+    for i in range(Mf):
+        y =y_points[i]
+        for j in range(2*Nf+1):
+            forcing[i,j] = ( 2.0/tanh(1.0/delta)) * (1.0/cosh(y/delta)**2) * tanh(y/delta)
+            forcing[i,j] *= 1.0/(Re * delta**2) 
+    
+    del y, i, j
+    forcing = f2d.to_spectral(forcing, CNSTS)
+
+    Cxx, Cyy, Cxy = x_independent_profile(PSI)
+
+    return PSI, Cxx, Cyy, Cxy, forcing
+
+def oscillatory_flow():
+    """
+    Some flow variables must be calculated in realspace and then transformed
+    spectral space, Cyy =1.0 so it is easy.
+    """
+
+    y_points = cos(pi*arange(Mf)/(Mf-1))
+
+    tmp = beta + (1-beta) / (1 + 1.j*De)
+    alpha = sqrt( (1.j*pi*Re*De) / (2*Wi*tmp) )
+
+    Chi = real( (1-1.j)*(1 - tanh(alpha) / alpha) )
+
+    # the coefficient for the forcing
+    P = (0.5*pi)**2 * (Re*De) / (Chi*Wi)
+
+    PSI = zeros((Mf, 2*Nf+1), dtype='d')
+    Cxx = zeros((Mf, 2*Nf+1), dtype='d')
+    Cxy = zeros((Mf, 2*Nf+1), dtype='d')
+
+    for i in range(Mf):
+        y =y_points[i]
+        for j in range(2*Nf+1):
+            psi_im = pi/(2.j*Chi) *(y-sinh(alpha*y)/(alpha*cosh(alpha))\
+                                     + sinh(alpha*-1)/(alpha*cosh(alpha)) )
+            PSI[i,j] = real(psi_im)
+
+            dyu_cmplx = pi/(2.j*Chi) *(-alpha*sinh(alpha*y)/(cosh(alpha)))
+            cxy_cmplx = (1.0/(1.0+1.j*De)) * ((2*Wi/pi) * dyu_cmplx) 
+
+            Cxy[i,j] = real( cxy_cmplx )
+
+            Cxx[i,j] = (1.0/(1.0+2.j*De))*(Wi/pi)*(cxy_cmplx*dyu_cmplx)
+            Cxx[i,j] += (1.0/(1.0-2.j*De))*(Wi/pi)*(conj(cxy_cmplx)*conj(dyu_cmplx)) 
+
+            Cxx[i,j] += 1. + (Wi/pi)*( cxy_cmplx*conj(dyu_cmplx) +
+                                       conj(cxy_cmplx)*dyu_cmplx ) 
+            Cxx[i,j] = real(Cxx[i,j])
+
+    del y, i, j
+
+    # transform to spectral space.
+    PSI = f2d.to_spectral(PSI, CNSTS)
+    PSI = fftshift(PSI, axes=1)
+    PSI = PSI.T.flatten()
+    Cxx = f2d.to_spectral(Cxx, CNSTS)
+    Cxx = fftshift(Cxx, axes=1)
+    Cxx = Cxx.T.flatten()
+    Cxy = f2d.to_spectral(Cxy, CNSTS)
+    Cxy = fftshift(Cxy, axes=1)
+    Cxy = Cxy.T.flatten()
+
+    Cyy = zeros((2*N+1)*M, dtype='complex')
+    Cyy[N*M] = 1
+
+    forcing = zeros((M,2*N+1), dtype='complex')
+    forcing[0,0] = P
+
+    return PSI, Cxx, Cyy, Cxy, forcing, P
 
 # -----------------------------------------------------------------------------
 # MAIN
@@ -486,13 +669,13 @@ beta \t\t= {beta}
 Wi \t\t= {Wi}         
 kx \t\t= {kx}
 dt\t\t= {dt}
-Omega\t\t={Omega}
+De\t\t={De}
 delta\t\t={delta}
 totTime\t\t= {t}
 NumTimeSteps\t= {NT}
 ------------------------------------
         """.format(N=N, M=M, kx=kx, Re=Re, beta=beta, Wi=Wi,
-                   Omega=Omega, delta=delta,
+                   De=De, delta=delta,
                    dt=dt, NT=numTimeSteps, t=totTime)
 
 # SET UP
@@ -589,34 +772,29 @@ Cxy = zeros((2*N+1)*M,dtype='complex')
 #
 #psiLam = copy(PSI)
 
-# --------------- POISEUILLE -----------------
 
-#plugAmp = 0.00 #* (M/32.0)
-#
-#PSI[N*M]   += (1.-plugAmp) * 2.0/3.0
-#PSI[N*M+1] += (1.-plugAmp) * 3.0/4.0
-#PSI[N*M+2] += (1.-plugAmp) * 0.0
-#PSI[N*M+3] += (1.-plugAmp) * -1.0/12.0
-#
-### set initial stress guess based on laminar flow
-#Cxx, Cyy, Cxy = x_independent_profile(PSI)
-#psiLam = copy(PSI)
-#
-### --- PLUG  ---
-##
-##PSI[N*M]   += (plugAmp) * (5.0/8.0) * 4.0/5.0
-##PSI[N*M+1] += (plugAmp) * (5.0/8.0) * 7.0/8.0
-##PSI[N*M+3] += (plugAmp) * (5.0/8.0) * -1.0/16.0
-##PSI[N*M+5] += (plugAmp) * (5.0/8.0) * -1.0/80.0
-##
-###PSI[N*M:] = 0
-###PSI[:(N+1)*M] = 0
-#
-#perKEestimate = 1.e-7
-#totEnergy = 1.0 + 1.e-7
-#sigma = 0.1
-#gam = 2
-#
+if args.flow_type==0:
+    # --------------- POISEUILLE -----------------
+    PSI, Cxx, Cyy, Cxy, forcing = poiseuille_flow()
+
+elif args.flow_type==1:
+    # --------------- SHEAR LAYER -----------------
+    PSI, Cxx, Cyy, Cxy, forcing = shear_layer_flow()
+    # set BC
+    CNSTS['U0'] = 1.0
+
+elif args.flow_type==2:
+    # --------------- OSCILLATORY FLOW -----------------
+    PSI, Cxx, Cyy, Cxy, forcing, CNSTS['P'] = oscillatory_flow()
+
+else:
+    print "flow type unspecified"
+    exit(1)
+
+psiLam = copy(PSI)
+
+### ----------------------- PERTURBATIONS ------------------------------------
+
 #PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
 #
 #lsd = 1e-8
@@ -631,134 +809,26 @@ Cxy = zeros((2*N+1)*M,dtype='complex')
 #PSI[(N)*M+1] += lsd *(155./64. - 4. )
 #PSI[(N)*M+0] += lsd *(1./8) 
 
-#for n in range(1,2):
+#perAmp = 1e-7
+#y = 2.0*arange(M)/(M-1.0) -1.0
 #
-#    # imaginary part
-#    PSI[(N+n)*M]   += lsd * (10**-n)*(1.j) * (5.0/8.0) * 4.0/5.0
-#    PSI[(N+n)*M+1] += lsd * (10**-n)*(1.j) * (5.0/8.0) * 7.0/8.0
-#    PSI[(N+n)*M+3] += lsd * (10**-n)*(1.j) * (5.0/8.0) * -1.0/16.0
-#    PSI[(N+n)*M+5] += lsd * (10**-n)*(1.j) * (5.0/8.0) * -1.0/80.0
+#for n in range(N/2):
+#    rn = (10.0**(-(n**2)))*(0.5-rand(5))
+#    rSpace = zeros(M, dtype='complex')
 #
-#    PSI[(N+n)*M]   += lsd * (10**-n)*(1.j) * (5.0/8.0) * -2.0
-#    PSI[(N+n)*M+3] += lsd * (10**-n)*(1.j) * (5.0/8.0) * 1.0
-#    PSI[(N+n)*M+5] += lsd * (10**-n)*(1.j) * (5.0/8.0) * 1.0
+#    ## sinusoidal
+#    rSpace =  perAmp*sin(1.0 * 2.0*pi * y) * rn[0]
+#    rSpace += perAmp*sin(2.0 * 2.0*pi * y) * rn[1]
+#    rSpace += perAmp*sin(3.0 * 2.0*pi * y) * rn[2]
+#    ## cosinusoidal 
+#    rSpace += perAmp*cos(1.0 * 2.0*pi * y) * rn[3]
+#    rSpace += perAmp*cos(2.0 * 2.0*pi * y) * rn[4]
 #
-#    #Real part y**7 - 2y**6 + 2y**4 -4y
-#    PSI[(N+n)*M+7] += lsd *(10**-n)*(1./64.)
-#    PSI[(N+n)*M+6] += lsd *(10**-n)*(-1./16.)
-#    PSI[(N+n)*M+5] += lsd *(10**-n)*(3./16. + 7./(4*16.))
-#    PSI[(N+n)*M+4] += lsd *(10**-n)*(1./8. )
-#    PSI[(N+n)*M+3] += lsd *(10**-n)*(81./(16.*4) )
-#    PSI[(N+n)*M+2] += lsd *(10**-n)*(1./16. )
-#    PSI[(N+n)*M+1] += lsd *(10**-n)*(155./64. - 4. )
-#    PSI[(N+n)*M+0] += lsd *(10**-n)*(1./8) 
+#    ## low order eigenfunction of biharmonic operator
+#    #rSpace = (sin(pscale * y)/(pscale*cos(pscale)) - sinh(gam*y)/(gam*cosh(gam))) * rn[0]
 #
-#    PSI[(N-n)*M] = conj(PSI[(N+n)*M])
-
-#forcing = zeros((M,2*N+1), dtype='complex')
-#forcing[0,0] = 2.0/Re
-
-#KE = 0
-#SMDY =  mk_single_diffy()
-#u0 = dot(SMDY, PSI[N*M: (N+1)*M])
-#u0sq = zeros(M, dtype='complex')
-#for n in range(0,M,2):
-#    for m in range(n-M+1, M):
-#
-#        p = abs(n-m)
-#        if (p==0):
-#            tmp = 2.0*u0[p]
-#        else:
-#            tmp = u0[p]
-#
-#        if (abs(m)==0):
-#            tmp *= 2.0*conj(u0[abs(m)])
-#        else:
-#            tmp *= conj(u0[abs(m)])
-#
-#        if (n==0):
-#            u0sq[n] += 0.25*tmp
-#        else:
-#            u0sq[n] += 0.5*tmp
-#
-#    KE += (2. / (1.-n*n)) * u0sq[n];
-#    print KE
-#
-#u0sq2 = dot(cheb_prod_mat(u0), u0)
-#print u0sq2-u0sq
-#
-#print 'KE0', KE*(15./8.)*0.5
-
-
-
-
-# --------------- SHEAR LAYER -----------------
-#
-#y_points = cos(pi*arange(Mf)/(Mf-1))
-#
-## Set initial streamfunction
-#PSI = zeros((Mf, 2*Nf+1), dtype='d')
-#
-#for i in range(Mf):
-#    y =y_points[i]
-#    for j in range(2*Nf+1):
-#        PSI[i,j] = delta * (1./tanh(1./delta)) * log(cosh(y/delta))
-#
-#del y, i, j
-#
-#PSI = f2d.to_spectral(PSI, CNSTS)
-#
-#
-#
-##test = f2d.dy(PSI, CNSTS) 
-##test = f2d.to_physical(test, CNSTS)
-##savetxt('U.dat', vstack((y_points,test[:,0])).T)
-##PSI = f2d.to_physical(PSI, CNSTS)
-##savetxt('PSI.dat', vstack((y_points,PSI[:,0])).T)
-##exit(1)
-#
-#PSI = fftshift(PSI, axes=1)
-#PSI = PSI.T.flatten()
-#psiLam = copy(PSI)
-#Cxx, Cyy, Cxy = x_independent_profile(PSI)
-#
-##perKEestimate = 1e-12
-##totEnergy = 1.687501 
-##sigma = 0.1
-##gam = 2
-##
-##PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
-#
-## WARNING THIS DOESN'T SATISFY THE BCS??
-#PSI[(N+1)*M:(N+1)*M + M/2] = 1e-12*(1*rand(M/2) + 1.j*rand(M/2))
-#PSI[(N-1)*M:N*M] = conj(PSI[(N+1)*M:(N+2)*M])
-#
-#
-## set forcing
-#forcing = zeros((Mf, 2*Nf+1), dtype='d')
-##test = zeros((Mf, 2*Nf+1), dtype='d')
-#
-#for i in range(Mf):
-#    y =y_points[i]
-#    for j in range(2*Nf+1):
-#        forcing[i,j] = ( 2.0/tanh(1.0/delta)) * (1.0/cosh(y/delta)**2) * tanh(y/delta)
-#        forcing[i,j] *= 1.0/(Re * delta**2) 
-#
-#del y, i, j
-#forcing = f2d.to_spectral(forcing, CNSTS)
-#forcing[:, 1:] = 0
-## set BC
-#CNSTS['U0'] = 1.0
-
-# --------------- OSCILLATORY FLOW -----------------
-#
-
-# PSI
-psiLam = copy(PSI)
-
-forcing = zeros((M,2*N+1), dtype='complex')
-forcing[0,0] = Omega / Re
-
+#    PSI[(N+n)*M:(N+n+1)*M] =stupid_transform(rSpace, CNSTS)
+#    PSI[(N-n)*M:(N-n+1)*M] = conj(PSI[(N+n)*M:(N+n+1)*M])
 
 # ----------------------------------------------------------------------------
 
@@ -776,8 +846,12 @@ dset[...] = forcing.T.flatten()
 f.close()
 
 # Form the operators
-PsiOpInvList = form_operators(dt)
-PsiOpInvListHalf = form_operators(dt/2.0)
+if args.flow_type==2:
+    PsiOpInvList = form_oscil_operators(dt)
+    PsiOpInvListHalf = form_oscil_operators(dt/2.0)
+else:
+    PsiOpInvList = form_operators(dt)
+    PsiOpInvListHalf = form_operators(dt/2.0)
 
 #### SAVE THE OPERATORS AND INITIAL STATE FOR THE C CODE
 
@@ -839,32 +913,36 @@ stepsPerFrame = numTimeSteps/numFrames
 
 # pass the flow variables and the time iteration settings to the C code
 if dealiasing:
-    cargs = ["./DNS_2D_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
-             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
-             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
-             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-w",
-             "{0:e}".format(CNSTS["Omega"]),
-             "-t", "{0:e}".format(CNSTS["dt"]),
-             "-s", "{0:d}".format(stepsPerFrame), "-T",
-             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime), "-d"]
 
     print "./DNS_2D_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
-             "{0:e}".format(CNSTS["beta"]), "-w", "{0:e}".format(CNSTS["Omega"]),\
+             "{0:e}".format(CNSTS["beta"]), "-D", "{0:e}".format(CNSTS["De"]),\
+             "-P", "{0:e}".format(CNSTS["P"]), \
              "-t", "{0:e}".format(CNSTS["dt"]),\
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
              "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime), "-d"
+
+    cargs = ["./DNS_2D_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
+             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
+             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
+             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
+             "{0:e}".format(CNSTS["beta"]), "-D",
+             "{0:e}".format(CNSTS["De"]),
+             "-P", "{0:e}".format(CNSTS["P"]),
+             "-t", "{0:e}".format(CNSTS["dt"]),
+             "-s", "{0:d}".format(stepsPerFrame), "-T",
+             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime), "-d"]
 
 else:
     cargs = ["./DNS_2D_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-w",
-             "{0:e}".format(CNSTS["Omega"]),
+             "{0:e}".format(CNSTS["beta"]), "-D",
+             "{0:e}".format(CNSTS["De"]),
+             "-P", "{0:e}".format(CNSTS["P"]),
              "-t", "{0:e}".format(CNSTS["dt"]),
              "-s", "{0:d}".format(stepsPerFrame), "-T",
              "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime)]
@@ -873,8 +951,9 @@ else:
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
-             "{0:e}".format(CNSTS["beta"]), "-w",\
-    "{0:e}".format(CNSTS["Omega"]),\
+             "{0:e}".format(CNSTS["beta"]), "-De",\
+            "{0:e}".format(CNSTS[""]),\
+             "-P", "{0:e}".format(CNSTS["P"]), \
              "-t", "{0:e}".format(CNSTS["dt"]),\
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
              "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime)
