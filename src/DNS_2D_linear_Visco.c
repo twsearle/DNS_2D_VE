@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 21 Oct 15:24:26 2015
+// Last modified: Tue  1 Dec 17:45:38 2015
 
 /* Program Description:
  *
@@ -186,7 +186,7 @@ int main(int argc, char **argv)
     trace1mode = fopen("./output/traceMode.dat", "w");
 
     // Variables for HDF5 output
-    hid_t hdf5fp, datatype_id, filetype_id;
+    hid_t hdf5final, hdf5fp, datatype_id, filetype_id;
     herr_t status;
     
     // create the datatype for scipy complex numbers
@@ -412,6 +412,15 @@ int main(int argc, char **argv)
 	step_sf_linear_SI_oscil_visco(psiOld, psiNL, cijOld, cijNL, psiOld,
 			forcing, forcingN, 0.5*dt, timeStep, hopsList, scr, params);
 
+	#ifdef MYDEBUG 
+	save_hdf5_state("./output/cxxN.h5", &cijNL[0], params);
+	save_hdf5_state("./output/cyyN.h5", &cijNL[(N+1)*M], params);
+	save_hdf5_state("./output/cxyN.h5", &cijNL[2*(N+1)*M], params);
+
+	printf("\nFORCE END THE DEBUGGING RUN\n");
+	break;
+	#endif
+
 	forcing[ind(0,0)] = params.P*cos(time+0.5*dt + phase);
 	forcingN[ind(0,0)] = params.P*cos((timeStep+1.0)*dt + phase);
 
@@ -427,11 +436,14 @@ int main(int argc, char **argv)
 	#ifndef OSCIL_FLOW
 	step_conformation_linear_Crank_Nicolson(cijOld, cijNL, psiOld, cijOld,
 					    0.5*dt, scr, params);
-
 	step_sf_linear_SI_Crank_Nicolson_visco(psiOld, psiNL, cijOld, cijNL, psiOld,
 			forcing, forcingN, 0.5*dt, timeStep, hopsList, scr, params);
 
 	#ifdef MYDEBUG 
+	save_hdf5_state("./output/cxxN.h5", &cijNL[0], params);
+	save_hdf5_state("./output/cyyN.h5", &cijNL[(N+1)*M], params);
+	save_hdf5_state("./output/cxyN.h5", &cijNL[2*(N+1)*M], params);
+
 	printf("\nFORCE END THE DEBUGGING RUN\n");
 	break;
 	#endif
@@ -497,7 +509,13 @@ int main(int argc, char **argv)
     }
 
     // save the final state
-    save_hdf5_state("./output/final.h5", &psi[0], params);
+    
+    hdf5final = H5Fcreate("output/final.h5", H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+
+    save_hdf5_state_visco(&hdf5final,
+    &filetype_id, &datatype_id, psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], params);
+
+
 
     fclose(tracefp);
     fclose(tracePSI);
@@ -507,6 +525,7 @@ int main(int argc, char **argv)
     status = H5Tclose(datatype_id);
     status = H5Tclose(filetype_id);
     status = H5Fclose(hdf5fp);
+    status = H5Fclose(hdf5final);
 
     // garbage collection
     fftw_destroy_plan(phys_plan);

@@ -71,7 +71,10 @@ if args.Newt:
     twsFileName = args.path + "/pf-N{N}-M{M}-kx{kx}-Re{Re}.pickle".format(**kwargs)
 else:
     #inFileName = args.path + "/traj.h5".format()
-    inFileName = args.path + "/final.h5".format()
+    #inFileName = args.path + "/initial_linear.h5".format()
+    #inFileName2 = "./initial_full.h5".format()
+    inFileName = args.path + "/linear_final.h5".format()
+    inFileName2 = "./full_final.h5".format()
     print 'Reading from: ', inFileName
     twsFileName = args.path + "/pf-N{N}-M{M}-kx{kx}-Re{Re}-b{beta}-Wi{Wi}.pickle".format(**kwargs)
 
@@ -83,10 +86,10 @@ def load_hdf5_snapshot_visco(fp, time):
     dataset_id = "/t{0:f}".format(time)
     print dataset_id
 
-    psi = array(f[dataset_id+"/psi"])
-    cxx = array(f[dataset_id+"/cxx"])
-    cyy = array(f[dataset_id+"/cyy"])
-    cxy = array(f[dataset_id+"/cxy"])
+    psi = array(fp[dataset_id+"/psi"])
+    cxx = array(fp[dataset_id+"/cxx"])
+    cyy = array(fp[dataset_id+"/cyy"])
+    cxy = array(fp[dataset_id+"/cxy"])
 
     return psi, cxx, cyy, cxy
 
@@ -95,7 +98,7 @@ def load_hdf5_snapshot(fp, time):
     dataset_id = "/t{0:f}".format(time)
     print dataset_id
 
-    inarr = array(f[dataset_id])
+    inarr = array(fp[dataset_id])
 
     return inarr
 
@@ -177,30 +180,30 @@ def plot_comp_modes(arr_ti, arr_true, phase_factor, arrname, time, CNSTS):
 
     fig=gcf()
     fig.suptitle(
-        '${0}$ time iteration red, TWS in green at {1}'.format(arrname, time))
+        '${0}$ linear red, full in green at {1}'.format(arrname, time))
     subplot_indices= {0:231, 1:232, 2:233, 3:234, 4:235, 5:236}
-    for n in range(3):
+    for n in range(2):
 
         ti_mode = stupid_transform_i(arr_ti[:, n], CNSTS)
         tws_mode = stupid_transform_i(arr_true[:, n]*(phase_factor**n), CNSTS)
 
         # plot graph
         splt =subplot(subplot_indices[n])
-        plot(y, real(ti_mode), 'r', linewidth=2.0)
         plot(y, real(tws_mode), 'g')
+        plot(y, real(ti_mode), 'r', linewidth=2.0)
         title('{0}'.format(n))
         xlabel('y')
         ylabel('$Re[{0}_{1}]$'.format(arrname, n))
 
-    for n in range(3):
+    for n in range(2):
 
         ti_mode = stupid_transform_i(arr_ti[:, n], CNSTS)
         tws_mode = stupid_transform_i(arr_true[:, n]*(phase_factor**n), CNSTS)
 
         # plot graph
         splt =subplot(subplot_indices[(3+n)])
-        plot(y, imag(ti_mode), 'r', linewidth=2.0)
         plot(y, imag(tws_mode), 'g')
+        plot(y, imag(ti_mode), 'r', linewidth=2.0)
         title('{0}'.format(n))
         xlabel('y')
         ylabel('$Im[{0}_{1}]$'.format(arrname, n))
@@ -272,6 +275,8 @@ NumTimeSteps\t= {NT}
 time = totTime
 
 f = h5py.File(inFileName, "r")
+f2 = h5py.File(inFileName2, "r")
+
 
 if args.Newt:
     psi = array(f["/psi"])
@@ -287,6 +292,11 @@ else:
     cyy_ti = array(f["/cyy"])
     cxy_ti = array(f["/cxy"])
 
+    #psi_ti = psi_ti.reshape((2*N+1, M)).T
+    #cxx_ti = cxx_ti.reshape((2*N+1, M)).T
+    #cyy_ti = cyy_ti.reshape((2*N+1, M)).T
+    #cxy_ti = cxy_ti.reshape((2*N+1, M)).T
+
     psi_ti = psi_ti.reshape((N+1, M)).T
     psi_ti = hstack((psi_ti, conj(psi_ti[:, N:0:-1])))
     cxx_ti = cxx_ti.reshape((N+1, M)).T
@@ -297,6 +307,25 @@ else:
     cxy_ti = hstack((cxy_ti, conj(cxy_ti[:, N:0:-1])))
 
     #psi_true, cxx_true, cyy_true, cxy_true, Nu = pickle.load(open(twsFileName, 'r'))
+
+    psi_true = array(f2["/psi"])
+    cxx_true = array(f2["/cxx"])
+    cyy_true = array(f2["/cyy"])
+    cxy_true = array(f2["/cxy"])
+
+    #psi_true = psi_true.reshape((2*N+1, M)).T
+    #cxx_true = cxx_true.reshape((2*N+1, M)).T
+    #cyy_true = cyy_true.reshape((2*N+1, M)).T
+    #cxy_true = cxy_true.reshape((2*N+1, M)).T
+
+    psi_true = psi_true.reshape((N+1, M)).T
+    psi_true = hstack((psi_true, conj(psi_true[:, N:0:-1])))
+    cxx_true = cxx_true.reshape((N+1, M)).T
+    cxx_true = hstack((cxx_true, conj(cxx_true[:, N:0:-1])))
+    cyy_true = cyy_true.reshape((N+1, M)).T
+    cyy_true = hstack((cyy_true, conj(cyy_true[:, N:0:-1])))
+    cxy_true = cxy_true.reshape((N+1, M)).T
+    cxy_true = hstack((cxy_true, conj(cxy_true[:, N:0:-1])))
 
 f.close()
 
@@ -335,12 +364,12 @@ y = 2.0*arange(Mf)/(Mf-1.) -1
 
 # Compare mode by mode
 
-#plot_comp_modes(psi_ti, psi_true, phase_factor, "\psi", time, CNSTS)
-#plot_comp_modes(cxx_ti, cxx_true, phase_factor, "cxx", time, CNSTS)
-#plot_comp_modes(cyy_ti, cyy_true, phase_factor, "cyy", time, CNSTS)
-#plot_comp_modes(cxy_ti, cxy_true, phase_factor, "cxy", time, CNSTS)
+plot_comp_modes(psi_ti, psi_true, phase_factor, "\psi", time, CNSTS)
+plot_comp_modes(cxx_ti, cxx_true, phase_factor, "cxx", time, CNSTS)
+plot_comp_modes(cyy_ti, cyy_true, phase_factor, "cyy", time, CNSTS)
+plot_comp_modes(cxy_ti, cxy_true, phase_factor, "cxy", time, CNSTS)
 
-plot_modes(psi_ti, "\psi", time, CNSTS)
-plot_modes(cxx_ti, "cxx", time, CNSTS)
-plot_modes(cyy_ti, "cyy", time, CNSTS)
-plot_modes(cxy_ti, "cxy", time, CNSTS)
+#plot_modes(psi_ti, "\psi", time, CNSTS)
+#plot_modes(cxx_ti, "cxx", time, CNSTS)
+#plot_modes(cyy_ti, "cyy", time, CNSTS)
+#plot_modes(cxy_ti, "cxy", time, CNSTS)

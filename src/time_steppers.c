@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 11 Nov 11:30:12 2015
+// Last modified: Mon 30 Nov 14:22:31 2015
 
 #include"fields_2D.h"
 #include"fields_IO.h"
@@ -1104,11 +1104,11 @@ void step_sf_SI_oscil_visco(
 				         scr.d2ycxyN[ind(i,j)]
 			               - scr.d2xcxyN[ind(i,j)] 
 				       - scr.dxycyy_cxxN[ind(i,j)]); 
-	    scr.RHSvec[j] += 0.5*dt*forcing[ind(i,j)];
-	    scr.RHSvec[j] += 0.5*dt*forcingN[ind(i,j)];
 	    scr.RHSvec[j] += - dt*params.Re*scr.udxlplpsi[ind(i,j)];
 	    scr.RHSvec[j] += - dt*params.Re*scr.vdylplpsi[ind(i,j)];
 	    scr.RHSvec[j] += + BFac*scr.lplpsi[ind(i,j)];
+	    scr.RHSvec[j] += 0.5*dt*forcing[ind(i,j)];
+	    scr.RHSvec[j] += 0.5*dt*forcingN[ind(i,j)];
 
 
 	}
@@ -1118,7 +1118,7 @@ void step_sf_SI_oscil_visco(
 	scr.RHSvec[M-2] = 0;
 	scr.RHSvec[M-1] = 0;
 
-	#ifdef MYDEBUG
+	//#ifdef MYDEBUG
 	if(timeStep==0)
 	{
 	    char fn[30];
@@ -1126,7 +1126,7 @@ void step_sf_SI_oscil_visco(
 	    printf("writing %s\n", fn);
 	    save_hdf5_arr(fn, &scr.RHSvec[0], M);
 	}
-	#endif
+	//#endif
 
 	// perform dot product to calculate new streamfunction.
 	for (j=M-1; j>=0; j=j-1)

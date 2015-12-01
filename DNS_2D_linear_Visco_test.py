@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Wed  7 Oct 11:50:57 2015
+#   Last modified: Tue  1 Dec 17:53:30 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -37,10 +37,12 @@ from scipy import optimize
 from numpy.linalg import cond 
 from numpy.fft import fftshift, ifftshift
 from numpy.random import rand
+import matplotlib.pyplot as plt
 
 import cPickle as pickle
 
 import ConfigParser
+import argparse
 import subprocess
 import h5py
 
@@ -58,6 +60,8 @@ Wi = config.getfloat('General', 'Wi')
 beta = config.getfloat('General', 'beta')
 kx = config.getfloat('General', 'kx')
 
+De = config.getfloat('Oscillatory Flow', 'De')
+
 dt = config.getfloat('Time Iteration', 'dt')
 totTime = config.getfloat('Time Iteration', 'totTime')
 numFrames = config.getint('Time Iteration', 'numFrames')
@@ -66,6 +70,18 @@ dealiasing = config.getboolean('Time Iteration', 'Dealiasing')
 N = 1
 
 fp.close()
+
+argparser = argparse.ArgumentParser()
+
+tmp = """simulation type, 
+            0: Poiseuille
+            1: Shear Layer
+            2: Oscillatory"""
+argparser.add_argument("-flow_type", type=int, default=3, 
+                       help=tmp)
+
+args = argparser.parse_args()
+initTime =0.0
 
 if dealiasing:
     Nf = (3*N)/2 + 1
@@ -76,20 +92,22 @@ else:
 
 numTimeSteps = int(totTime / dt)
 assert (totTime / dt) - float(numTimeSteps) == 0, "Non-integer number of timesteps"
+assert args.flow_type < 3, "flow type unspecified!" 
 
 NOld = N 
 MOld = M
-kwargs = {'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0, 'Re': Re, 'Wi': Wi, 'beta': beta,
-          'kx': kx,'time': totTime, 'dt':dt, 'dealiasing':dealiasing}
-baseFileName  = "-N{N}-M{M}-kx{kx}-Re{Re}.pickle".format(**kwargs)
+CNSTS = {'NOld': NOld, 'MOld': MOld, 'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0,
+          'Re': Re, 'Wi': Wi, 'beta': beta, 'De':De, 'kx': kx,'time': totTime,
+         'dt':dt, 'P': 1.0,
+          'dealiasing':dealiasing}
+baseFileName  = "-N{N}-M{M}-kx{kx}-Re{Re}.pickle".format(**CNSTS)
 outFileName  = "pf{0}".format(baseFileName)
 outFileNameTrace = "trace{0}.dat".format(baseFileName[:-7])
 outFileNameTime = "series-pf{0}".format(baseFileName)
 #inFileName = "pf-N{N}-M{M}-kx{kx}-Re{Re}.pickle".format(N=NOld, M=MOld, 
 #                                                        kx=kx, Re=Re)
-inFileName = "pf-N{N}-M{M}-kx{kx}-Re{Re}.pickle".format(**kwargs)
+inFileName = "pf-N{N}-M{M}-kx{kx}-Re{Re}.pickle".format(**CNSTS)
 
-CNSTS = kwargs
 
 # -----------------------------------------------------------------------------
 
@@ -251,6 +269,117 @@ def form_operators(dt):
     PsiOpInvList = array(PsiOpInvList)
     return PsiOpInvList
 
+def form_oscil_operators(dt):
+    PsiOpInvList = []
+
+    B = (pi*Re*De) / (2*Wi)
+
+    # zeroth mode
+    Psi0thOp = zeros((M,M), dtype='complex')
+    Psi0thOp = B*SMDY - 0.5*dt*beta*SMDYYY + 0j
+
+    # Apply BCs
+
+    # dypsi0(+-1) = 0
+    Psi0thOp[M-3, :] = DERIVTOP
+    Psi0thOp[M-2, :] = DERIVBOT
+    # psi0(-1) =  0
+    Psi0thOp[M-1, :] = BBOT
+
+    PsiOpInvList.append(linalg.inv(Psi0thOp))
+
+    for i in range(1, N+1):
+        n = i
+
+        PSIOP = zeros((2*M, 2*M), dtype='complex')
+        SLAPLAC = -n*n*kx*kx*SII + SMDYY
+
+        PSIOP[0:M, 0:M] = 0
+        PSIOP[0:M, M:2*M] = B*SII - 0.5*oneOverRe*beta*dt*SLAPLAC
+
+        PSIOP[M:2*M, 0:M] = SLAPLAC
+        PSIOP[M:2*M, M:2*M] = -SII
+
+        # Apply BCs
+        # dypsi(+-1) = 0
+        PSIOP[M-2, :] = concatenate((DERIVTOP, zeros(M, dtype='complex')))
+        PSIOP[M-1, :] = concatenate((DERIVBOT, zeros(M, dtype='complex')))
+        
+        # dxpsi(+-1) = 0
+        PSIOP[2*M-2, :] = concatenate((BTOP, zeros(M, dtype='complex')))
+        PSIOP[2*M-1, :] = concatenate((BBOT, zeros(M, dtype='complex')))
+
+        # store the inverse of the relevent part of the matrix
+        PSIOP = linalg.inv(PSIOP)
+        PSIOP = PSIOP[0:M, 0:M]
+
+        PsiOpInvList.append(PSIOP)
+
+    del PSIOP
+
+    PsiOpInvList = array(PsiOpInvList)
+    return PsiOpInvList
+
+def oscillatory_flow():
+    """
+    Some flow variables must be calculated in realspace and then transformed
+    spectral space, Cyy =1.0 so it is easy.
+    """
+
+    y_points = cos(pi*arange(Mf)/(Mf-1))
+
+    tmp = beta + (1-beta) / (1 + 1.j*De)
+    alpha = sqrt( (1.j*pi*Re*De) / (2*Wi*tmp) )
+
+    Chi = real( (1-1.j)*(1 - tanh(alpha) / alpha) )
+
+    # the coefficient for the forcing
+    P = (0.5*pi)**2 * (Re*De) / (Chi*Wi)
+
+    PSI = zeros((Mf, 2*Nf+1), dtype='d')
+    Cxx = zeros((Mf, 2*Nf+1), dtype='d')
+    Cxy = zeros((Mf, 2*Nf+1), dtype='d')
+
+    for i in range(Mf):
+        y =y_points[i]
+        for j in range(2*Nf+1):
+            psi_im = pi/(2.j*Chi) *(y-sinh(alpha*y)/(alpha*cosh(alpha))\
+                                     + sinh(alpha*-1)/(alpha*cosh(alpha)) )
+            PSI[i,j] = real(psi_im)
+
+            dyu_cmplx = pi/(2.j*Chi) *(-alpha*sinh(alpha*y)/(cosh(alpha)))
+            cxy_cmplx = (1.0/(1.0+1.j*De)) * ((2*Wi/pi) * dyu_cmplx) 
+
+            Cxy[i,j] = real( cxy_cmplx )
+
+            Cxx[i,j] = (1.0/(1.0+2.j*De))*(Wi/pi)*(cxy_cmplx*dyu_cmplx)
+            Cxx[i,j] += (1.0/(1.0-2.j*De))*(Wi/pi)*(conj(cxy_cmplx)*conj(dyu_cmplx)) 
+
+            Cxx[i,j] += 1. + (Wi/pi)*( cxy_cmplx*conj(dyu_cmplx) +
+                                       conj(cxy_cmplx)*dyu_cmplx ) 
+            Cxx[i,j] = real(Cxx[i,j])
+
+    del y, i, j
+
+    # transform to spectral space.
+    PSI = f2d.to_spectral(PSI, CNSTS)
+    PSI = fftshift(PSI, axes=1)
+    PSI = PSI.T.flatten()
+    Cxx = f2d.to_spectral(Cxx, CNSTS)
+    Cxx = fftshift(Cxx, axes=1)
+    Cxx = Cxx.T.flatten()
+    Cxy = f2d.to_spectral(Cxy, CNSTS)
+    Cxy = fftshift(Cxy, axes=1)
+    Cxy = Cxy.T.flatten()
+
+    Cyy = zeros((2*N+1)*M, dtype='complex')
+    Cyy[N*M] = 1
+
+    forcing = zeros((M,2*N+1), dtype='complex')
+    forcing[0,0] = P
+
+    return PSI, Cxx, Cyy, Cxy, forcing, P
+
 def stupid_transform(GLreal, CNSTS):
     """
     apply the Chebyshev transform the stupid way.
@@ -316,12 +445,10 @@ def test_arrays_equal(arr1, arr2, tol=1e-12):
                     print "mode", -n,linalg.norm(arr1[(N-n)*M:(N+1-n)*M]-arr2[(N-n)*M:(N+1-n)*M])
 
 
-            imshow(real(ctestSpec3), origin='lower')
-            colorbar()
-            show()
-            imshow(real(pythonSpec3), origin='lower')
-            colorbar()
-            show()
+            plt.plot(real(arr1.flatten()))
+            plt.plot(real(arr2.flatten()), linewidth=2.0)
+            #plt.semilogy( abs(arr1-arr2).flatten() )
+            plt.show(block=True)
 
             print 'FAIL'
 
@@ -382,26 +509,32 @@ del j
 PSI = zeros((2*N+1)*M, dtype='complex')
 
 
-# --------------- POISEUILLE -----------------
+if args.flow_type==0:
+    # --------------- POISEUILLE -----------------
 
 
-plugAmp = 0.00 #* (M/32.0)
+    plugAmp = 0.00 #* (M/32.0)
 
-PSI[N*M]   +=  2.0/3.0
-PSI[N*M+1] +=  3.0/4.0
-PSI[N*M+2] +=  0.0
-PSI[N*M+3] +=  -1.0/12.0
+    PSI[N*M]   +=  2.0/3.0
+    PSI[N*M+1] +=  3.0/4.0
+    PSI[N*M+2] +=  0.0
+    PSI[N*M+3] +=  -1.0/12.0
 
-PSI[(N+1)*M:(N+2)*M] = rand(M) + 1.j*rand(M)
-PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
+    PSI[(N+1)*M:(N+1)*M + M/2] = 1e-2*(rand(M/2) + 1.j*rand(M/2))
+    PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
 
-## set initial stress guess based on laminar flow
-Cxx, Cyy, Cxy = x_independent_profile(PSI)
+    ## set initial stress guess based on laminar flow
+    Cxx, Cyy, Cxy = x_independent_profile(PSI)
 
-psiLam = copy(PSI)
+    psiLam = copy(PSI)
 
-forcing = zeros((M,2*N+1), dtype='complex')
-forcing[0,0] = 2.0/Re
+    forcing = zeros((M,2*N+1), dtype='complex')
+    forcing[0,0] = 2.0/Re
+
+elif args.flow_type==2:
+    # --------------- OSCILLATORY FLOW -----------------
+    PSI, Cxx, Cyy, Cxy, forcing, CNSTS['P'] = oscillatory_flow()
+    psiLam = copy(PSI)
 
 f = h5py.File("forcing.h5", "w")
 dset = f.create_dataset("psi", (3*M,), dtype='complex')
@@ -416,8 +549,12 @@ dset[...] = psiLam.T.flatten()
 f.close()
 
 # Form the operators
-PsiOpInvList = form_operators(dt)
-PsiOpInvListHalf = form_operators(dt/2.0)
+if args.flow_type==2:
+    PsiOpInvList = form_oscil_operators(dt)
+    PsiOpInvListHalf = form_oscil_operators(dt/2.0)
+else:
+    PsiOpInvList = form_operators(dt)
+    PsiOpInvListHalf = form_operators(dt/2.0)
 
 #### SAVE THE OPERATORS AND INITIAL STATE FOR THE C CODE
 
@@ -483,36 +620,49 @@ stepsPerFrame = numTimeSteps/numFrames
 
 # pass the flow variables and the time iteration settings to the C code
 if dealiasing:
+    print "./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
+             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
+             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
+             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
+             "{0:e}".format(CNSTS["beta"]), "-D", "{0:e}".format(CNSTS["De"]),\
+             "-P", "{0:e}".format(CNSTS["P"]), \
+             "-t", "{0:e}".format(CNSTS["dt"]),\
+             "-s", "{0:d}".format(stepsPerFrame), "-T",\
+             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime), "-d"
+
     cargs = ["./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),
+             "{0:e}".format(CNSTS["beta"]), "-D",
+             "{0:e}".format(CNSTS["De"]),
+             "-P", "{0:e}".format(CNSTS["P"]),
+             "-t", "{0:e}".format(CNSTS["dt"]),
              "-s", "{0:d}".format(stepsPerFrame), "-T",
-             "{0:d}".format(numTimeSteps), "-d"]
-    print "./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M", \
-             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
-             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
-             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
-             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),\
-             "-s", "{0:d}".format(stepsPerFrame), "-T",\
-             "{0:d}".format(numTimeSteps), "-d"
+             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime), "-d"]
 
 else:
     cargs = ["./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),
+             "{0:e}".format(CNSTS["beta"]), "-D",
+             "{0:e}".format(CNSTS["De"]),
+             "-P", "{0:e}".format(CNSTS["P"]),
+             "-t", "{0:e}".format(CNSTS["dt"]),
              "-s", "{0:d}".format(stepsPerFrame), "-T",
-             "{0:d}".format(numTimeSteps)]
-    print "./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M", \
+             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime)]
+
+    print "./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
              "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
              "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
-             "{0:e}".format(CNSTS["beta"]), "-t", "{0:e}".format(CNSTS["dt"]),\
+             "{0:e}".format(CNSTS["beta"]), "-De",\
+            "{0:e}".format(CNSTS[""]),\
+             "-P", "{0:e}".format(CNSTS["P"]), \
+             "-t", "{0:e}".format(CNSTS["dt"]),\
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
-             "{0:d}".format(numTimeSteps)
+             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime)
 
 subprocess.call(cargs)
 
@@ -706,6 +856,152 @@ DXYCYY_CXX = 1.j*kx*dot(SMDY, (Cyy[(N+1)*M:(N+2)*M] - Cxx[(N+1)*M:(N+2)*M]))
 print 'DXYCYY_CXX ?' 
 test_arrays_equal(DXYCYY_CXX, dxycyy_cxxc)
 
+cyy0dyu0c = load_hdf5_state("./output/cyy0dyu0.h5")
+CYY0DYU0 = dot(cheb_prod_mat(Cyy[N*M:(N+1)*M]), dot(SMDY, U[N*M:(N+1)*M]))
+print 'CYY0DYU0 ?' 
+test_arrays_equal(CYY0DYU0, cyy0dyu0c)
+
+cxy0dyu0c = load_hdf5_state("./output/cxy0dyu0.h5")
+CXY0DYU0 = dot(cheb_prod_mat(Cxy[N*M:(N+1)*M]), dot(SMDY, U[N*M:(N+1)*M]))
+print 'CXY0DYU0 ?' 
+test_arrays_equal(CXY0DYU0, cxy0dyu0c)
+
+print """
+-----------------------
+Updated stresses check
+-----------------------
+"""
+
+DXYPSI = zeros((2*N+1)*M, dtype='complex')
+DXYPSI[(N+1)*M:(N+2)*M] = 1.j*kx*U[(N+1)*M:(N+2)*M]
+DXYPSI[(N-1)*M:N*M] = conj(DXYPSI[(N+1)*M:(N+2)*M])
+
+if args.flow_type ==2: # Oscillatory flow 
+    CxxN = zeros((2*N+1)*M, dtype='complex')
+    CxxN[(N+1)*M:(N+2)*M] = Cxx[(N+1)*M:(N+2)*M] \
+            - 0.25*dt*(1./Wi)*Cxx[(N+1)*M:(N+2)*M] \
+            + dt*dot(tsm.cheb_prod_mat(Cxy[(N+1)*M:(N+2)*M]), D2YPSI[N*M:(N+1)*M]) \
+            + dt*dot(tsm.cheb_prod_mat(Cxy[N*M:(N+1)*M]), D2YPSI[(N+1)*M:(N+2)*M]) \
+            + dt*dot(tsm.cheb_prod_mat(Cxx[N*M:(N+1)*M]), DXYPSI[(N+1)*M:(N+2)*M]) \
+            - 0.5*dt*dot(dot(cheb_prod_mat(V[(N+1)*M:(N+2)*M]),SMDY), Cxx[N*M:(N+1)*M]) \
+            - 0.5*dt*dot(1.j*kx*cheb_prod_mat(U[N*M:(N+1)*M]), Cxx[(N+1)*M:(N+2)*M])
+
+    CxxN[N*M:(N+1)*M] = (1.0 - 0.25*dt*(1./Wi)) * Cxx[N*M:(N+1)*M] \
+                         + dt*CXY0DYU0
+    CxxN[N*M] += (.5*dt/Wi)
+
+    CxxN = CxxN * (Wi/(Wi+dt*0.25))
+
+    CyyN = zeros((2*N+1)*M, dtype='complex')
+    CyyN[(N+1)*M:(N+2)*M] = Cyy[(N+1)*M:(N+2)*M] \
+            - 0.25*dt*(1./Wi)*Cyy[(N+1)*M:(N+2)*M] \
+            + dt*dot(tsm.cheb_prod_mat(Cxy[N*M:(N+1)*M]), -D2XPSI[(N+1)*M:(N+2)*M]) \
+            + dt*dot(tsm.cheb_prod_mat(Cyy[N*M:(N+1)*M]), -DXYPSI[(N+1)*M:(N+2)*M]) \
+            - 0.5*dt*dot(dot(cheb_prod_mat(V[(N+1)*M:(N+2)*M]),SMDY), Cyy[N*M:(N+1)*M]) \
+            - 0.5*dt*dot(1.j*kx*cheb_prod_mat(U[N*M:(N+1)*M]), Cyy[(N+1)*M:(N+2)*M])
+
+    CyyN[N*M:(N+1)*M] = (1.0 - 0.25*dt*(1./Wi))*Cyy[N*M:(N+1)*M]
+    CyyN[N*M] += (.5*dt/Wi)
+
+    CyyN = CyyN * (Wi/(Wi+dt*0.25))
+
+    CxyN = zeros((2*N+1)*M, dtype='complex')
+    CxyN[(N+1)*M:(N+2)*M] = Cxy[(N+1)*M:(N+2)*M] \
+            - 0.25*dt*(1./Wi)*Cxy[(N+1)*M:(N+2)*M] \
+            - 0.5*dt*dot(tsm.cheb_prod_mat(Cxx[N*M:(N+1)*M]), D2XPSI[(N+1)*M:(N+2)*M]) \
+            + 0.5*dt*dot(tsm.cheb_prod_mat(Cyy[N*M:(N+1)*M]), D2YPSI[(N+1)*M:(N+2)*M]) \
+            + 0.5*dt*dot(tsm.cheb_prod_mat(Cyy[(N+1)*M:(N+2)*M]), D2YPSI[N*M:(N+1)*M]) \
+            - 0.5*dt*dot(dot(cheb_prod_mat(V[(N+1)*M:(N+2)*M]), SMDY), Cxy[N*M:(N+1)*M]) \
+            - 0.5*dt*dot(1.j*kx*cheb_prod_mat(U[N*M:(N+1)*M]), Cxy[(N+1)*M:(N+2)*M])
+
+    CxyN[N*M:(N+1)*M] = (1.0 - 0.25*dt*(1./Wi))*Cxy[N*M:(N+1)*M] \
+                         + 0.5*dt*CYY0DYU0
+
+    CxyN = CxyN * (Wi/(Wi+dt*0.25))
+
+else: # Time independent forcing flow
+    CxxN = zeros((2*N+1)*M, dtype='complex')
+    CxxN[(N+1)*M:(N+2)*M] = Cxx[(N+1)*M:(N+2)*M] \
+            - 0.25*dt*(1./Wi)*Cxx[(N+1)*M:(N+2)*M] \
+            + dt*dot(tsm.cheb_prod_mat(Cxy[(N+1)*M:(N+2)*M]), D2YPSI[N*M:(N+1)*M]) \
+            + dt*dot(tsm.cheb_prod_mat(Cxy[N*M:(N+1)*M]), D2YPSI[(N+1)*M:(N+2)*M]) \
+            + dt*dot(tsm.cheb_prod_mat(Cxx[N*M:(N+1)*M]), DXYPSI[(N+1)*M:(N+2)*M]) \
+            - 0.5*dt*dot(dot(cheb_prod_mat(V[(N+1)*M:(N+2)*M]),SMDY), Cxx[N*M:(N+1)*M]) \
+            - 0.5*dt*dot(1.j*kx*cheb_prod_mat(U[N*M:(N+1)*M]), Cxx[(N+1)*M:(N+2)*M])
+
+    CxxN[N*M:(N+1)*M] = (1.0 - 0.25*dt*(1./Wi)) * Cxx[N*M:(N+1)*M] \
+                         + dt*CXY0DYU0
+    CxxN[N*M] += (.5*dt/Wi)
+
+    CxxN = CxxN * (Wi/(Wi+dt*0.25))
+
+    CyyN = zeros((2*N+1)*M, dtype='complex')
+    CyyN[(N+1)*M:(N+2)*M] = Cyy[(N+1)*M:(N+2)*M] \
+            - 0.25*dt*(1./Wi)*Cyy[(N+1)*M:(N+2)*M] \
+            + dt*dot(tsm.cheb_prod_mat(Cxy[N*M:(N+1)*M]), -D2XPSI[(N+1)*M:(N+2)*M]) \
+            + dt*dot(tsm.cheb_prod_mat(Cyy[N*M:(N+1)*M]), -DXYPSI[(N+1)*M:(N+2)*M]) \
+            - 0.5*dt*dot(dot(cheb_prod_mat(V[(N+1)*M:(N+2)*M]),SMDY), Cyy[N*M:(N+1)*M]) \
+            - 0.5*dt*dot(1.j*kx*cheb_prod_mat(U[N*M:(N+1)*M]), Cyy[(N+1)*M:(N+2)*M])
+
+    CyyN[N*M:(N+1)*M] = (1.0 - 0.25*dt*(1./Wi))*Cyy[N*M:(N+1)*M]
+    CyyN[N*M] += (.5*dt/Wi)
+
+    CyyN = CyyN * (Wi/(Wi+dt*0.25))
+
+    CxyN = zeros((2*N+1)*M, dtype='complex')
+    CxyN[(N+1)*M:(N+2)*M] = Cxy[(N+1)*M:(N+2)*M] \
+            - 0.25*dt*(1./Wi)*Cxy[(N+1)*M:(N+2)*M] \
+            - 0.5*dt*dot(tsm.cheb_prod_mat(Cxx[N*M:(N+1)*M]), D2XPSI[(N+1)*M:(N+2)*M]) \
+            + 0.5*dt*dot(tsm.cheb_prod_mat(Cyy[N*M:(N+1)*M]), D2YPSI[(N+1)*M:(N+2)*M]) \
+            + 0.5*dt*dot(tsm.cheb_prod_mat(Cyy[(N+1)*M:(N+2)*M]), D2YPSI[N*M:(N+1)*M]) \
+            - 0.5*dt*dot(dot(cheb_prod_mat(V[(N+1)*M:(N+2)*M]), SMDY), Cxy[N*M:(N+1)*M]) \
+            - 0.5*dt*dot(1.j*kx*cheb_prod_mat(U[N*M:(N+1)*M]), Cxy[(N+1)*M:(N+2)*M])
+
+    CxyN[N*M:(N+1)*M] = (1.0 - 0.25*dt*(1./Wi))*Cxy[N*M:(N+1)*M] \
+                         + 0.5*dt*CYY0DYU0
+
+    CxyN = CxyN * (Wi/(Wi+dt*0.25))
+
+cxxNc = load_hdf5_state("./output/cxxN.h5").reshape(2*N+1, M).T 
+cxyNc = load_hdf5_state("./output/cxyN.h5").reshape(2*N+1, M).T 
+cyyNc = load_hdf5_state("./output/cyyN.h5").reshape(2*N+1, M).T 
+print '0:'
+print 'CxxN'
+test_arrays_equal(CxxN[N*M:(N+1)*M], cxxNc[:,0])
+print 'CyyN'
+test_arrays_equal(CyyN[N*M:(N+1)*M], cyyNc[:,0])
+print 'CxyN'
+test_arrays_equal(CxyN[N*M:(N+1)*M], cxyNc[:,0])
+
+print '1:'
+print 'CxxN'
+test_arrays_equal(CxxN[(N+1)*M:(N+2)*M], cxxNc[:,1])
+print 'CyyN'
+test_arrays_equal(CyyN[(N+1)*M:(N+2)*M], cyyNc[:,1])
+print 'CxyN'
+test_arrays_equal(CxyN[(N+1)*M:(N+2)*M], cxyNc[:,1])
+
+
+dycxy0Nc = load_hdf5_state("./output/dycxy0N.h5")
+DYCXY0N = dot(SMDY, CxyN[N*M:(N+1)*M])
+print 'DYCXY0N ?' 
+test_arrays_equal(DYCXY0N, dycxy0Nc)
+
+d2xcxyNc = load_hdf5_state("./output/d2xcxyN.h5")
+D2XCXYN = -kx**2 * CxyN[(N+1)*M:(N+2)*M]
+print 'D2XCXYN ?' 
+test_arrays_equal(D2XCXYN, d2xcxyNc)
+
+d2ycxyNc = load_hdf5_state("./output/d2ycxyN.h5")
+D2YCXYN = dot(SMDY, dot(SMDY, CxyN[(N+1)*M:(N+2)*M]))
+print 'D2YCXYN ?' 
+test_arrays_equal(D2YCXYN, d2ycxyNc)
+
+dxycyy_cxxNc = load_hdf5_state("./output/dxycyy_cxxN.h5")
+DXYCYY_CXXN = 1.j*kx*dot(SMDY, (CyyN[(N+1)*M:(N+2)*M] - CxxN[(N+1)*M:(N+2)*M]))
+print 'DXYCYY_CXXN ?' 
+test_arrays_equal(DXYCYY_CXXN, dxycyy_cxxNc)
+
 print """
 --------------
 Operator check
@@ -730,25 +1026,54 @@ for i in range(1,N+1):
     print 'half operator ',i
     test_arrays_equal(hopc, PsiOpInvListHalf[i].flatten())
 
+
 DYYYPSI = dot(MDY, dot(MDY, dot(MDY, PSI)))
 
 RHSVec = zeros((2*N+1)*M, dtype='complex')
+if args.flow_type == 2:
+    RHSVec[(N+1)*M:(N+2)*M] = dt*0.25*oneOverRe*beta*BIHARMPSI[(N+1)*M:(N+2)*M] \
+                            + LPLPSI[(N+1)*M:(N+2)*M] \
+                            - dt*0.5*UDXLPLPSI[(N+1)*M:(N+2)*M] \
+                            - dt*0.5*VDYLPLPSI \
+                            - dt*0.25*(1.0-beta)*oneOverRe*(1./Wi)*D2XCXY \
+                            - dt*0.25*(1.0-beta)*oneOverRe*(1./Wi)*DXYCYY_CXX \
+                            + dt*0.25*(1.0-beta)*oneOverRe*(1./Wi)*D2YCXY \
+                            - dt*0.25*(1.0-beta)*oneOverRe*(1./Wi)*D2XCXYN \
+                            - dt*0.25*(1.0-beta)*oneOverRe*(1./Wi)*DXYCYY_CXXN \
+                            + dt*0.25*(1.0-beta)*oneOverRe*(1./Wi)*D2YCXYN
 
-RHSVec[(N+1)*M:(N+2)*M] = dt*0.25*oneOverRe*beta*BIHARMPSI[(N+1)*M:(N+2)*M] \
-                        + LPLPSI[(N+1)*M:(N+2)*M] \
-                        - dt*0.5*UDXLPLPSI[(N+1)*M:(N+2)*M] \
-                        - dt*0.5*VDYLPLPSI \
-                        - dt*0.5*(1.0-beta)*oneOverRe*D2XCXY \
-                        - dt*0.5*(1.0-beta)*oneOverRe*DXYCYY_CXX \
-                        + dt*0.5*(1.0-beta)*oneOverRe*D2YCXY 
+    # Zeroth mode (dt/2 because that is how it appears in the method)
+
+    RHSVec[N*M:(N+1)*M] = 0
+    RHSVec[N*M:(N+1)*M] = dt*0.25*beta*oneOverRe*D3YPSI[N*M:(N+1)*M] \
+                          + U[N*M:(N+1)*M] \
+                          + dt*0.25*(1.-beta)*oneOverRe*(1./Wi)*DYCXY0 \
+                          + dt*0.25*(1.-beta)*oneOverRe*(1./Wi)*DYCXY0N
+
+    RHSVec[N*M] += dt*oneOverRe
 
 
-# Zeroth mode (dt/2 because that is how it appears in the method)
-RHSVec[N*M:(N+1)*M] = 0
-RHSVec[N*M:(N+1)*M] = dt*0.25*beta*oneOverRe*D3YPSI[N*M:(N+1)*M] \
-                      + U[N*M:(N+1)*M] \
-                      + dt*0.5*(1.-beta)*oneOverRe*DYCXY0
-RHSVec[N*M] += dt*oneOverRe
+else:
+    RHSVec[(N+1)*M:(N+2)*M] = dt*0.25*oneOverRe*beta*BIHARMPSI[(N+1)*M:(N+2)*M] \
+                            + LPLPSI[(N+1)*M:(N+2)*M] \
+                            - dt*0.5*UDXLPLPSI[(N+1)*M:(N+2)*M] \
+                            - dt*0.5*VDYLPLPSI \
+                            - dt*0.25*(1.0-beta)*oneOverRe*(1./Wi)*D2XCXY \
+                            - dt*0.25*(1.0-beta)*oneOverRe*(1./Wi)*DXYCYY_CXX \
+                            + dt*0.25*(1.0-beta)*oneOverRe*(1./Wi)*D2YCXY \
+                            - dt*0.25*(1.0-beta)*oneOverRe*(1./Wi)*D2XCXYN \
+                            - dt*0.25*(1.0-beta)*oneOverRe*(1./Wi)*DXYCYY_CXXN \
+                            + dt*0.25*(1.0-beta)*oneOverRe*(1./Wi)*D2YCXYN
+
+    # Zeroth mode (dt/2 because that is how it appears in the method)
+
+    RHSVec[N*M:(N+1)*M] = 0
+    RHSVec[N*M:(N+1)*M] = dt*0.25*beta*oneOverRe*D3YPSI[N*M:(N+1)*M] \
+                          + U[N*M:(N+1)*M] \
+                          + dt*0.25*(1.-beta)*oneOverRe*(1./Wi)*DYCXY0 \
+                          + dt*0.25*(1.-beta)*oneOverRe*(1./Wi)*DYCXY0N
+
+    RHSVec[N*M] += dt*oneOverRe
 
 # Apply BC's
 

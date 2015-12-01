@@ -10,7 +10,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 26 Oct 15:35:45 2015
+// Last modified: Tue  1 Dec 17:50:09 2015
 
 #include"fields_1D.h"
 #include"fields_IO.h"
@@ -272,7 +272,7 @@ void step_conformation_linear_Crank_Nicolson(
     single_dx(scr.v, scr.dxv, 1, params);
     single_dy(scr.v, scr.dyv, params);
     
-    // Cxx*dxU 
+    // Cxx*dxu 
     fft_cheby_convolve(&cijNL[ind(0,0)], scr.dxu, scr.cxxdxu, scr, params);
 
     // Cxy*dyu = Cxy*dyu + cxy*dyU
@@ -424,6 +424,11 @@ void step_conformation_linear_Crank_Nicolson(
         cij[(N+1)*M + ind(0,j)] = creal(cij[(N+1)*M + ind(0,j)]);
         cij[2*(N+1)*M + ind(0,j)] = creal(cij[2*(N+1)*M + ind(0,j)]);
     }
+    
+    #ifdef MYDEBUG
+    save_hdf5_arr("./output/cyy0dyu0.h5", &scr.cyy0dyU0[0], M);
+    save_hdf5_arr("./output/cxy0dyu0.h5", &scr.cxy0dyU0[0], M);
+    #endif
 
 }
 
@@ -524,12 +529,12 @@ void step_sf_linear_SI_Crank_Nicolson_visco(
     single_d2x(&psi[ind(1,0)], scr.scratch, 1, params);
 
 
-#ifdef MYDEBUG
+    #ifdef MYDEBUG
     if(timeStep==0)
     {
 	save_hdf5_arr("./output/d2xpsi.h5", &scr.scratch[0], M);
     }
-#endif
+    #endif
 
     single_dy(scr.scratch, scr.scratch2, params);
     single_dy(scr.scratch2, scr.d2xd2ypsi, params);
@@ -587,7 +592,7 @@ void step_sf_linear_SI_Crank_Nicolson_visco(
     single_dx(scr.scratch, scr.scratch2, 1, params);
     single_dy(scr.scratch2, scr.dxycyy_cxx, params);
     
-#ifdef MYDEBUG
+    #ifdef MYDEBUG
     if(timeStep==0)
     {
 	save_hdf5_arr("./output/U0.h5",  &scr.U0[0], M);
@@ -604,12 +609,16 @@ void step_sf_linear_SI_Crank_Nicolson_visco(
 	save_hdf5_arr("./output/biharmpsi.h5", &scr.biharmpsi[0], M);
 	save_hdf5_arr("./output/udxlplpsi.h5", &scr.udxlplpsi[0], M);
 	save_hdf5_arr("./output/vdylplpsi.h5", &scr.vdylplpsi[0], M);
-	save_hdf5_arr("./output/dycxy0.h5", &scr.dycxy0N[0], M);
-	save_hdf5_arr("./output/d2ycxy.h5", &scr.d2ycxyN[0], M);
-	save_hdf5_arr("./output/d2xcxy.h5", &scr.d2xcxyN[0], M);
-	save_hdf5_arr("./output/dxycyy_cxx.h5", &scr.dxycyy_cxxN[0], M);
+	save_hdf5_arr("./output/dycxy0.h5", &scr.dycxy0[0], M);
+	save_hdf5_arr("./output/d2ycxy.h5", &scr.d2ycxy[0], M);
+	save_hdf5_arr("./output/d2xcxy.h5", &scr.d2xcxy[0], M);
+	save_hdf5_arr("./output/dxycyy_cxx.h5", &scr.dxycyy_cxx[0], M);
+	save_hdf5_arr("./output/dycxy0N.h5", &scr.dycxy0N[0], M);
+	save_hdf5_arr("./output/d2ycxyN.h5", &scr.d2ycxyN[0], M);
+	save_hdf5_arr("./output/d2xcxyN.h5", &scr.d2xcxyN[0], M);
+	save_hdf5_arr("./output/dxycyy_cxxN.h5", &scr.dxycyy_cxxN[0], M);
     }
-#endif
+    #endif
     
     // Streamfunction equation:
 
@@ -699,14 +708,14 @@ void step_sf_linear_SI_Crank_Nicolson_visco(
     scr.RHSvec[M-2] = -params.U0; 
     scr.RHSvec[M-1] = 0; 
 
-#ifdef MYDEBUG
+    #ifdef MYDEBUG
     if(timeStep==0)
     {
 	char fn[30];
 	sprintf(fn, "./output/RHSVec%d.h5", 0);
 	save_hdf5_arr(fn, &scr.RHSvec[0], M);
     }
-#endif
+    #endif
 
 
     // step the zeroth mode
@@ -903,6 +912,11 @@ void step_conformation_linear_oscil(
         cij[2*(N+1)*M + ind(0,j)] = creal(cij[2*(N+1)*M + ind(0,j)]);
     }
 
+    #ifdef MYDEBUG
+    save_hdf5_arr("./output/cyy0dyu0.h5", &scr.cyy0dyU0[0], M);
+    save_hdf5_arr("./output/cxy0dyu0.h5", &scr.cxy0dyU0[0], M);
+    #endif
+
 }
 
 void step_sf_linear_SI_oscil_visco(
@@ -1081,10 +1095,14 @@ void step_sf_linear_SI_oscil_visco(
 	save_hdf5_arr("./output/biharmpsi.h5", &scr.biharmpsi[0], M);
 	save_hdf5_arr("./output/udxlplpsi.h5", &scr.udxlplpsi[0], M);
 	save_hdf5_arr("./output/vdylplpsi.h5", &scr.vdylplpsi[0], M);
-	save_hdf5_arr("./output/dycxy0.h5", &scr.dycxy0N[0], M);
-	save_hdf5_arr("./output/d2ycxy.h5", &scr.d2ycxyN[0], M);
-	save_hdf5_arr("./output/d2xcxy.h5", &scr.d2xcxyN[0], M);
-	save_hdf5_arr("./output/dxycyy_cxx.h5", &scr.dxycyy_cxxN[0], M);
+	save_hdf5_arr("./output/dycxy0.h5", &scr.dycxy0[0], M);
+	save_hdf5_arr("./output/d2ycxy.h5", &scr.d2ycxy[0], M);
+	save_hdf5_arr("./output/d2xcxy.h5", &scr.d2xcxy[0], M);
+	save_hdf5_arr("./output/dxycyy_cxx.h5", &scr.dxycyy_cxx[0], M);
+	save_hdf5_arr("./output/dycxy0N.h5", &scr.dycxy0N[0], M);
+	save_hdf5_arr("./output/d2ycxyN.h5", &scr.d2ycxyN[0], M);
+	save_hdf5_arr("./output/d2xcxyN.h5", &scr.d2xcxyN[0], M);
+	save_hdf5_arr("./output/dxycyy_cxxN.h5", &scr.dxycyy_cxxN[0], M);
     }
 #endif
     
@@ -1124,7 +1142,7 @@ void step_sf_linear_SI_oscil_visco(
     scr.RHSvec[M-2] = 0;
     scr.RHSvec[M-1] = 0;
 
-    #ifdef MYDEBUG
+    //#ifdef MYDEBUG
     if(timeStep==0)
     {
 	char fn[30];
@@ -1132,7 +1150,7 @@ void step_sf_linear_SI_oscil_visco(
 	printf("writing %s\n", fn);
 	save_hdf5_arr(fn, &scr.RHSvec[0], M);
     }
-    #endif
+    //#endif
 
     // perform dot product to calculate new streamfunction.
     for (j=M-1; j>=0; j=j-1)

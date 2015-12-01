@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 11 Nov 10:52:57 2015
+// Last modified: Mon 30 Nov 14:17:55 2015
 
 /* Program Description:
  *
@@ -464,7 +464,6 @@ int main(int argc, char **argv)
 
 	// OSCILLATING PRESSURE GRADIENT
 	#ifdef OSCIL_FLOW
-
 	periods = floor(initTime/(2.0*M_PI));
 	phase = initTime - 2.0*M_PI*periods;
 
@@ -478,9 +477,6 @@ int main(int argc, char **argv)
 			forcing, forcingN, 0.5*dt, timeStep, hopsList, scr, params);
 
 	// calculate forcing on the half step
-	periods = floor(initTime / (2.0*M_PI));
-	phase = initTime - 2.0*M_PI*periods;
-
 	forcing[ind(0,0)] = params.P*cos((timeStep)*dt + phase);
 	forcingN[ind(0,0)] = params.P*cos((timeStep+1.0)*dt + phase);
 

@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Wed 11 Nov 12:00:33 2015
+#   Last modified: Mon 30 Nov 16:45:02 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -809,26 +809,27 @@ psiLam = copy(PSI)
 #PSI[(N)*M+1] += lsd *(155./64. - 4. )
 #PSI[(N)*M+0] += lsd *(1./8) 
 
-#perAmp = 1e-7
-#y = 2.0*arange(M)/(M-1.0) -1.0
-#
-#for n in range(N/2):
-#    rn = (10.0**(-(n**2)))*(0.5-rand(5))
-#    rSpace = zeros(M, dtype='complex')
-#
-#    ## sinusoidal
-#    rSpace =  perAmp*sin(1.0 * 2.0*pi * y) * rn[0]
-#    rSpace += perAmp*sin(2.0 * 2.0*pi * y) * rn[1]
-#    rSpace += perAmp*sin(3.0 * 2.0*pi * y) * rn[2]
-#    ## cosinusoidal 
-#    rSpace += perAmp*cos(1.0 * 2.0*pi * y) * rn[3]
-#    rSpace += perAmp*cos(2.0 * 2.0*pi * y) * rn[4]
-#
-#    ## low order eigenfunction of biharmonic operator
-#    #rSpace = (sin(pscale * y)/(pscale*cos(pscale)) - sinh(gam*y)/(gam*cosh(gam))) * rn[0]
-#
-#    PSI[(N+n)*M:(N+n+1)*M] =stupid_transform(rSpace, CNSTS)
-#    PSI[(N-n)*M:(N-n+1)*M] = conj(PSI[(N+n)*M:(N+n+1)*M])
+perAmp = 1e-8
+y = 2.0*arange(M)/(M-1.0) -1.0
+
+for n in range(1,N+1-N/3):
+    #rn = (10.0**(-(n**2)))*(0.5-rand(5))
+    rn = (10.0**(-n))*array([-0.43,-0.234,0.2134,-0.134,0.7653683])
+    rSpace = zeros(M, dtype='complex')
+
+    ## sinusoidal
+    rSpace =  perAmp*sin(1.0 * 2.0*pi * y) * rn[0]
+    rSpace += perAmp*sin(2.0 * 2.0*pi * y) * rn[1]
+    rSpace += perAmp*sin(3.0 * 2.0*pi * y) * rn[2]
+    ## cosinusoidal 
+    rSpace += perAmp*cos(1.0 * 2.0*pi * y) * rn[3]
+    rSpace += perAmp*cos(2.0 * 2.0*pi * y) * rn[4]
+
+    ## low order eigenfunction of biharmonic operator
+    #rSpace = (sin(pscale * y)/(pscale*cos(pscale)) - sinh(gam*y)/(gam*cosh(gam))) * rn[0]
+
+    PSI[(N+n)*M:(N+n+1)*M] =stupid_transform(rSpace, CNSTS)
+    PSI[(N-n)*M:(N-n+1)*M] = conj(PSI[(N+n)*M:(N+n+1)*M])
 
 # ----------------------------------------------------------------------------
 
