@@ -74,7 +74,7 @@ else:
     #inFileName = args.path + "/initial_linear.h5".format()
     #inFileName2 = "./initial_full.h5".format()
     inFileName = args.path + "/linear_final.h5".format()
-    inFileName2 = "./full_final.h5".format()
+    #inFileName2 = "./full_final.h5".format()
     print 'Reading from: ', inFileName
     twsFileName = args.path + "/pf-N{N}-M{M}-kx{kx}-Re{Re}-b{beta}-Wi{Wi}.pickle".format(**kwargs)
 
@@ -275,7 +275,7 @@ NumTimeSteps\t= {NT}
 time = totTime
 
 f = h5py.File(inFileName, "r")
-f2 = h5py.File(inFileName2, "r")
+#f2 = h5py.File(inFileName2, "r")
 
 
 if args.Newt:
@@ -306,26 +306,26 @@ else:
     cxy_ti = cxy_ti.reshape((N+1, M)).T
     cxy_ti = hstack((cxy_ti, conj(cxy_ti[:, N:0:-1])))
 
-    #psi_true, cxx_true, cyy_true, cxy_true, Nu = pickle.load(open(twsFileName, 'r'))
+    ##psi_true, cxx_true, cyy_true, cxy_true, Nu = pickle.load(open(twsFileName, 'r'))
 
-    psi_true = array(f2["/psi"])
-    cxx_true = array(f2["/cxx"])
-    cyy_true = array(f2["/cyy"])
-    cxy_true = array(f2["/cxy"])
+    #psi_true = array(f2["/psi"])
+    #cxx_true = array(f2["/cxx"])
+    #cyy_true = array(f2["/cyy"])
+    #cxy_true = array(f2["/cxy"])
 
-    #psi_true = psi_true.reshape((2*N+1, M)).T
-    #cxx_true = cxx_true.reshape((2*N+1, M)).T
-    #cyy_true = cyy_true.reshape((2*N+1, M)).T
-    #cxy_true = cxy_true.reshape((2*N+1, M)).T
+    ##psi_true = psi_true.reshape((2*N+1, M)).T
+    ##cxx_true = cxx_true.reshape((2*N+1, M)).T
+    ##cyy_true = cyy_true.reshape((2*N+1, M)).T
+    ##cxy_true = cxy_true.reshape((2*N+1, M)).T
 
-    psi_true = psi_true.reshape((N+1, M)).T
-    psi_true = hstack((psi_true, conj(psi_true[:, N:0:-1])))
-    cxx_true = cxx_true.reshape((N+1, M)).T
-    cxx_true = hstack((cxx_true, conj(cxx_true[:, N:0:-1])))
-    cyy_true = cyy_true.reshape((N+1, M)).T
-    cyy_true = hstack((cyy_true, conj(cyy_true[:, N:0:-1])))
-    cxy_true = cxy_true.reshape((N+1, M)).T
-    cxy_true = hstack((cxy_true, conj(cxy_true[:, N:0:-1])))
+    #psi_true = psi_true.reshape((N+1, M)).T
+    #psi_true = hstack((psi_true, conj(psi_true[:, N:0:-1])))
+    #cxx_true = cxx_true.reshape((N+1, M)).T
+    #cxx_true = hstack((cxx_true, conj(cxx_true[:, N:0:-1])))
+    #cyy_true = cyy_true.reshape((N+1, M)).T
+    #cyy_true = hstack((cyy_true, conj(cyy_true[:, N:0:-1])))
+    #cxy_true = cxy_true.reshape((N+1, M)).T
+    #cxy_true = hstack((cxy_true, conj(cxy_true[:, N:0:-1])))
 
 f.close()
 
@@ -364,12 +364,12 @@ y = 2.0*arange(Mf)/(Mf-1.) -1
 
 # Compare mode by mode
 
-plot_comp_modes(psi_ti, psi_true, phase_factor, "\psi", time, CNSTS)
-plot_comp_modes(cxx_ti, cxx_true, phase_factor, "cxx", time, CNSTS)
-plot_comp_modes(cyy_ti, cyy_true, phase_factor, "cyy", time, CNSTS)
-plot_comp_modes(cxy_ti, cxy_true, phase_factor, "cxy", time, CNSTS)
+#plot_comp_modes(psi_ti, psi_true, phase_factor, "\psi", time, CNSTS)
+#plot_comp_modes(cxx_ti, cxx_true, phase_factor, "cxx", time, CNSTS)
+#plot_comp_modes(cyy_ti, cyy_true, phase_factor, "cyy", time, CNSTS)
+#plot_comp_modes(cxy_ti, cxy_true, phase_factor, "cxy", time, CNSTS)
 
-#plot_modes(psi_ti, "\psi", time, CNSTS)
-#plot_modes(cxx_ti, "cxx", time, CNSTS)
-#plot_modes(cyy_ti, "cyy", time, CNSTS)
-#plot_modes(cxy_ti, "cxy", time, CNSTS)
+plot_modes(psi_ti, "\psi", time, CNSTS)
+plot_modes(cxx_ti, "cxx", time, CNSTS)
+plot_modes(cyy_ti, "cyy", time, CNSTS)
+plot_modes(cxy_ti, "cxy", time, CNSTS)

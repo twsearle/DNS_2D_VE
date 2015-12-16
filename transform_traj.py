@@ -249,8 +249,8 @@ else:
                                                        "cyy": cyyReal, "cxy": cxyReal}) 
 
          
-        fpvd.write('<DataSet timestep="{0}" group="" part="0"\n'.format(time))
         fpvd.write('file="{0}"/>'.format(filename))
+        fpvd.write('<DataSet timestep="{0}" group="" part="0"\n'.format(time))
 
 
 fpvd.write('''

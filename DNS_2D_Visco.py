@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Mon 30 Nov 16:45:02 2015
+#   Last modified: Mon 14 Dec 16:11:00 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -653,6 +653,20 @@ def oscillatory_flow():
     forcing = zeros((M,2*N+1), dtype='complex')
     forcing[0,0] = P
 
+    # VERRRYYY IMPORTANT! accidentally introducing tiny imaginary part to linear
+    # code
+    PSI[N*M:(N+1)*M] = real(PSI[N*M:(N+1)*M])
+    Cxx[N*M:(N+1)*M] = real(Cxx[N*M:(N+1)*M])
+    Cxy[N*M:(N+1)*M] = real(Cxy[N*M:(N+1)*M])
+    Cyy[N*M:(N+1)*M] = real(Cyy[N*M:(N+1)*M])
+
+    Cxx[(N+1)*M:] = 0.0
+    Cxx[:N*M] = 0.0
+    Cyy[(N+1)*M:] = 0.0
+    Cyy[:N*M] = 0.0
+    Cxy[(N+1)*M:] = 0.0
+    Cxy[:N*M] = 0.0
+
     return PSI, Cxx, Cyy, Cxy, forcing, P
 
 # -----------------------------------------------------------------------------
@@ -809,27 +823,52 @@ psiLam = copy(PSI)
 #PSI[(N)*M+1] += lsd *(155./64. - 4. )
 #PSI[(N)*M+0] += lsd *(1./8) 
 
-perAmp = 1e-8
-y = 2.0*arange(M)/(M-1.0) -1.0
+#perAmp = 1e-7
+#y = 2.0*arange(M)/(M-1.0) -1.0
 
-for n in range(1,N+1-N/3):
-    #rn = (10.0**(-(n**2)))*(0.5-rand(5))
-    rn = (10.0**(-n))*array([-0.43,-0.234,0.2134,-0.134,0.7653683])
-    rSpace = zeros(M, dtype='complex')
+#for n in range(1,N+1-N/3):
+#    #rn = (10.0**(-(n**2)))*(0.5-rand(5))
+#    rn = (10.0**(-n))*array([-0.43,-0.234,0.2134,-0.134,0.7653683])
+#    rSpace = zeros(M, dtype='complex')
+#
+#    ## sinusoidal
+#    rSpace =  perAmp*sin(1.0 * 2.0*pi * y) * rn[0]
+#    rSpace += perAmp*sin(2.0 * 2.0*pi * y) * rn[1]
+#    rSpace += perAmp*sin(3.0 * 2.0*pi * y) * rn[2]
+#    ## cosinusoidal 
+#    rSpace += perAmp*cos(1.0 * 2.0*pi * y) * rn[3]
+#    rSpace += perAmp*cos(2.0 * 2.0*pi * y) * rn[4]
+#
+#    ## low order eigenfunction of biharmonic operator
+#    #rSpace = (sin(pscale * y)/(pscale*cos(pscale)) - sinh(gam*y)/(gam*cosh(gam))) * rn[0]
+#
+#    PSI[(N+n)*M:(N+n+1)*M] =stupid_transform(rSpace, CNSTS)
+#    PSI[(N-n)*M:(N-n+1)*M] = conj(PSI[(N+n)*M:(N+n+1)*M])
 
-    ## sinusoidal
-    rSpace =  perAmp*sin(1.0 * 2.0*pi * y) * rn[0]
-    rSpace += perAmp*sin(2.0 * 2.0*pi * y) * rn[1]
-    rSpace += perAmp*sin(3.0 * 2.0*pi * y) * rn[2]
-    ## cosinusoidal 
-    rSpace += perAmp*cos(1.0 * 2.0*pi * y) * rn[3]
-    rSpace += perAmp*cos(2.0 * 2.0*pi * y) * rn[4]
+#rspace = perAmp*tanh(arange(Mf)*pi/(Mf-1.)) * (1.0 + 1.j)
+#rspace = perAmp*(arange(Mf)[::-1])
+#PSI[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(real(rspace), CNSTS)
+#PSI[(N+1)*M:(N+2)*M] += 1.j*f2d.forward_cheb_transform(imag(rspace), CNSTS)
 
-    ## low order eigenfunction of biharmonic operator
-    #rSpace = (sin(pscale * y)/(pscale*cos(pscale)) - sinh(gam*y)/(gam*cosh(gam))) * rn[0]
+#PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
 
-    PSI[(N+n)*M:(N+n+1)*M] =stupid_transform(rSpace, CNSTS)
-    PSI[(N-n)*M:(N-n+1)*M] = conj(PSI[(N+n)*M:(N+n+1)*M])
+f = h5py.File("linear_evec.h5","r")
+
+PSIlin = array(f["psi"]).reshape(2,M).T
+Cxxlin = array(f["cxx"]).reshape(2,M).T
+Cyylin = array(f["cyy"]).reshape(2,M).T
+Cxylin = array(f["cxy"]).reshape(2,M).T
+
+f.close()
+perAmp = 2.e-4 / linalg.norm(PSIlin[:,1])
+PSI[(N+1)*M:(N+2)*M] = perAmp * PSIlin[:,1]
+PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
+Cxx[(N+1)*M:(N+2)*M] = perAmp * Cxxlin[:,1]
+Cxx[(N-1)*M:(N)*M] = conj(Cxx[(N+1)*M:(N+2)*M])
+Cyy[(N+1)*M:(N+2)*M] = perAmp * Cyylin[:,1] 
+Cyy[(N-1)*M:(N)*M] = conj(Cyy[(N+1)*M:(N+2)*M])
+Cxy[(N+1)*M:(N+2)*M] = perAmp * Cxylin[:,1] 
+Cxy[(N-1)*M:(N)*M] = conj(Cxy[(N+1)*M:(N+2)*M])
 
 # ----------------------------------------------------------------------------
 

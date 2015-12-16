@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Tue  1 Dec 17:53:30 2015
+#   Last modified: Wed  2 Dec 16:16:49 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -536,6 +536,8 @@ elif args.flow_type==2:
     PSI, Cxx, Cyy, Cxy, forcing, CNSTS['P'] = oscillatory_flow()
     psiLam = copy(PSI)
 
+
+
 f = h5py.File("forcing.h5", "w")
 dset = f.create_dataset("psi", (3*M,), dtype='complex')
 dset[...] = forcing.T.flatten()
@@ -878,46 +880,43 @@ DXYPSI[(N-1)*M:N*M] = conj(DXYPSI[(N+1)*M:(N+2)*M])
 
 if args.flow_type ==2: # Oscillatory flow 
     CxxN = zeros((2*N+1)*M, dtype='complex')
-    CxxN[(N+1)*M:(N+2)*M] = Cxx[(N+1)*M:(N+2)*M] \
-            - 0.25*dt*(1./Wi)*Cxx[(N+1)*M:(N+2)*M] \
+    CxxN[(N+1)*M:(N+2)*M] = (0.5*pi/Wi)*(De - 0.25*dt)*Cxx[(N+1)*M:(N+2)*M] \
             + dt*dot(tsm.cheb_prod_mat(Cxy[(N+1)*M:(N+2)*M]), D2YPSI[N*M:(N+1)*M]) \
             + dt*dot(tsm.cheb_prod_mat(Cxy[N*M:(N+1)*M]), D2YPSI[(N+1)*M:(N+2)*M]) \
             + dt*dot(tsm.cheb_prod_mat(Cxx[N*M:(N+1)*M]), DXYPSI[(N+1)*M:(N+2)*M]) \
             - 0.5*dt*dot(dot(cheb_prod_mat(V[(N+1)*M:(N+2)*M]),SMDY), Cxx[N*M:(N+1)*M]) \
             - 0.5*dt*dot(1.j*kx*cheb_prod_mat(U[N*M:(N+1)*M]), Cxx[(N+1)*M:(N+2)*M])
 
-    CxxN[N*M:(N+1)*M] = (1.0 - 0.25*dt*(1./Wi)) * Cxx[N*M:(N+1)*M] \
+    CxxN[N*M:(N+1)*M] = (0.5*pi/Wi)*(De - 0.25*dt) * Cxx[N*M:(N+1)*M] \
                          + dt*CXY0DYU0
-    CxxN[N*M] += (.5*dt/Wi)
+    CxxN[N*M] += (0.25*dt*pi/Wi)
 
-    CxxN = CxxN * (Wi/(Wi+dt*0.25))
+    CxxN = CxxN * 2.*Wi / (pi*(De + 0.25*dt))
 
     CyyN = zeros((2*N+1)*M, dtype='complex')
-    CyyN[(N+1)*M:(N+2)*M] = Cyy[(N+1)*M:(N+2)*M] \
-            - 0.25*dt*(1./Wi)*Cyy[(N+1)*M:(N+2)*M] \
+    CyyN[(N+1)*M:(N+2)*M] = (0.5*pi/Wi)*(De - 0.25*dt)*Cyy[(N+1)*M:(N+2)*M] \
             + dt*dot(tsm.cheb_prod_mat(Cxy[N*M:(N+1)*M]), -D2XPSI[(N+1)*M:(N+2)*M]) \
             + dt*dot(tsm.cheb_prod_mat(Cyy[N*M:(N+1)*M]), -DXYPSI[(N+1)*M:(N+2)*M]) \
             - 0.5*dt*dot(dot(cheb_prod_mat(V[(N+1)*M:(N+2)*M]),SMDY), Cyy[N*M:(N+1)*M]) \
             - 0.5*dt*dot(1.j*kx*cheb_prod_mat(U[N*M:(N+1)*M]), Cyy[(N+1)*M:(N+2)*M])
 
-    CyyN[N*M:(N+1)*M] = (1.0 - 0.25*dt*(1./Wi))*Cyy[N*M:(N+1)*M]
-    CyyN[N*M] += (.5*dt/Wi)
+    CyyN[N*M:(N+1)*M] = (0.5*pi/Wi)*(De - 0.25*dt)*Cyy[N*M:(N+1)*M]
+    CyyN[N*M] += (pi*.25*dt/Wi)
 
-    CyyN = CyyN * (Wi/(Wi+dt*0.25))
+    CyyN = CyyN * 2.*Wi / (pi*(De + 0.25*dt))
 
     CxyN = zeros((2*N+1)*M, dtype='complex')
-    CxyN[(N+1)*M:(N+2)*M] = Cxy[(N+1)*M:(N+2)*M] \
-            - 0.25*dt*(1./Wi)*Cxy[(N+1)*M:(N+2)*M] \
+    CxyN[(N+1)*M:(N+2)*M] = (0.5*pi/Wi)*(De - 0.25*dt)*Cxy[(N+1)*M:(N+2)*M] \
             - 0.5*dt*dot(tsm.cheb_prod_mat(Cxx[N*M:(N+1)*M]), D2XPSI[(N+1)*M:(N+2)*M]) \
             + 0.5*dt*dot(tsm.cheb_prod_mat(Cyy[N*M:(N+1)*M]), D2YPSI[(N+1)*M:(N+2)*M]) \
             + 0.5*dt*dot(tsm.cheb_prod_mat(Cyy[(N+1)*M:(N+2)*M]), D2YPSI[N*M:(N+1)*M]) \
             - 0.5*dt*dot(dot(cheb_prod_mat(V[(N+1)*M:(N+2)*M]), SMDY), Cxy[N*M:(N+1)*M]) \
             - 0.5*dt*dot(1.j*kx*cheb_prod_mat(U[N*M:(N+1)*M]), Cxy[(N+1)*M:(N+2)*M])
 
-    CxyN[N*M:(N+1)*M] = (1.0 - 0.25*dt*(1./Wi))*Cxy[N*M:(N+1)*M] \
+    CxyN[N*M:(N+1)*M] = (0.5*pi/Wi)*(De - 0.25*dt)*Cxy[N*M:(N+1)*M] \
                          + 0.5*dt*CYY0DYU0
 
-    CxyN = CxyN * (Wi/(Wi+dt*0.25))
+    CxyN = CxyN * 2.*Wi / (pi*(De + 0.25*dt))
 
 else: # Time independent forcing flow
     CxxN = zeros((2*N+1)*M, dtype='complex')
@@ -1031,26 +1030,27 @@ DYYYPSI = dot(MDY, dot(MDY, dot(MDY, PSI)))
 
 RHSVec = zeros((2*N+1)*M, dtype='complex')
 if args.flow_type == 2:
-    RHSVec[(N+1)*M:(N+2)*M] = dt*0.25*oneOverRe*beta*BIHARMPSI[(N+1)*M:(N+2)*M] \
-                            + LPLPSI[(N+1)*M:(N+2)*M] \
-                            - dt*0.5*UDXLPLPSI[(N+1)*M:(N+2)*M] \
-                            - dt*0.5*VDYLPLPSI \
-                            - dt*0.25*(1.0-beta)*oneOverRe*(1./Wi)*D2XCXY \
-                            - dt*0.25*(1.0-beta)*oneOverRe*(1./Wi)*DXYCYY_CXX \
-                            + dt*0.25*(1.0-beta)*oneOverRe*(1./Wi)*D2YCXY \
-                            - dt*0.25*(1.0-beta)*oneOverRe*(1./Wi)*D2XCXYN \
-                            - dt*0.25*(1.0-beta)*oneOverRe*(1./Wi)*DXYCYY_CXXN \
-                            + dt*0.25*(1.0-beta)*oneOverRe*(1./Wi)*D2YCXYN
+    Bfac =  0.5*pi*(Re*De/Wi)
+    RHSVec[(N+1)*M:(N+2)*M] = dt*0.25*beta*BIHARMPSI[(N+1)*M:(N+2)*M] \
+                            + Bfac*LPLPSI[(N+1)*M:(N+2)*M] \
+                            - dt*0.5*Re*UDXLPLPSI[(N+1)*M:(N+2)*M] \
+                            - dt*0.5*Re*VDYLPLPSI \
+                            - dt*0.25*(1.0-beta)*(0.5*pi/Wi)*D2XCXY \
+                            - dt*0.25*(1.0-beta)*(0.5*pi/Wi)*DXYCYY_CXX \
+                            + dt*0.25*(1.0-beta)*(0.5*pi/Wi)*D2YCXY \
+                            - dt*0.25*(1.0-beta)*(0.5*pi/Wi)*D2XCXYN \
+                            - dt*0.25*(1.0-beta)*(0.5*pi/Wi)*DXYCYY_CXXN \
+                            + dt*0.25*(1.0-beta)*(0.5*pi/Wi)*D2YCXYN
 
     # Zeroth mode (dt/2 because that is how it appears in the method)
 
     RHSVec[N*M:(N+1)*M] = 0
-    RHSVec[N*M:(N+1)*M] = dt*0.25*beta*oneOverRe*D3YPSI[N*M:(N+1)*M] \
-                          + U[N*M:(N+1)*M] \
-                          + dt*0.25*(1.-beta)*oneOverRe*(1./Wi)*DYCXY0 \
-                          + dt*0.25*(1.-beta)*oneOverRe*(1./Wi)*DYCXY0N
+    RHSVec[N*M:(N+1)*M] = dt*0.25*beta*D3YPSI[N*M:(N+1)*M] \
+                          + Bfac*U[N*M:(N+1)*M] \
+                          + dt*0.25*(1.-beta)*(0.5*pi/Wi)*DYCXY0 \
+                          + dt*0.25*(1.-beta)*(0.5*pi/Wi)*DYCXY0N
 
-    RHSVec[N*M] += dt*oneOverRe
+    RHSVec[N*M] += CNSTS['P']*0.5*dt
 
 
 else:

@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral linear time stepping code
 #
-#   Last modified: Mon 30 Nov 16:45:00 2015
+#   Last modified: Mon 14 Dec 13:10:55 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -520,6 +520,20 @@ def oscillatory_flow():
     forcing = zeros((M,2*N+1), dtype='complex')
     forcing[0,0] = P
 
+    # VERRRYYY IMPORTANT! accidentally introducing tiny imaginary part to linear
+    # code
+    PSI[N*M:(N+1)*M] = real(PSI[N*M:(N+1)*M])
+    Cxx[N*M:(N+1)*M] = real(Cxx[N*M:(N+1)*M])
+    Cxy[N*M:(N+1)*M] = real(Cxy[N*M:(N+1)*M])
+    Cyy[N*M:(N+1)*M] = real(Cyy[N*M:(N+1)*M])
+
+    Cxx[(N+1)*M:] = 0.0
+    Cxx[:N*M] = 0.0
+    Cyy[(N+1)*M:] = 0.0
+    Cyy[:N*M] = 0.0
+    Cxy[(N+1)*M:] = 0.0
+    Cxy[:N*M] = 0.0
+
     return PSI, Cxx, Cyy, Cxy, forcing, P
 
 # -----------------------------------------------------------------------------
@@ -606,26 +620,38 @@ else:
 psiLam = copy(PSI)
 
 
-perAmp = 1e-8
+perAmp = 1e-7
 
 #rn = (10.0**(-1))*(0.5-rand(5))
-rn = (10.0**(-1))*array([-0.43,-0.234,0.2134,-0.134,0.7653683])
-rSpace = zeros(M, dtype='complex')
-y = 2.0*arange(M)/(M-1.0) -1.0
-
-## sinusoidal
-rSpace =  perAmp*sin(1.0 * 2.0*pi * y) * rn[0]
-rSpace += perAmp*sin(2.0 * 2.0*pi * y) * rn[1]
-rSpace += perAmp*sin(3.0 * 2.0*pi * y) * rn[2]
-## cosinusoidal 
-rSpace += perAmp*cos(1.0 * 2.0*pi * y) * rn[3]
-rSpace += perAmp*cos(2.0 * 2.0*pi * y) * rn[4]
-
+#rn = (10.0**(-1))*array([-0.43,-0.234,0.2134,-0.134,0.7653683])
+#rSpace = zeros(M, dtype='complex')
+#y = 2.0*arange(M)/(M-1.0) -1.0
+#
+### sinusoidal
+#rSpace =  perAmp*sin(1.0 * 2.0*pi * y) * rn[0]
+#rSpace += perAmp*sin(2.0 * 2.0*pi * y) * rn[1]
+#rSpace += perAmp*sin(3.0 * 2.0*pi * y) * rn[2]
+### cosinusoidal 
+#rSpace += perAmp*cos(1.0 * 2.0*pi * y) * rn[3]
+#rSpace += perAmp*cos(2.0 * 2.0*pi * y) * rn[4]
+#
+#
 ## low order eigenfunction of biharmonic operator
-#rSpace = (sin(pscale * y)/(pscale*cos(pscale)) - sinh(gam*y)/(gam*cosh(gam))) * rn[0]
+##rSpace = (sin(pscale * y)/(pscale*cos(pscale)) - sinh(gam*y)/(gam*cosh(gam))) * rn[0]
+#
+#PSI[(N+1)*M:(N+2)*M] = stupid_transform(rSpace, CNSTS)
 
-PSI[(N+1)*M:(N+2)*M] =stupid_transform(rSpace, CNSTS)
+#perturbation similar to that used in stupid code
+#rspace = perAmp*tanh(arange(Mf)*pi/(Mf-1.)) * (1.0 + 1.j);
+ypoints = cos(arange(Mf)*pi/(Mf-1.))
+rspace = perAmp*sin(2.0*pi*ypoints) * (1.0 + 1.j);
+rspace += perAmp*sin(3.0*pi*ypoints) * (1.0 + 1.j);
+#rspace = perAmp*(arange(Mf)[::-1])*1.j
+PSI[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(real(rspace), CNSTS)
+PSI[(N+1)*M:(N+2)*M] += 1.j*f2d.forward_cheb_transform(imag(rspace), CNSTS)
+
 PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
+
 
 # ----------------------------------------------------------------------------
 

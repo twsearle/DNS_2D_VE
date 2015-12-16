@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 30 Nov 14:17:55 2015
+// Last modified: Wed  2 Dec 16:02:25 2015
 
 /* Program Description:
  *
@@ -472,9 +472,13 @@ int main(int argc, char **argv)
 
 	step_conformation_oscil(cijOld, cijNL, psiOld, cijOld,
 					    0.5*dt, scr, params);
-
 	step_sf_SI_oscil_visco(psiOld, psiNL, cijOld, cijNL, psiOld,
 			forcing, forcingN, 0.5*dt, timeStep, hopsList, scr, params);
+
+	#ifdef MYDEBUG
+	printf("\nFORCE END DEBUGGING RUN\n");
+	exit(1);
+	#endif
 
 	// calculate forcing on the half step
 	forcing[ind(0,0)] = params.P*cos((timeStep)*dt + phase);

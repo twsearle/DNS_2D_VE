@@ -10,7 +10,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Tue  1 Dec 17:50:09 2015
+// Last modified: Fri 11 Dec 14:29:18 2015
 
 #include"fields_1D.h"
 #include"fields_IO.h"
@@ -913,8 +913,17 @@ void step_conformation_linear_oscil(
     }
 
     #ifdef MYDEBUG
+    save_hdf5_arr("./output/dxu.h5", &scr.dxu[0], M);
+    save_hdf5_arr("./output/d2ypsi.h5", &scr.dyu[0], M);
     save_hdf5_arr("./output/cyy0dyu0.h5", &scr.cyy0dyU0[0], M);
     save_hdf5_arr("./output/cxy0dyu0.h5", &scr.cxy0dyU0[0], M);
+    save_hdf5_arr("./output/cxydyu.h5", &scr.cxydyu[0], M);
+    save_hdf5_arr("./output/cxydxv.h5", &scr.cxydxv[0], M);
+    save_hdf5_arr("./output/cyydyv.h5", &scr.cyydyv[0], M);
+    save_hdf5_arr("./output/cxxdxu.h5", &scr.cxxdxu[0], M);
+    save_hdf5_arr("./output/cxxdxv.h5", &scr.cxxdxv[0], M);
+    save_hdf5_arr("./output/cyydyu.h5", &scr.cyydyu[0], M);
+
     #endif
 
 }
@@ -936,7 +945,7 @@ void step_sf_linear_SI_oscil_visco(
     single_dy(&psi[ind(0,0)], scr.U0, params);
     single_dy(&psi[ind(1,0)], scr.u, params);
 
-    // v = -dydpsi
+    // v = -dxdpsi
     single_dx(&psi[ind(1,0)], scr.v, 1, params);
     for(j=0; j<M; j++)
     {
@@ -976,16 +985,59 @@ void step_sf_linear_SI_oscil_visco(
         scr.vdylplpsi[j] = scr.d3yPSI0[j];
     }
 
+    // SCREW WITH EVERYTHING
+    //double cumsum=0;
+    //for (j=0; j<M; j++)
+    //{
+    //    cumsum += cimag(scr.d3yPSI0[j]);
+    //    //cumsum += cimag(psi[j]);
+    //}
+    //printf("SUM %e \n", cumsum); 
+    //cumsum = 0.0;
+    //for (j=0; j<M; j++)
+    //{
+    //    cumsum += creal(scr.v[j]);
+    //}
+    //printf("SUM %e \n", cumsum); 
+    //fft_cheby_convolve(scr.v, scr.v, scr.scratch, scr, params);
+    //fft_cheby_convolve(scr.d3yPSI0, scr.d3yPSI0, scr.scratch2, scr, params);
+    //
+    ////fft_cheby_convolve(scr.v, scr.lplpsi, scr.scratch, scr, params);
+
+    //char file1[50];
+    //char file2[50];
+    //char file3[50];
+    //sprintf(file1, "./output/v%d.h5", timeStep);
+    //sprintf(file2, "./output/d3ypsi%d.h5", timeStep);
+    //sprintf(file3, "./output/vdylplpsi%d.h5", timeStep);
+
+    //// save_hdf5_arr(file1, &scr.v[0], M);
+    //// save_hdf5_arr(file2, &scr.scratch2[0], M);
+    //// save_hdf5_arr(file3, &scr.vdylplpsi[0], M);
+
     #ifdef MYDEBUG
     if(timeStep==0)
     {
 	save_hdf5_arr("./output/dylplpsi.h5", &scr.vdylplpsi[0], M);
     }
+    
     #endif
 
 
     fft_cheby_convolve(scr.vdylplpsi, scr.v, scr.vdylplpsi, 
 	    scr, params);
+
+    #ifdef MYDEBUG
+    if(timeStep==0)
+    {
+	save_hdf5_arr("./output/vdylplpsi.h5", &scr.vdylplpsi[0], M);
+    }
+    //add on the nonlinear term in the perturbation
+    //for (j=0; j<M; j++)
+    //{
+    //    scr.vdylplpsi[j] += scr.scratch[j];
+    //}
+    #endif
 
     // ----------- linear Terms --------------
     
@@ -1087,7 +1139,6 @@ void step_sf_linear_SI_oscil_visco(
 	save_hdf5_arr("./output/lplpsi.h5", &scr.lplpsi[0], M);
 	save_hdf5_arr("./output/d2yPSI0.h5", &scr.d2yPSI0[0], M);
 	save_hdf5_arr("./output/d3yPSI0.h5", &scr.d3yPSI0[0], M);
-	save_hdf5_arr("./output/d2ypsi.h5", &scr.d2ypsi[0], M);
 	save_hdf5_arr("./output/d3ypsi.h5", &scr.d3ypsi[0], M);
 	save_hdf5_arr("./output/d4ypsi.h5", &scr.d4ypsi[0], M);
 	save_hdf5_arr("./output/d2xd2ypsi.h5", &scr.d2xd2ypsi[0], M);
@@ -1103,6 +1154,7 @@ void step_sf_linear_SI_oscil_visco(
 	save_hdf5_arr("./output/d2ycxyN.h5", &scr.d2ycxyN[0], M);
 	save_hdf5_arr("./output/d2xcxyN.h5", &scr.d2xcxyN[0], M);
 	save_hdf5_arr("./output/dxycyy_cxxN.h5", &scr.dxycyy_cxxN[0], M);
+
     }
 #endif
     
@@ -1218,6 +1270,7 @@ void step_sf_linear_SI_oscil_visco(
 	    psi[ind(0,j)] += opsList[j*M + l] * scr.RHSvec[l];
 
 	}
+	psi[ind(0,j)] = creal(psi[ind(0,j)]);
     }
 
 }

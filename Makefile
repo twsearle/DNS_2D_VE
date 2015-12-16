@@ -15,7 +15,8 @@ V_LIN_OBJ= obj/fields_1D.o obj/fields_IO.o obj/DNS_2D_linear_Visco.o obj/time_st
 
 .PHONY : clean debug oscil
 
-oscil: MYFLAGS= -DOSCIL_FLOW -O3 -pg -g -ggdb -DMYDEBUG
+oscil: MYFLAGS= -DOSCIL_FLOW -O3
+	#-DMYDEBUG 
 debug: MYFLAGS= -pg -g -ggdb -DMYDEBUG 
 
 oscil debug : clean all 
@@ -37,9 +38,11 @@ DNS_2D_linear_Newt : $(N_LIN_OBJ)
 DNS_2D_linear_Visco : $(V_LIN_OBJ)
 	$(CC) -o DNS_2D_linear_Visco $(V_LIN_OBJ) $(CFLAGS) $(LIBFLAGS) $(MYFLAGS)
 
-test_fields : obj/fields_2D.o obj/fields_1D.o obj/fields_IO.o obj/test_fields.o obj/test_fields_1D.o
+test_fields : obj/fields_2D.o obj/fields_1D.o obj/fields_IO.o obj/test_fields.o obj/test_fields_1D.o obj/stupid_1D.o obj/stupid_2D.o
 	$(CC) -o test_fields obj/test_fields.o obj/fields_2D.o obj/fields_IO.o $(CFLAGS) $(LIBFLAGS)
 	$(CC) -o test_fields_1D obj/test_fields_1D.o obj/fields_1D.o obj/fields_IO.o $(CFLAGS) $(LIBFLAGS)
+	$(CC) -o stupid_1D obj/stupid_1D.o obj/fields_1D.o obj/fields_IO.o $(CFLAGS) $(LIBFLAGS)
+	$(CC) -o stupid_2D obj/stupid_2D.o obj/fields_2D.o obj/fields_IO.o $(CFLAGS) $(LIBFLAGS)
 
 $(ODIR)/%.o : $(SDIR)/%.c $(HEADERS)
 	$(CC) -c -o $@ $< $(CFLAGS) $(MYFLAGS) 

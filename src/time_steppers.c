@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 30 Nov 14:22:31 2015
+// Last modified: Thu 10 Dec 16:44:31 2015
 
 #include"fields_2D.h"
 #include"fields_IO.h"
@@ -879,6 +879,16 @@ void step_conformation_oscil(
         cij[(N+1)*M + ind(0,j)] = creal(cij[(N+1)*M + ind(0,j)]);
         cij[2*(N+1)*M + ind(0,j)] = creal(cij[2*(N+1)*M + ind(0,j)]);
     }
+#ifdef MYDEBUG
+    save_hdf5_state("./output/dxu.h5", &scr.dxu[0], params);
+    save_hdf5_state("./output/cxxdxu.h5", &scr.cxxdxu[0], params);
+    save_hdf5_state("./output/cxxdxv.h5", &scr.cxxdxv[0], params);
+    save_hdf5_state("./output/cxydyu.h5", &scr.cxydyu[0], params);
+    save_hdf5_state("./output/cxydxv.h5", &scr.cxydxv[0], params);
+    save_hdf5_state("./output/cyydyu.h5", &scr.cyydyu[0], params);
+    save_hdf5_state("./output/cyydyv.h5", &scr.cyydyv[0], params);
+#endif 
+
 
 }
 
@@ -895,9 +905,10 @@ void step_sf_SI_oscil_visco(
     double BFac = (M_PI*params.Re*params.De) / (2.0*params.Wi);
     double beta = params.beta;
 
+
     // -----------Nonlinear Terms --------------
-    //
-    // 
+    
+     
     dy(psiNL, scr.u, params);
 
     // v
@@ -946,8 +957,49 @@ void step_sf_SI_oscil_visco(
     }
     #endif
 
+    //fft_convolve_r(scr.v, scr.v, scr.scratch, scr, params);
+
+    //fft_convolve_r(scr.vdylplpsi, scr.vdylplpsi, scr.scratch2, scr, params);
 
     fft_convolve_r(scr.vdylplpsi, scr.v, scr.vdylplpsi, scr, params);
+
+    //// TOTALLY SCREW WITH EVERYTHING ------------------------------
+    ////
+    //int Mf = params.Mf;
+    //int Nf = params.Nf;
+    //double y=0;
+    //double xi=0;
+    //
+    //for (i=0; i<2*Nf+1; i++)
+    //{
+    //    xi = i*2.*M_PI/(2*Nf+1.);
+    //    for (j=0; j<Mf; j++)
+    //    {
+    //        y = cos(j*M_PI/(Mf-1));
+    //        scr.scratchp1[indfft(i,j)] = 2*tanh(y)*cos(xi)+(1./cosh(y));
+    //    }
+    //}
+
+    //to_spectral_r(scr.scratchp1, psiNL, scr, params);
+    //fft_convolve_r(psiNL, psiNL, scr.scratch, scr, params);
+
+    ////char file1[50];
+    ////char file2[50];
+    ////har file3[50];
+    ////sprintf(file1, "./output/v%d.h5", timeStep);
+    ////sprintf(file2, "./output/d3ypsi2%d.h5", timeStep);
+    ////sprintf(file3, "./output/vdylplpsi%d.h5", timeStep);
+
+    //save_hdf5_state("output/test.h5", &scr.scratch[0], params);
+    ////save_hdf5_state(file2, &scr.scratch2[0], params);
+    ////save_hdf5_state(file3, &scr.vdylplpsi[0], params);
+
+    #ifdef MYDEBUG
+    if(timeStep==0)
+    {
+    save_hdf5_state("./output/vdylplpsi", &scr.vdylplpsi[0], params);
+    }
+    #endif
 
     //vdyypsi = vdyu
     dy(scr.u, scr.dyu, params);
@@ -1027,7 +1079,6 @@ void step_sf_SI_oscil_visco(
 	save_hdf5_state("./output/d4xpsi.h5", &scr.d4xpsi[0], params);
 	save_hdf5_state("./output/biharmpsi.h5", &scr.biharmpsi[0], params);
 	save_hdf5_state("./output/udxlplpsi.h5", &scr.udxlplpsi[0], params);
-	save_hdf5_state("./output/vdylplpsi.h5", &scr.vdylplpsi[0], params);
     }
 #endif
 
@@ -1197,7 +1248,39 @@ void step_sf_SI_oscil_visco(
 	    psi[ind(0,j)] += opsList[j*M + l] * scr.RHSvec[l];
 
 	}
+	psi[ind(0,j)] = creal(psi[ind(0,j)]);
     }
+
+    #ifdef MYDEBUG
+
+    save_hdf5_state("./output/dxu.h5", &scr.dxu[0], params);
+    save_hdf5_state("./output/dyu.h5", &scr.dyu[0], params);
+    save_hdf5_state("./output/dxv.h5", &scr.dxv[0], params);
+    save_hdf5_state("./output/dyv.h5", &scr.dyv[0], params);
+
+    save_hdf5_state("./output/vgradcxx.h5", &scr.vgradcxx[0], params);
+    save_hdf5_state("./output/vgradcyy.h5", &scr.vgradcyy[0], params);
+    save_hdf5_state("./output/vgradcxy.h5", &scr.vgradcxy[0], params);
+
+    save_hdf5_state("./output/u.h5",  &scr.u[0], params);
+    save_hdf5_state("./output/v.h5", &scr.v[0], params);
+    save_hdf5_state("./output/lplpsi.h5", &scr.lplpsi[0], params);
+    save_hdf5_state("./output/d2ypsi.h5", &scr.dyu[0], params);
+    save_hdf5_state("./output/d3ypsi.h5", &scr.dyyypsi[0], params);
+    save_hdf5_state("./output/d4ypsi.h5", &scr.d4ypsi[0], params);
+    save_hdf5_state("./output/d2xd2ypsi.h5", &scr.d2xd2ypsi[0], params);
+    save_hdf5_state("./output/d4xpsi.h5", &scr.d4xpsi[0], params);
+    save_hdf5_state("./output/biharmpsi.h5", &scr.biharmpsi[0], params);
+    save_hdf5_state("./output/udxlplpsi.h5", &scr.udxlplpsi[0], params);
+    save_hdf5_state("./output/vdylplpsi.h5", &scr.vdylplpsi[0], params);
+    save_hdf5_state("./output/vdyypsi.h5", &scr.vdyypsi[0], params);
+
+    save_hdf5_state("./output/d2xcxy.h5", &scr.d2xcxy[0], params);
+    save_hdf5_state("./output/d2ycxy.h5", &scr.d2ycxy[0], params);
+    save_hdf5_state("./output/dxycyy_cxx.h5", &scr.dxycyy_cxx[0], params);
+    save_hdf5_state("./output/dycxy.h5", &scr.dycxy[0], params);
+
+    #endif // MY_DEBUG
 
 }
 

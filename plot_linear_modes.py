@@ -204,9 +204,9 @@ def calc_laminar_flow(y_points, t):
         U0[i] = real(u_im)
 
         dyu_cmplx = pi/(2.j*Chi) *(-alpha*sinh(alpha*y)/(cosh(alpha)))
-        cxy_cmplx = (1.0/(1.0+1.j*De)) * ((2*Wi/pi) * dyu_cmplx)*exp(1.j*t) 
+        cxy_cmplx = (1.0/(1.0+1.j*De)) * ((2*Wi/pi) * dyu_cmplx) 
 
-        Cxy0[i] = real( cxy_cmplx )
+        Cxy0[i] = real( cxy_cmplx *exp(1.j*t))
 
         Cxx0tmp = (1.0/(1.0+2.j*De))*(Wi/pi)*(cxy_cmplx*dyu_cmplx)*exp(2.j*t)
         Cxx0tmp += (1.0/(1.0-2.j*De))*(Wi/pi)*(conj(cxy_cmplx)*conj(dyu_cmplx))*exp(-2.j*t) 
