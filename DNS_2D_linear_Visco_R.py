@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral linear time stepping code
 #
-#   Last modified: Mon  2 Nov 10:43:55 2015
+#   Last modified: Fri 18 Dec 17:49:00 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -288,14 +288,37 @@ def form_oscil_operators(dt):
     for i in range(1, N+1):
         n = i
 
+        #PSIOP = zeros((2*M, 2*M), dtype='complex')
+        #SLAPLAC = -n*n*kx*kx*SII + SMDYY
+
+        #PSIOP[0:M, 0:M] = 0
+        #PSIOP[0:M, M:2*M] = B*SII - 0.5*beta*dt*SLAPLAC
+
+        #PSIOP[M:2*M, 0:M] = SLAPLAC
+        #PSIOP[M:2*M, M:2*M] = -SII
+
+        ## Apply BCs
+        ## dypsi(+-1) = 0
+        #PSIOP[M-2, :] = concatenate((DERIVTOP, zeros(M, dtype='complex')))
+        #PSIOP[M-1, :] = concatenate((DERIVBOT, zeros(M, dtype='complex')))
+        #
+        ## dxpsi(+-1) = 0
+        #PSIOP[2*M-2, :] = concatenate((BTOP, zeros(M, dtype='complex')))
+        #PSIOP[2*M-1, :] = concatenate((BBOT, zeros(M, dtype='complex')))
+
+        ## store the inverse of the relevent part of the matrix
+        #PSIOP = linalg.inv(PSIOP)
+        #PSIOP = PSIOP[0:M, 0:M]
+
         PSIOP = zeros((2*M, 2*M), dtype='complex')
         SLAPLAC = -n*n*kx*kx*SII + SMDYY
 
         PSIOP[0:M, 0:M] = 0
-        PSIOP[0:M, M:2*M] = B*SII - 0.5*oneOverRe*beta*dt*SLAPLAC
 
-        PSIOP[M:2*M, 0:M] = SLAPLAC
-        PSIOP[M:2*M, M:2*M] = -SII
+        PSIOP[0:M, 0:M] = SLAPLAC
+        PSIOP[0:M, M:2*M] = -SII
+        PSIOP[M:2*M, M:2*M] = - 0.5*beta*dt*SLAPLAC + B*SII 
+
 
         # Apply BCs
         # dypsi(+-1) = 0
@@ -308,7 +331,7 @@ def form_oscil_operators(dt):
 
         # store the inverse of the relevent part of the matrix
         PSIOP = linalg.inv(PSIOP)
-        PSIOP = PSIOP[0:M, 0:M]
+        PSIOP = PSIOP[0:M, M:2*M]
 
         PsiOpInvList.append(PSIOP)
 
