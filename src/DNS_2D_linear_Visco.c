@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Tue  1 Dec 17:45:38 2015
+// Last modified: Fri 18 Dec 17:41:23 2015
 
 /* Program Description:
  *
@@ -417,8 +417,8 @@ int main(int argc, char **argv)
 	save_hdf5_state("./output/cyyN.h5", &cijNL[(N+1)*M], params);
 	save_hdf5_state("./output/cxyN.h5", &cijNL[2*(N+1)*M], params);
 
-	printf("\nFORCE END THE DEBUGGING RUN\n");
-	break;
+	save_hdf5_arr("./output/RHSVec1s.h5", &scr.scratch[0], M);
+
 	#endif
 
 	forcing[ind(0,0)] = params.P*cos(time+0.5*dt + phase);
@@ -428,6 +428,12 @@ int main(int argc, char **argv)
 
 	step_sf_linear_SI_oscil_visco(psiOld, psi, cijOld, cij, psiNL,
 			    forcing, forcingN, dt, timeStep, opsList, scr, params);
+
+	#ifdef MYDEBUG 
+	printf("\nFORCE END THE DEBUGGING RUN\n");
+	break;
+	#endif
+
 	#endif
 	//------------------------------------
 
@@ -492,9 +498,12 @@ int main(int argc, char **argv)
 	    KE_tot = KE0 + KE1;
 
 	    printf("%e\t%e\t%e\t%e\t\n", time, KE_tot, KE0, KE1);
+	    // scr.scratch[0] = log(cabs((0.5*M_PI/params.Wi)*cij[2*(N+1)*M + ind(1,1)]));
+	    // scr.scratch[1] = log(cabs((0.5*M_PI/params.Wi)*cij[ind(1,2)]));
+	    // printf("%f %20.18f %20.18f\n", time , creal(scr.scratch[0]), creal(scr.scratch[1]));
 	    
             save_hdf5_snapshot_visco(&hdf5fp, &filetype_id, &datatype_id,
-		 psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], time, params);
+		psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], time, params);
              
 	    
 	    fprintf(tracefp, "%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1);

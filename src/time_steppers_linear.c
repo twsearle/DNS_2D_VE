@@ -10,7 +10,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri 11 Dec 14:29:18 2015
+// Last modified: Fri 18 Dec 15:30:59 2015
 
 #include"fields_1D.h"
 #include"fields_IO.h"
@@ -942,11 +942,11 @@ void step_sf_linear_SI_oscil_visco(
     // -----------Nonlinear Terms --------------
     //
     // u
-    single_dy(&psi[ind(0,0)], scr.U0, params);
-    single_dy(&psi[ind(1,0)], scr.u, params);
+    single_dy(&psiNL[ind(0,0)], scr.U0, params);
+    single_dy(&psiNL[ind(1,0)], scr.u, params);
 
     // v = -dxdpsi
-    single_dx(&psi[ind(1,0)], scr.v, 1, params);
+    single_dx(&psiNL[ind(1,0)], scr.v, 1, params);
     for(j=0; j<M; j++)
     {
 	scr.v[j] = -scr.v[j];
@@ -954,7 +954,7 @@ void step_sf_linear_SI_oscil_visco(
 
 
     // lpldpsi = dyy(dpsi) + dxx(dpsi)
-    single_d2x(&psi[ind(1,0)], scr.scratch, 1, params);
+    single_d2x(&psiNL[ind(1,0)], scr.scratch, 1, params);
     single_dy(scr.u, scr.lplpsi, params);
 
     for(j=0; j<M; j++)
@@ -1194,15 +1194,19 @@ void step_sf_linear_SI_oscil_visco(
     scr.RHSvec[M-2] = 0;
     scr.RHSvec[M-1] = 0;
 
-    //#ifdef MYDEBUG
-    if(timeStep==0)
+    #ifdef MYDEBUG
+    //if(timeStep==0)
+    //{
+    char fn[30];
+    sprintf(fn, "./output/RHSVec%d.h5", 1);
+    printf("writing %s\n", fn);
+    save_hdf5_arr(fn, &scr.RHSvec[0], M);
+    for (j=0;j<M;j++)
     {
-	char fn[30];
-	sprintf(fn, "./output/RHSVec%d.h5", 1);
-	printf("writing %s\n", fn);
-	save_hdf5_arr(fn, &scr.RHSvec[0], M);
+	scr.scratch[j] = scr.RHSvec[j];
     }
-    //#endif
+    //}
+    #endif
 
     // perform dot product to calculate new streamfunction.
     for (j=M-1; j>=0; j=j-1)

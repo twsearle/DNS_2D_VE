@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Mon 14 Dec 16:11:00 2015
+#   Last modified: Fri 18 Dec 17:32:16 2015
 #
 #-----------------------------------------------------------------------------
 
@@ -300,7 +300,7 @@ def form_oscil_operators(dt):
         SLAPLAC = -n*n*kx*kx*SII + SMDYY
 
         PSIOP[0:M, 0:M] = 0
-        PSIOP[0:M, M:2*M] = B*SII - 0.5*oneOverRe*beta*dt*SLAPLAC
+        PSIOP[0:M, M:2*M] = B*SII - 0.5*beta*dt*SLAPLAC
 
         PSIOP[M:2*M, 0:M] = SLAPLAC
         PSIOP[M:2*M, M:2*M] = -SII
@@ -823,7 +823,7 @@ psiLam = copy(PSI)
 #PSI[(N)*M+1] += lsd *(155./64. - 4. )
 #PSI[(N)*M+0] += lsd *(1./8) 
 
-#perAmp = 1e-7
+perAmp = 1e-6
 #y = 2.0*arange(M)/(M-1.0) -1.0
 
 #for n in range(1,N+1-N/3):
@@ -845,30 +845,42 @@ psiLam = copy(PSI)
 #    PSI[(N+n)*M:(N+n+1)*M] =stupid_transform(rSpace, CNSTS)
 #    PSI[(N-n)*M:(N-n+1)*M] = conj(PSI[(N+n)*M:(N+n+1)*M])
 
-#rspace = perAmp*tanh(arange(Mf)*pi/(Mf-1.)) * (1.0 + 1.j)
-#rspace = perAmp*(arange(Mf)[::-1])
-#PSI[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(real(rspace), CNSTS)
-#PSI[(N+1)*M:(N+2)*M] += 1.j*f2d.forward_cheb_transform(imag(rspace), CNSTS)
+#perturbation similar to that used in stupid code
+#rspace = perAmp*tanh(arange(Mf)*pi/(Mf-1.)) * (1.0 + 1.j);
+ypoints = cos(arange(Mf)*pi/(Mf-1.))
+rspace = perAmp*sin(2.0*pi*ypoints) * (1.0 + 1.j);
+rspace += perAmp*sin(3.0*pi*ypoints) * (1.0 + 1.j);
+##rspace = perAmp*(arange(Mf)[::-1])*1.j
+PSI[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(real(rspace), CNSTS)
+PSI[(N+1)*M:(N+2)*M] += 1.j*f2d.forward_cheb_transform(imag(rspace), CNSTS)
 
-#PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
-
-f = h5py.File("linear_evec.h5","r")
-
-PSIlin = array(f["psi"]).reshape(2,M).T
-Cxxlin = array(f["cxx"]).reshape(2,M).T
-Cyylin = array(f["cyy"]).reshape(2,M).T
-Cxylin = array(f["cxy"]).reshape(2,M).T
-
-f.close()
-perAmp = 2.e-4 / linalg.norm(PSIlin[:,1])
-PSI[(N+1)*M:(N+2)*M] = perAmp * PSIlin[:,1]
 PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
-Cxx[(N+1)*M:(N+2)*M] = perAmp * Cxxlin[:,1]
-Cxx[(N-1)*M:(N)*M] = conj(Cxx[(N+1)*M:(N+2)*M])
-Cyy[(N+1)*M:(N+2)*M] = perAmp * Cyylin[:,1] 
-Cyy[(N-1)*M:(N)*M] = conj(Cyy[(N+1)*M:(N+2)*M])
-Cxy[(N+1)*M:(N+2)*M] = perAmp * Cxylin[:,1] 
-Cxy[(N-1)*M:(N)*M] = conj(Cxy[(N+1)*M:(N+2)*M])
+
+#Cxx[(N+1)*M + 2] = perAmp * (Wi*2./pi)
+#Cxx[(N-1)*M + 2] = perAmp * (Wi*2./pi)
+#
+#Cxy[(N+1)*M + 1] = perAmp * (Wi*2./pi)
+#Cxy[(N-1)*M + 1] = perAmp * (Wi*2./pi)
+
+print log(abs(perAmp))
+
+#f = h5py.File("linear_evec.h5","r")
+#
+#PSIlin = array(f["psi"]).reshape(2,M).T
+#Cxxlin = array(f["cxx"]).reshape(2,M).T
+#Cyylin = array(f["cyy"]).reshape(2,M).T
+#Cxylin = array(f["cxy"]).reshape(2,M).T
+#
+#f.close()
+#perAmp = 2.e-4 / linalg.norm(PSIlin[:,1])
+#PSI[(N+1)*M:(N+2)*M] = perAmp * PSIlin[:,1]
+#PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
+#Cxx[(N+1)*M:(N+2)*M] = perAmp * Cxxlin[:,1]
+#Cxx[(N-1)*M:(N)*M] = conj(Cxx[(N+1)*M:(N+2)*M])
+#Cyy[(N+1)*M:(N+2)*M] = perAmp * Cyylin[:,1] 
+#Cyy[(N-1)*M:(N)*M] = conj(Cyy[(N+1)*M:(N+2)*M])
+#Cxy[(N+1)*M:(N+2)*M] = perAmp * Cxylin[:,1] 
+#Cxy[(N-1)*M:(N)*M] = conj(Cxy[(N+1)*M:(N+2)*M])
 
 # ----------------------------------------------------------------------------
 

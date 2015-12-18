@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed  2 Dec 16:02:25 2015
+// Last modified: Fri 18 Dec 17:41:10 2015
 
 /* Program Description:
  *
@@ -642,6 +642,9 @@ int main(int argc, char **argv)
 
 	    fprintf(traceStressfp, "%e\t%e\t%d\n", time, EE0, posdefck);
 
+	    //scr.scratch[0] = log(cabs((0.5*M_PI/params.Wi)*cij[2*(N+1)*M + ind(1,1)]));
+	    //scr.scratch[1] = log(cabs((0.5*M_PI/params.Wi)*cij[ind(1,2)]));
+	    //printf("%f %20.18f %20.18f\n", time , creal(scr.scratch[0]), creal(scr.scratch[1]));
             printf("%e\t%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1, EE0);
 
             save_hdf5_snapshot_visco(&hdf5fp, &filetype_id, &datatype_id,
