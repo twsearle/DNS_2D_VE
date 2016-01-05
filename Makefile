@@ -15,7 +15,7 @@ V_LIN_OBJ= obj/fields_1D.o obj/fields_IO.o obj/DNS_2D_linear_Visco.o obj/time_st
 
 .PHONY : clean debug oscil
 
-oscil: MYFLAGS= -DOSCIL_FLOW -O3 
+oscil: MYFLAGS= -DOSCIL_FLOW -O3
 	# -DMYDEBUG 
 debug: MYFLAGS= -pg -g -ggdb -DMYDEBUG 
 

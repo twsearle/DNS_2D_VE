@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral linear time stepping code
 #
-#   Last modified: Fri 18 Dec 17:29:47 2015
+#   Last modified: Tue  5 Jan 14:18:10 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -49,6 +49,7 @@ Outline:
 from scipy import *
 from scipy import linalg
 from scipy import optimize
+from scipy.special import iv
 from numpy.linalg import cond 
 from numpy.fft import fftshift, ifftshift
 from numpy.random import rand
@@ -121,7 +122,8 @@ kx = args.kx
 initTime = args.initTime
 
 if dealiasing:
-    Nf = (3*N)/2 + 1
+    #Nf = (3*N)/2 + 1
+    Nf = 4*N
     Mf = 2*M
 else:
     Nf = N
@@ -559,6 +561,54 @@ def oscillatory_flow():
 
     return PSI, Cxx, Cyy, Cxy, forcing, P
 
+def cprod(A,B):
+
+    _tmp = zeros(M,dtype='D')
+
+    for m in range(M):
+        for s in range(-(M-1),M):
+            if abs(m-s)<M:
+                _tmp[m] += 0.5*( 1 + (abs(m-s)==0) )*( 1 + (abs(s)==0) )*A[abs(m-s)]*B[abs(s)]/( 1 + (abs(m)==0) )
+
+    return _tmp
+
+
+def give_base_profile(Wireal, _t):
+    
+    Wi = Wireal*2.0/pi
+
+    B = Re*De/Wi
+
+    _alpha = sqrt( 1j*B/(beta + (1.0-beta)/(1.0+1j*De)) )
+
+    CC = real((1.0-1j)*(1.0-tanh(_alpha)/_alpha))
+    _U0 = zeros(M,dtype='d')
+    _Txy = zeros(M,dtype='d')
+    _Txx = zeros(M,dtype='d')
+    _t1 = zeros(M,dtype='D')
+    _t2 = zeros(M,dtype='D')
+
+    for m in range(0,M,2):
+            _U0[m] = real( pi*exp(1j*_t)*(-2.0*iv(m,_alpha)/cosh(_alpha))/(2.0*1j*CC) )
+
+    for m in range(1,M,2):
+            _Txy[m] = real( pi*exp(1j*_t)*(-_alpha*2.0*iv(m,_alpha)/cosh(_alpha))/(2.0*1j*CC*(1.0+1j*De)) )
+
+            _t1[m] = pi*(-_alpha*2.0*iv(m,_alpha)/cosh(_alpha))/(2.0*1j*CC) 
+            _t2[m] = pi*(-_alpha*2.0*iv(m,_alpha)/cosh(_alpha))/(2.0*1j*CC*(1.0+1j*De))
+
+    _Txx = cprod(imag(_t1),imag(_t2)) + cprod(real(_t1),real(_t2))
+    _Txx += ( cprod(real(_t1),real(_t2)) - cprod(imag(_t1),imag(_t2)) + 2*De*( cprod(real(_t1),imag(_t2)) + cprod(real(_t2),imag(_t1)) ) )*cos(2*_t)/(1+4*De*De)
+    _Txx += -( cprod(real(_t1),imag(_t2)) + cprod(real(_t2),imag(_t1)) + 2*De*( cprod(imag(_t1),imag(_t2)) - cprod(real(_t1),real(_t2))) )*sin(2*_t)/(1+4*De*De)
+
+
+    _U0[0] += real( pi*exp(1j*_t)*(1.0+iv(0,_alpha)/cosh(_alpha))/(2.0*1j*CC) )
+
+    _Cxy = _Txy*Wi
+    _Cxx = _Txx*Wi*Wi
+    _Cxx[0] += 1.0
+
+    return _U0, _Cxy, _Cxx
 # -----------------------------------------------------------------------------
 # MAIN
 # -----------------------------------------------------------------------------
@@ -632,6 +682,11 @@ elif args.flow_type==1:
 elif args.flow_type==2:
     # --------------- OSCILLATORY FLOW -----------------
     PSI, Cxx, Cyy, Cxy, forcing, CNSTS['P'] = oscillatory_flow()
+    Ubase, Cxybase, Cxxbase = give_base_profile(Wi,0)
+
+    Cxx[N*M:(N+1)*M] = Cxxbase
+    Cxy[N*M:(N+1)*M] = Cxybase
+    
 
 else:
     print "flow type unspecified"
@@ -666,20 +721,21 @@ perAmp = 1.0e-6
 
 #perturbation similar to that used in stupid code
 #rspace = perAmp*tanh(arange(Mf)*pi/(Mf-1.)) * (1.0 + 1.j);
-ypoints = cos(arange(Mf)*pi/(Mf-1.))
-rspace = perAmp*sin(2.0*pi*ypoints) * (1.0 + 1.j);
-rspace += perAmp*sin(3.0*pi*ypoints) * (1.0 + 1.j);
-##rspace = perAmp*(arange(Mf)[::-1])*1.j
-PSI[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(real(rspace), CNSTS)
-PSI[(N+1)*M:(N+2)*M] += 1.j*f2d.forward_cheb_transform(imag(rspace), CNSTS)
-
-PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
-
-#Cxx[(N+1)*M + 2] = perAmp * (Wi*2./pi)
-#Cxx[(N-1)*M + 2] = perAmp * (Wi*2./pi)
+#ypoints = cos(arange(Mf)*pi/(Mf-1.))
+#rspace = perAmp*sin(2.0*pi*ypoints) * (1.0 + 1.j);
+#rspace += perAmp*sin(3.0*pi*ypoints) * (1.0 + 1.j);
+###rspace = perAmp*(arange(Mf)[::-1])*1.j
+#PSI[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(real(rspace), CNSTS)
+#PSI[(N+1)*M:(N+2)*M] += 1.j*f2d.forward_cheb_transform(imag(rspace), CNSTS)
 #
-#Cxy[(N+1)*M + 1] = perAmp * (Wi*2./pi)
-#Cxy[(N-1)*M + 1] = perAmp * (Wi*2./pi)
+#PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
+
+# perturbation used in pythonic test code.
+Cxx[(N+1)*M + 2] = perAmp * (Wi*2./pi)
+Cxx[(N-1)*M + 2] = perAmp * (Wi*2./pi)
+
+Cxy[(N+1)*M + 1] = perAmp * (Wi*2./pi)
+Cxy[(N-1)*M + 1] = perAmp * (Wi*2./pi)
 
 print log(abs(perAmp))
 

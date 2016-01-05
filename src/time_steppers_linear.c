@@ -10,7 +10,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri 18 Dec 15:30:59 2015
+// Last modified: Tue  5 Jan 13:41:30 2016
 
 #include"fields_1D.h"
 #include"fields_IO.h"
@@ -141,7 +141,7 @@ void step_sf_linear_SI_Crank_Nicolson(
     
 #ifdef MYDEBUG
     if(timeStep==0)
-    {
+    { 
 	save_hdf5_arr("./output/U0.h5",  &scr.U0[0], M);
 	save_hdf5_arr("./output/u.h5",  &scr.u[0], M);
 	save_hdf5_arr("./output/v.h5", &scr.v[0], M);
@@ -1043,8 +1043,8 @@ void step_sf_linear_SI_oscil_visco(
     
     // lplpsi dyy(psi) + dxx(psi)
 
-    single_d2x(&psi[ind(1,0)], scr.scratch, 1, params);
-    single_dy(&psi[ind(1,0)], scr.u, params);
+    single_d2x(&psiOld[ind(1,0)], scr.scratch, 1, params);
+    single_dy(&psiOld[ind(1,0)], scr.u, params);
     single_dy(scr.u, scr.lplpsi, params);
 
     for(j=0; j<M; j++)
@@ -1054,7 +1054,7 @@ void step_sf_linear_SI_oscil_visco(
 
     // d3yPSI0
     
-    single_dy(&psi[ind(0,0)], scr.U0, params);
+    single_dy(&psiOld[ind(0,0)], scr.U0, params);
     single_dy(scr.U0, scr.d2yPSI0, params);
     single_dy(scr.d2yPSI0, scr.d3yPSI0, params);
 
@@ -1064,7 +1064,7 @@ void step_sf_linear_SI_oscil_visco(
     single_dy(scr.d2ypsi, scr.d3ypsi, params);
     single_dy(scr.d3ypsi, scr.d4ypsi, params);
 
-    single_d2x(&psi[ind(1,0)], scr.scratch, 1, params);
+    single_d2x(&psiOld[ind(1,0)], scr.scratch, 1, params);
 
 
 #ifdef MYDEBUG
@@ -1078,7 +1078,7 @@ void step_sf_linear_SI_oscil_visco(
     single_dy(scr.scratch2, scr.d2xd2ypsi, params);
 
 
-    single_d4x(&psi[ind(1,0)], scr.d4xpsi, 1, params);
+    single_d4x(&psiOld[ind(1,0)], scr.d4xpsi, 1, params);
 
     for(j=0; j<M; j++)
     {
@@ -1130,33 +1130,6 @@ void step_sf_linear_SI_oscil_visco(
     single_dx(scr.scratch, scr.scratch2, 1, params);
     single_dy(scr.scratch2, scr.dxycyy_cxx, params);
     
-#ifdef MYDEBUG
-    if(timeStep==0)
-    {
-	save_hdf5_arr("./output/U0.h5",  &scr.U0[0], M);
-	save_hdf5_arr("./output/u.h5",  &scr.u[0], M);
-	save_hdf5_arr("./output/v.h5", &scr.v[0], M);
-	save_hdf5_arr("./output/lplpsi.h5", &scr.lplpsi[0], M);
-	save_hdf5_arr("./output/d2yPSI0.h5", &scr.d2yPSI0[0], M);
-	save_hdf5_arr("./output/d3yPSI0.h5", &scr.d3yPSI0[0], M);
-	save_hdf5_arr("./output/d3ypsi.h5", &scr.d3ypsi[0], M);
-	save_hdf5_arr("./output/d4ypsi.h5", &scr.d4ypsi[0], M);
-	save_hdf5_arr("./output/d2xd2ypsi.h5", &scr.d2xd2ypsi[0], M);
-	save_hdf5_arr("./output/d4xpsi.h5", &scr.d4xpsi[0], M);
-	save_hdf5_arr("./output/biharmpsi.h5", &scr.biharmpsi[0], M);
-	save_hdf5_arr("./output/udxlplpsi.h5", &scr.udxlplpsi[0], M);
-	save_hdf5_arr("./output/vdylplpsi.h5", &scr.vdylplpsi[0], M);
-	save_hdf5_arr("./output/dycxy0.h5", &scr.dycxy0[0], M);
-	save_hdf5_arr("./output/d2ycxy.h5", &scr.d2ycxy[0], M);
-	save_hdf5_arr("./output/d2xcxy.h5", &scr.d2xcxy[0], M);
-	save_hdf5_arr("./output/dxycyy_cxx.h5", &scr.dxycyy_cxx[0], M);
-	save_hdf5_arr("./output/dycxy0N.h5", &scr.dycxy0N[0], M);
-	save_hdf5_arr("./output/d2ycxyN.h5", &scr.d2ycxyN[0], M);
-	save_hdf5_arr("./output/d2xcxyN.h5", &scr.d2xcxyN[0], M);
-	save_hdf5_arr("./output/dxycyy_cxxN.h5", &scr.dxycyy_cxxN[0], M);
-
-    }
-#endif
     
     // Streamfunction equation:
 

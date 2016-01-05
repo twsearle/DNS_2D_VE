@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri 18 Dec 17:41:23 2015
+// Last modified: Tue  5 Jan 16:01:48 2016
 
 /* Program Description:
  *
@@ -379,6 +379,19 @@ int main(int argc, char **argv)
     // perform the time iteration
     printf("\n------\nperforming the time iteration\n------\n");
     printf("\nTime:\t\tKE_tot:\t\tKE0:\t\tKE1:\n");
+
+    KE0 = calc_cheby_KE_mode(scr.U0, scr.U0, 0, params) * (15.0/ 8.0) * 0.5;
+    KE1 = calc_cheby_KE_mode(scr.u, scr.v, 1, params) * (15.0/ 8.0);
+
+    KE_tot = KE0 + KE1;
+
+    //printf("%e\t%e\t%e\t%e\t\n", time, KE_tot, KE0, KE1);
+    
+    save_hdf5_snapshot_visco(&hdf5fp, &filetype_id, &datatype_id,
+	psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], 0.0, params);
+     
+    fprintf(tracefp, "%e\t%e\t%e\t%e\n", 0.0, KE_tot, KE0, KE1);
+
     for (timeStep=0; timeStep<=numTimeSteps; timeStep++)
     {
 
@@ -413,9 +426,34 @@ int main(int argc, char **argv)
 			forcing, forcingN, 0.5*dt, timeStep, hopsList, scr, params);
 
 	#ifdef MYDEBUG 
-	save_hdf5_state("./output/cxxN.h5", &cijNL[0], params);
-	save_hdf5_state("./output/cyyN.h5", &cijNL[(N+1)*M], params);
-	save_hdf5_state("./output/cxyN.h5", &cijNL[2*(N+1)*M], params);
+	save_hdf5_state("./output/psiStar.h5", &psiNL[0], params);
+	save_hdf5_state("./output/cxxStar.h5", &cijNL[0], params);
+	save_hdf5_state("./output/cyyStar.h5", &cijNL[(N+1)*M], params);
+	save_hdf5_state("./output/cxyStar.h5", &cijNL[2*(N+1)*M], params);
+
+	save_hdf5_arr("./output/U0.h5",  &scr.U0[0], M);
+	save_hdf5_arr("./output/u.h5",  &scr.u[0], M);
+	save_hdf5_arr("./output/v.h5", &scr.v[0], M);
+	save_hdf5_arr("./output/lplpsi.h5", &scr.lplpsi[0], M);
+	save_hdf5_arr("./output/d2yPSI0.h5", &scr.d2yPSI0[0], M);
+	save_hdf5_arr("./output/d3yPSI0.h5", &scr.d3yPSI0[0], M);
+	save_hdf5_arr("./output/d3ypsi.h5", &scr.d3ypsi[0], M);
+	save_hdf5_arr("./output/d4ypsi.h5", &scr.d4ypsi[0], M);
+	save_hdf5_arr("./output/d2xd2ypsi.h5", &scr.d2xd2ypsi[0], M);
+	save_hdf5_arr("./output/d4xpsi.h5", &scr.d4xpsi[0], M);
+	save_hdf5_arr("./output/biharmpsi.h5", &scr.biharmpsi[0], M);
+	save_hdf5_arr("./output/dycxy0.h5", &scr.dycxy0[0], M);
+	save_hdf5_arr("./output/d2ycxy.h5", &scr.d2ycxy[0], M);
+	save_hdf5_arr("./output/d2xcxy.h5", &scr.d2xcxy[0], M);
+	save_hdf5_arr("./output/dxycyy_cxx.h5", &scr.dxycyy_cxx[0], M);
+
+	save_hdf5_arr("./output/dycxy0Star.h5", &scr.dycxy0N[0], M);
+	save_hdf5_arr("./output/d2ycxyStar.h5", &scr.d2ycxyN[0], M);
+	save_hdf5_arr("./output/d2xcxyStar.h5", &scr.d2xcxyN[0], M);
+	save_hdf5_arr("./output/dxycyy_cxxStar.h5", &scr.dxycyy_cxxN[0], M);
+
+	save_hdf5_arr("./output/udxlplpsi.h5", &scr.udxlplpsi[0], M);
+	save_hdf5_arr("./output/vdylplpsi.h5", &scr.vdylplpsi[0], M);
 
 	save_hdf5_arr("./output/RHSVec1s.h5", &scr.scratch[0], M);
 
@@ -430,6 +468,20 @@ int main(int argc, char **argv)
 			    forcing, forcingN, dt, timeStep, opsList, scr, params);
 
 	#ifdef MYDEBUG 
+
+	save_hdf5_arr("./output/dycxy0New.h5", &scr.dycxy0N[0], M);
+	save_hdf5_arr("./output/d2ycxyNew.h5", &scr.d2ycxyN[0], M);
+	save_hdf5_arr("./output/d2xcxyNew.h5", &scr.d2xcxyN[0], M);
+	save_hdf5_arr("./output/dxycyy_cxxNew.h5", &scr.dxycyy_cxxN[0], M);
+
+	save_hdf5_arr("./output/udxlplpsiStar.h5", &scr.udxlplpsi[0], M);
+	save_hdf5_arr("./output/vdylplpsiStar.h5", &scr.vdylplpsi[0], M);
+
+	save_hdf5_state("./output/psiNew.h5", &psi[0], params);
+	save_hdf5_state("./output/cxxNew.h5", &cij[0], params);
+	save_hdf5_state("./output/cyyNew.h5", &cij[(N+1)*M], params);
+	save_hdf5_state("./output/cxyNew.h5", &cij[2*(N+1)*M], params);
+
 	printf("\nFORCE END THE DEBUGGING RUN\n");
 	break;
 	#endif
@@ -462,15 +514,11 @@ int main(int argc, char **argv)
 	#endif
 	//------------------------------------
 
-	if (timeStep==0)
-	{
-	    save_hdf5_state("./output/psi2.h5", &psi[0], params);
-	}
-
 	// output some information at every frame
-	if ((timeStep % stepsPerFrame) == 0 )
+	if (((timeStep+1) % stepsPerFrame) == 0 )
 	{
 
+	    time = (timeStep + 1)*dt;
 	    double normPSI1 = 0;
 	    double normPSI0 = 0;
 
@@ -497,10 +545,10 @@ int main(int argc, char **argv)
     
 	    KE_tot = KE0 + KE1;
 
-	    printf("%e\t%e\t%e\t%e\t\n", time, KE_tot, KE0, KE1);
-	    // scr.scratch[0] = log(cabs((0.5*M_PI/params.Wi)*cij[2*(N+1)*M + ind(1,1)]));
-	    // scr.scratch[1] = log(cabs((0.5*M_PI/params.Wi)*cij[ind(1,2)]));
-	    // printf("%f %20.18f %20.18f\n", time , creal(scr.scratch[0]), creal(scr.scratch[1]));
+	    // printf("%e\t%e\t%e\t%e\t\n", time, KE_tot, KE0, KE1);
+	    scr.scratch[0] = log(cabs((0.5*M_PI/params.Wi)*cij[2*(N+1)*M + ind(1,1)]));
+	    scr.scratch[1] = log(cabs((0.5*M_PI/params.Wi)*cij[ind(1,2)]));
+	    printf("%f %20.18f %20.18f\n", time , creal(scr.scratch[0]), creal(scr.scratch[1]));
 	    
             save_hdf5_snapshot_visco(&hdf5fp, &filetype_id, &datatype_id,
 		psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], time, params);
