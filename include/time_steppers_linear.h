@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 21 Oct 15:11:28 2015
+// Last modified: Tue  5 Jan 22:25:13 2016
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -41,5 +41,13 @@ void step_sf_linear_SI_oscil_visco(
 	complex_d *psiOld, complex_d *psi, complex_d *cijOld, complex_d *cij, complex_d
 	*psiNL, complex_d *forcing, complex_d *forcingN, double dt, int timeStep,
 	complex_d *opsList, lin_flow_scratch scr, flow_params params);
+
+void calc_base_cij(
+	complex_d *cij, double time, lin_flow_scratch scr,
+	flow_params params);
+
+void calc_base_sf(
+	complex_d *cij, double time, lin_flow_scratch scr,
+	flow_params params);
 
 #endif // FIELDS_2D_C_H

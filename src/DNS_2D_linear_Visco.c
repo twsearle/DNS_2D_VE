@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Tue  5 Jan 16:01:48 2016
+// Last modified: Wed  6 Jan 16:41:03 2016
 
 /* Program Description:
  *
@@ -294,6 +294,7 @@ int main(int argc, char **argv)
 
     scr.scratchp1 = (complex_d*) fftw_malloc((2*Mf-2) * sizeof(complex_d));
     scr.scratchp2 = (complex_d*) fftw_malloc((2*Mf-2) * sizeof(complex_d));
+    scr.scratchp3 = (complex_d*) fftw_malloc((2*Mf-2) * sizeof(complex_d));
 
     scr.RHSvec = (complex_d*) fftw_malloc(M * sizeof(complex_d));
 
@@ -392,7 +393,7 @@ int main(int argc, char **argv)
      
     fprintf(tracefp, "%e\t%e\t%e\t%e\n", 0.0, KE_tot, KE0, KE1);
 
-    for (timeStep=0; timeStep<=numTimeSteps; timeStep++)
+    for (timeStep=0; timeStep<numTimeSteps; timeStep++)
     {
 
 	time = timeStep*dt;
@@ -419,11 +420,18 @@ int main(int argc, char **argv)
 	forcing[ind(0,0)] = params.P*cos(time + phase);
 	forcingN[ind(0,0)] = params.P*cos((timeStep+0.5)*dt + phase);
 
+	//break;
+
 	step_conformation_linear_oscil(cijOld, cijNL, psiOld, cijOld,
 					    0.5*dt, scr, params);
 
+	//calc_base_cij(cijNL, (timeStep+0.5)*dt, scr, params);
+
 	step_sf_linear_SI_oscil_visco(psiOld, psiNL, cijOld, cijNL, psiOld,
 			forcing, forcingN, 0.5*dt, timeStep, hopsList, scr, params);
+
+	//calc_base_sf(psiNL, (timeStep+0.5)*dt, scr, params);
+
 
 	#ifdef MYDEBUG 
 	save_hdf5_state("./output/psiStar.h5", &psiNL[0], params);
@@ -462,10 +470,15 @@ int main(int argc, char **argv)
 	forcing[ind(0,0)] = params.P*cos(time+0.5*dt + phase);
 	forcingN[ind(0,0)] = params.P*cos((timeStep+1.0)*dt + phase);
 
+
 	step_conformation_linear_oscil(cijOld, cij, psiNL, cijNL, dt, scr, params);
+
+	//calc_base_cij(cij, (timeStep+1.0)*dt, scr, params);
 
 	step_sf_linear_SI_oscil_visco(psiOld, psi, cijOld, cij, psiNL,
 			    forcing, forcingN, dt, timeStep, opsList, scr, params);
+
+	//calc_base_sf(psi, (timeStep+1.0)*dt, scr, params);
 
 	#ifdef MYDEBUG 
 

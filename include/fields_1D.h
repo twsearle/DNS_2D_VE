@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Tue  6 Oct 17:00:38 2015
+// Last modified: Tue  5 Jan 16:42:00 2016
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -65,7 +65,7 @@ struct lin_flow_scratch {
 
     fftw_complex *scratchin, *scratchout;
 
-    complex_d *scratchp1, *scratchp2;
+    complex_d *scratchp1, *scratchp2, *scratchp3;
 
     fftw_complex *RHSvec;
     

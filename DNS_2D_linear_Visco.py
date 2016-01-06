@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral linear time stepping code
 #
-#   Last modified: Tue  5 Jan 14:18:10 2016
+#   Last modified: Tue  5 Jan 17:36:00 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -496,9 +496,11 @@ def oscillatory_flow():
     y_points = cos(pi*arange(Mf)/(Mf-1))
 
     tmp = beta + (1-beta) / (1 + 1.j*De)
+    print 'tmp', tmp
     alpha = sqrt( (1.j*pi*Re*De) / (2*Wi*tmp) )
-
+    print 'alpha', alpha
     Chi = real( (1-1.j)*(1 - tanh(alpha) / alpha) )
+    print 'Chi', Chi 
 
     # the coefficient for the forcing
     P = (0.5*pi)**2 * (Re*De) / (Chi*Wi)

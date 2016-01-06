@@ -10,7 +10,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Tue  5 Jan 13:41:30 2016
+// Last modified: Wed  6 Jan 16:39:49 2016
 
 #include"fields_1D.h"
 #include"fields_IO.h"
@@ -885,18 +885,18 @@ void step_conformation_linear_oscil(
 	// zeroth Mode
     for (j=0; j<M; j++)
     {
-	cij[ind(0,j)] = old_fac*cijOld[ind(0,j)];
-	cij[ind(0,j)] += dt*2.*scr.cxy0dyU0[j];
-	cij[ind(0,j)] *= new_fac;
-	
+        cij[ind(0,j)] = old_fac*cijOld[ind(0,j)];
+        cij[ind(0,j)] += dt*2.*scr.cxy0dyU0[j];
+        cij[ind(0,j)] *= new_fac;
+        
 
-	cij[(N+1)*M + ind(0,j)] = old_fac*cijOld[(N+1)*M + ind(0,j)];
-	cij[(N+1)*M + ind(0,j)] *= new_fac;
-	
+        cij[(N+1)*M + ind(0,j)] = old_fac*cijOld[(N+1)*M + ind(0,j)];
+        cij[(N+1)*M + ind(0,j)] *= new_fac;
+        
 
-	cij[2*(N+1)*M + ind(0,j)] = old_fac*cijOld[2*(N+1)*M + ind(0,j)];
-	cij[2*(N+1)*M + ind(0,j)] += dt*scr.cyy0dyU0[j];
-	cij[2*(N+1)*M + ind(0,j)] *= new_fac;
+        cij[2*(N+1)*M + ind(0,j)] = old_fac*cijOld[2*(N+1)*M + ind(0,j)];
+        cij[2*(N+1)*M + ind(0,j)] += dt*scr.cyy0dyU0[j];
+        cij[2*(N+1)*M + ind(0,j)] *= new_fac;
 
     }
 
@@ -1237,19 +1237,124 @@ void step_sf_linear_SI_oscil_visco(
 
     // step the zeroth mode
 
-    //for (j=M-1; j>=0; j=j-1)
     for (j=0; j<M; j++)
     {
-	psi[ind(0,j)] = 0;
-	//for (l=M-1; l>=0; l=l-1)
-	for (l=0; l<M; l++)
-	{
-	    psi[ind(0,j)] += opsList[j*M + l] * scr.RHSvec[l];
+        psi[ind(0,j)] = 0;
+        //for (l=M-1; l>=0; l=l-1)
+        for (l=0; l<M; l++)
+        {
+            psi[ind(0,j)] += opsList[j*M + l] * scr.RHSvec[l];
 
-	}
-	psi[ind(0,j)] = creal(psi[ind(0,j)]);
+        }
+        psi[ind(0,j)] = creal(psi[ind(0,j)]);
     }
 
 }
 
+void calc_base_cij(
+	complex_d *cij, double time, lin_flow_scratch scr, flow_params params)
+{
+    int i;
+    int N = params.N;
+    int M = params.M;
+
+    double Re = params.Re;
+    double Wi = params.Wi;
+    double De = params.De;
+    double beta = params.beta;
+    double y;
+
+    complex_d tmp = beta + (1.-beta) / (1. + 1.*I*De);
+    //printf("tmp %f+%fI\n", creal(tmp), cimag(tmp));
+
+    complex_d alpha = csqrt( (I*M_PI*Re*De) / (2*Wi*tmp) );
+    //printf("alpha %f+%fI\n", creal(alpha), cimag(alpha));
+
+    complex_d Chi = creal( (1-I)*(1. - ctanh(alpha) / alpha) );
+    //printf("Chi %f+%fI\n", creal(Chi), cimag(Chi));
+
+    complex_d dyu_cmplx = 0;
+    complex_d cxy_cmplx = 0;
+    complex_d cxx_cmplx = 0;
+
+    for(i=0; i<params.Mf; i++)
+    {
+        y = cos(M_PI*i/(params.Mf-1.));
+
+
+        dyu_cmplx = M_PI/(2.*I*Chi) *(-alpha*csinh(alpha*y)/(ccosh(alpha)));
+        cxy_cmplx = (1.0/(1.0+I*De)) * ((2*Wi/M_PI) * dyu_cmplx);
+
+        scr.scratchp3[i] = creal( cxy_cmplx * cexp(I*time) );
+
+        cxx_cmplx = (1.0/(1.0+2.*I*De))*(Wi/M_PI)*(cxy_cmplx*dyu_cmplx)*cexp(2.*I*time);
+	cxx_cmplx +=(1.0/(1.0-2.*I*De))*(Wi/M_PI)*(conj(cxy_cmplx)*conj(dyu_cmplx))*cexp(-2.*I*time); 
+        cxx_cmplx += 1. + (params.Wi/M_PI)*( cxy_cmplx*conj(dyu_cmplx) + conj(cxy_cmplx)*dyu_cmplx ); 
+
+        scr.scratchp2[i] = creal(cxx_cmplx);
+    }
+
+    // cxx
+    to_cheby_spectral(scr.scratchp2, &cij[0], scr, params);
+    // cxy
+    to_cheby_spectral(scr.scratchp3, &cij[2*(N+1)*M], scr, params);
+    
+    // mean flow, so must have zero imaginary part!
+    for (i=0; i<params.M; i++)
+    {
+	cij[ind(0,i)] = creal(cij[ind(0,i)]);
+	cij[2*(N+1)*M + ind(0,i)] = creal(cij[2*(N+1)*M + ind(0,i)]);
+    }
+
+}
+
+void calc_base_sf(
+	complex_d *psi, double time, lin_flow_scratch scr, flow_params params)
+{
+    int i;
+    int N = params.N;
+    int M = params.M;
+
+    double Re = params.Re;
+    double Wi = params.Wi;
+    double De = params.De;
+    double beta = params.beta;
+    double y;
+
+    complex_d tmp = beta + (1.-beta) / (1. + 1.*I*De);
+    //printf("tmp %f+%fI\n", creal(tmp), cimag(tmp));
+
+    complex_d alpha = csqrt( (I*M_PI*Re*De) / (2*Wi*tmp) );
+    //printf("alpha %f+%fI\n", creal(alpha), cimag(alpha));
+
+    complex_d Chi = creal( (1.-I)*(1. - ctanh(alpha) / alpha) );
+    //printf("Chi %f+%fI\n", creal(Chi), cimag(Chi));
+
+    complex_d psi_im = 0;
+
+    for(i=0; i<params.Mf; i++)
+    {
+        y = cos(M_PI*i/(params.Mf-1.));
+
+	psi_im = M_PI/(2.*I*Chi) *( y - csinh(alpha*y)/(alpha*ccosh(alpha))
+                                      + csinh(alpha*-1.)/(alpha*ccosh(alpha)) );
+
+
+        scr.scratchp1[i] = creal(psi_im * cexp(I*time));
+
+	//printf("psi %f+%fI\n", creal(scr.scratchp1[i]), cimag(scr.scratchp1[i]));
+
+    }
+
+    save_hdf5_arr("./output/psibase.h5", &scr.scratchp1[0], M);
+
+    // psi
+    to_cheby_spectral(scr.scratchp1, &psi[0], scr, params);
+    
+    for (i=0; i<params.M; i++)
+    {
+	psi[ind(0,i)] = creal(psi[ind(0,i)]);
+    }
+
+}
 #endif // FIELDS_2D_C_H
