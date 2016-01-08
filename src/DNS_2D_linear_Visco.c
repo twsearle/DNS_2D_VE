@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed  6 Jan 16:41:03 2016
+// Last modified: Fri  8 Jan 17:26:30 2016
 
 /* Program Description:
  *
@@ -84,11 +84,12 @@ int main(int argc, char **argv)
     params.De = 1.0;
     params.P = 1.0;
     params.dealiasing = 0;
+    params.oscillatory_flow = 0;
 
     // Read in parameters from cline args.
 
 
-    while ((shortArg = getopt (argc, argv, "dN:M:U:k:R:W:b:D:P:t:s:T:i:")) != -1)
+    while ((shortArg = getopt (argc, argv, "OdN:M:U:k:R:W:b:D:P:t:s:T:i:")) != -1)
 	switch (shortArg)
 	  {
 	  case 'N':
@@ -133,6 +134,10 @@ int main(int argc, char **argv)
 	  case 'd':
 	    params.dealiasing = 1;
 	    printf("Dealiasing on\n");
+	    break;
+	  case 'O':
+	    params.oscillatory_flow = 1;
+	    printf("oscillatory flow\n");
 	    break;
 	  case '?':
 	    fprintf (stderr, "Option -%c requires an argument.\n", optopt);
@@ -377,29 +382,45 @@ int main(int argc, char **argv)
     save_hdf5_state("./output/forcing.h5", &forcing[0], params);
     #endif
     
-    // perform the time iteration
+    // BEGIN TIME STEPPING
+    // -------------------
+    
     printf("\n------\nperforming the time iteration\n------\n");
     printf("\nTime:\t\tKE_tot:\t\tKE0:\t\tKE1:\n");
 
+    // calculate and output t=0 quantities
+    // u
+    single_dy(&psi[ind(0,0)], scr.U0, params);
+    single_dy(&psi[ind(1,0)], scr.u, params);
+
+    // v = -dxdpsi
+    single_dx(&psi[ind(1,0)], scr.v, 1, params);
+    for(j=0; j<M; j++)
+    {
+	scr.v[j] = -scr.v[j];
+    }
     KE0 = calc_cheby_KE_mode(scr.U0, scr.U0, 0, params) * (15.0/ 8.0) * 0.5;
     KE1 = calc_cheby_KE_mode(scr.u, scr.v, 1, params) * (15.0/ 8.0);
 
     KE_tot = KE0 + KE1;
 
-    //printf("%e\t%e\t%e\t%e\t\n", time, KE_tot, KE0, KE1);
-    
     save_hdf5_snapshot_visco(&hdf5fp, &filetype_id, &datatype_id,
 	psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], 0.0, params);
      
     fprintf(tracefp, "%e\t%e\t%e\t%e\n", 0.0, KE_tot, KE0, KE1);
+
+    printf("%e\t%e\t%e\t%e\t\n", 0.0, KE_tot, KE0, KE1);
+
+    scr.scratch[0] = log(cabs((0.5*M_PI/params.Wi)*cij[2*(N+1)*M + ind(1,1)]));
+    scr.scratch[1] = log(cabs((0.5*M_PI/params.Wi)*cij[ind(1,2)]));
+    printf("%f %20.18f %20.18f\n", time , creal(scr.scratch[0]), creal(scr.scratch[1]));
 
     for (timeStep=0; timeStep<numTimeSteps; timeStep++)
     {
 
 	time = timeStep*dt;
 
-	// predictor step to calculate nonlinear terms
-
+	// Reset temporary variables for the new timestep
         for (i=0; i<3*(N+1)*M; i++)
         {
             cijOld[i] = cij[i];
@@ -413,127 +434,175 @@ int main(int argc, char **argv)
 
 
 	// OSCILLATING PRESSURE GRADIENT
-	#ifdef OSCIL_FLOW
-	periods = floor(initTime/(2.0*M_PI));
-	phase = initTime - 2.0*M_PI*periods;
+	// ----------------------------------
+	
+	if (params.oscillatory_flow != 0)
+	{
+	    // Calculate forcing for the half step 
+	    
+	    periods = floor(initTime/(2.0*M_PI));
+	    phase = initTime - 2.0*M_PI*periods;
 
-	forcing[ind(0,0)] = params.P*cos(time + phase);
-	forcingN[ind(0,0)] = params.P*cos((timeStep+0.5)*dt + phase);
+	    forcing[ind(0,0)] = params.P*cos(time + phase);
+	    forcingN[ind(0,0)] = params.P*cos((timeStep+0.5)*dt + phase);
 
-	//break;
+	    // calculate the half-step variables for the nonlinear terms
+	    // (the *nl variables)
 
-	step_conformation_linear_oscil(cijOld, cijNL, psiOld, cijOld,
-					    0.5*dt, scr, params);
+	    step_conformation_linear_oscil(cijOld, cijNL, psiOld, cijOld,
+						0.5*dt, scr, params);
 
-	//calc_base_cij(cijNL, (timeStep+0.5)*dt, scr, params);
+	    calc_base_cij(cijNL, (timeStep+0.5)*dt, scr, params);
 
-	step_sf_linear_SI_oscil_visco(psiOld, psiNL, cijOld, cijNL, psiOld,
-			forcing, forcingN, 0.5*dt, timeStep, hopsList, scr, params);
+	    step_sf_linear_SI_oscil_visco(psiOld, psiNL, cijOld, cijNL, psiOld,
+			    forcing, forcingN, 0.5*dt, timeStep, hopsList, scr, params);
 
-	//calc_base_sf(psiNL, (timeStep+0.5)*dt, scr, params);
+	    calc_base_sf(psiNL, (timeStep+0.5)*dt, scr, params);
 
+	    #ifdef MYDEBUG 
+	    // output when debugging
+	    save_hdf5_state("./output/psiStar.h5", &psiNL[0], params);
+	    save_hdf5_state("./output/cxxStar.h5", &cijNL[0], params);
+	    save_hdf5_state("./output/cyyStar.h5", &cijNL[(N+1)*M], params);
+	    save_hdf5_state("./output/cxyStar.h5", &cijNL[2*(N+1)*M], params);
 
-	#ifdef MYDEBUG 
-	save_hdf5_state("./output/psiStar.h5", &psiNL[0], params);
-	save_hdf5_state("./output/cxxStar.h5", &cijNL[0], params);
-	save_hdf5_state("./output/cyyStar.h5", &cijNL[(N+1)*M], params);
-	save_hdf5_state("./output/cxyStar.h5", &cijNL[2*(N+1)*M], params);
+	    save_hdf5_arr("./output/U0.h5",  &scr.U0[0], M);
+	    save_hdf5_arr("./output/u.h5",  &scr.u[0], M);
+	    save_hdf5_arr("./output/v.h5", &scr.v[0], M);
+	    save_hdf5_arr("./output/lplpsi.h5", &scr.lplpsi[0], M);
+	    save_hdf5_arr("./output/d2yPSI0.h5", &scr.d2yPSI0[0], M);
+	    save_hdf5_arr("./output/d3yPSI0.h5", &scr.d3yPSI0[0], M);
+	    save_hdf5_arr("./output/d3ypsi.h5", &scr.d3ypsi[0], M);
+	    save_hdf5_arr("./output/d4ypsi.h5", &scr.d4ypsi[0], M);
+	    save_hdf5_arr("./output/d2xd2ypsi.h5", &scr.d2xd2ypsi[0], M);
+	    save_hdf5_arr("./output/d4xpsi.h5", &scr.d4xpsi[0], M);
+	    save_hdf5_arr("./output/biharmpsi.h5", &scr.biharmpsi[0], M);
+	    save_hdf5_arr("./output/dycxy0.h5", &scr.dycxy0[0], M);
+	    save_hdf5_arr("./output/d2ycxy.h5", &scr.d2ycxy[0], M);
+	    save_hdf5_arr("./output/d2xcxy.h5", &scr.d2xcxy[0], M);
+	    save_hdf5_arr("./output/dxycyy_cxx.h5", &scr.dxycyy_cxx[0], M);
 
-	save_hdf5_arr("./output/U0.h5",  &scr.U0[0], M);
-	save_hdf5_arr("./output/u.h5",  &scr.u[0], M);
-	save_hdf5_arr("./output/v.h5", &scr.v[0], M);
-	save_hdf5_arr("./output/lplpsi.h5", &scr.lplpsi[0], M);
-	save_hdf5_arr("./output/d2yPSI0.h5", &scr.d2yPSI0[0], M);
-	save_hdf5_arr("./output/d3yPSI0.h5", &scr.d3yPSI0[0], M);
-	save_hdf5_arr("./output/d3ypsi.h5", &scr.d3ypsi[0], M);
-	save_hdf5_arr("./output/d4ypsi.h5", &scr.d4ypsi[0], M);
-	save_hdf5_arr("./output/d2xd2ypsi.h5", &scr.d2xd2ypsi[0], M);
-	save_hdf5_arr("./output/d4xpsi.h5", &scr.d4xpsi[0], M);
-	save_hdf5_arr("./output/biharmpsi.h5", &scr.biharmpsi[0], M);
-	save_hdf5_arr("./output/dycxy0.h5", &scr.dycxy0[0], M);
-	save_hdf5_arr("./output/d2ycxy.h5", &scr.d2ycxy[0], M);
-	save_hdf5_arr("./output/d2xcxy.h5", &scr.d2xcxy[0], M);
-	save_hdf5_arr("./output/dxycyy_cxx.h5", &scr.dxycyy_cxx[0], M);
+	    save_hdf5_arr("./output/dycxy0Star.h5", &scr.dycxy0N[0], M);
+	    save_hdf5_arr("./output/d2ycxyStar.h5", &scr.d2ycxyN[0], M);
+	    save_hdf5_arr("./output/d2xcxyStar.h5", &scr.d2xcxyN[0], M);
+	    save_hdf5_arr("./output/dxycyy_cxxStar.h5", &scr.dxycyy_cxxN[0], M);
 
-	save_hdf5_arr("./output/dycxy0Star.h5", &scr.dycxy0N[0], M);
-	save_hdf5_arr("./output/d2ycxyStar.h5", &scr.d2ycxyN[0], M);
-	save_hdf5_arr("./output/d2xcxyStar.h5", &scr.d2xcxyN[0], M);
-	save_hdf5_arr("./output/dxycyy_cxxStar.h5", &scr.dxycyy_cxxN[0], M);
+	    save_hdf5_arr("./output/udxlplpsi.h5", &scr.udxlplpsi[0], M);
+	    save_hdf5_arr("./output/vdylplpsi.h5", &scr.vdylplpsi[0], M);
 
-	save_hdf5_arr("./output/udxlplpsi.h5", &scr.udxlplpsi[0], M);
-	save_hdf5_arr("./output/vdylplpsi.h5", &scr.vdylplpsi[0], M);
+	    save_hdf5_arr("./output/RHSVec1s.h5", &scr.scratch[0], M);
 
-	save_hdf5_arr("./output/RHSVec1s.h5", &scr.scratch[0], M);
+	    save_hdf5_arr("./output/vgradcxx.h5", &scr.vgradcxx[0], M);
+	    save_hdf5_arr("./output/vgradcxy.h5", &scr.vgradcxy[0], M);
+	    save_hdf5_arr("./output/vgradcyy.h5", &scr.vgradcyy[0], M);
 
-	#endif
+	    save_hdf5_arr("./output/cxydyu.h5", scr.cxydyu, M);
+	    save_hdf5_arr("./output/cxxdxu.h5", scr.cxxdxu, M);
 
-	forcing[ind(0,0)] = params.P*cos(time+0.5*dt + phase);
-	forcingN[ind(0,0)] = params.P*cos((timeStep+1.0)*dt + phase);
+	    save_hdf5_arr("./output/cxydxv.h5", scr.cxydxv, M);
+	    save_hdf5_arr("./output/cyydyv.h5", scr.cyydyv, M);
 
-
-	step_conformation_linear_oscil(cijOld, cij, psiNL, cijNL, dt, scr, params);
-
-	//calc_base_cij(cij, (timeStep+1.0)*dt, scr, params);
-
-	step_sf_linear_SI_oscil_visco(psiOld, psi, cijOld, cij, psiNL,
-			    forcing, forcingN, dt, timeStep, opsList, scr, params);
-
-	//calc_base_sf(psi, (timeStep+1.0)*dt, scr, params);
-
-	#ifdef MYDEBUG 
-
-	save_hdf5_arr("./output/dycxy0New.h5", &scr.dycxy0N[0], M);
-	save_hdf5_arr("./output/d2ycxyNew.h5", &scr.d2ycxyN[0], M);
-	save_hdf5_arr("./output/d2xcxyNew.h5", &scr.d2xcxyN[0], M);
-	save_hdf5_arr("./output/dxycyy_cxxNew.h5", &scr.dxycyy_cxxN[0], M);
-
-	save_hdf5_arr("./output/udxlplpsiStar.h5", &scr.udxlplpsi[0], M);
-	save_hdf5_arr("./output/vdylplpsiStar.h5", &scr.vdylplpsi[0], M);
-
-	save_hdf5_state("./output/psiNew.h5", &psi[0], params);
-	save_hdf5_state("./output/cxxNew.h5", &cij[0], params);
-	save_hdf5_state("./output/cyyNew.h5", &cij[(N+1)*M], params);
-	save_hdf5_state("./output/cxyNew.h5", &cij[2*(N+1)*M], params);
-
-	printf("\nFORCE END THE DEBUGGING RUN\n");
-	break;
-	#endif
-
-	#endif
-	//------------------------------------
+	    save_hdf5_arr("./output/cxxdxv.h5", scr.cxxdxv, M);
+	    save_hdf5_arr("./output/cyydyu.h5", scr.cyydyu, M);
 
 
-	// TIME INDEPENDENT PRESSURE GRADIENT
-	#ifndef OSCIL_FLOW
-	step_conformation_linear_Crank_Nicolson(cijOld, cijNL, psiOld, cijOld,
-					    0.5*dt, scr, params);
-	step_sf_linear_SI_Crank_Nicolson_visco(psiOld, psiNL, cijOld, cijNL, psiOld,
-			forcing, forcingN, 0.5*dt, timeStep, hopsList, scr, params);
+	    #endif // MYDEBUG
 
-	#ifdef MYDEBUG 
-	save_hdf5_state("./output/cxxN.h5", &cijNL[0], params);
-	save_hdf5_state("./output/cyyN.h5", &cijNL[(N+1)*M], params);
-	save_hdf5_state("./output/cxyN.h5", &cijNL[2*(N+1)*M], params);
+	    // Calculate forcing for the full step 
+	    
+	    forcing[ind(0,0)] = params.P*cos(time+0.5*dt + phase);
+	    forcingN[ind(0,0)] = params.P*cos((timeStep+1.0)*dt + phase);
 
-	printf("\nFORCE END THE DEBUGGING RUN\n");
-	break;
-	#endif
 
-	// 'corrector' step to calculate full step based on nonlinear terms from predictor step
-	step_conformation_linear_Crank_Nicolson(cijOld, cij, psiNL, cijNL, dt, scr, params);
+	    // Calculate flow at new time step
+	    
+	    step_conformation_linear_oscil(cijOld, cij, psiNL, cijNL, dt, scr, params);
 
-	step_sf_linear_SI_Crank_Nicolson_visco(psiOld, psi, cijOld, cij, psiNL,
-			    forcing, forcingN, dt, timeStep, opsList, scr, params);
-	#endif
-	//------------------------------------
+	    calc_base_cij(cij, (timeStep+1.0)*dt, scr, params);
 
-	// output some information at every frame
+	    step_sf_linear_SI_oscil_visco(psiOld, psi, cijOld, cij, psiNL,
+				forcing, forcingN, dt, timeStep, opsList, scr, params);
+
+	    calc_base_sf(psi, (timeStep+1.0)*dt, scr, params);
+
+	    #ifdef MYDEBUG 
+	    // output when debugging
+
+	    save_hdf5_arr("./output/dycxy0New.h5", &scr.dycxy0N[0], M);
+	    save_hdf5_arr("./output/d2ycxyNew.h5", &scr.d2ycxyN[0], M);
+	    save_hdf5_arr("./output/d2xcxyNew.h5", &scr.d2xcxyN[0], M);
+	    save_hdf5_arr("./output/dxycyy_cxxNew.h5", &scr.dxycyy_cxxN[0], M);
+
+	    save_hdf5_arr("./output/udxlplpsiStar.h5", &scr.udxlplpsi[0], M);
+	    save_hdf5_arr("./output/vdylplpsiStar.h5", &scr.vdylplpsi[0], M);
+
+	    save_hdf5_arr("./output/vgradcxxStar.h5", &scr.vgradcxx[0], M);
+	    save_hdf5_arr("./output/vgradcxyStar.h5", &scr.vgradcxy[0], M);
+	    save_hdf5_arr("./output/vgradcyyStar.h5", &scr.vgradcyy[0], M);
+
+	    save_hdf5_arr("./output/cxydyuStar.h5", scr.cxydyu, M);
+	    save_hdf5_arr("./output/cxxdxuStar.h5", scr.cxxdxu, M);
+
+	    save_hdf5_arr("./output/cxydxvStar.h5", scr.cxydxv, M);
+	    save_hdf5_arr("./output/cyydyvStar.h5", scr.cyydyv, M);
+
+	    save_hdf5_arr("./output/cxxdxvStar.h5", scr.cxxdxv, M);
+	    save_hdf5_arr("./output/cyydyuStar.h5", scr.cyydyu, M);
+
+	    save_hdf5_state("./output/psiNew.h5", &psi[0], params);
+	    save_hdf5_state("./output/cxxNew.h5", &cij[0], params);
+	    save_hdf5_state("./output/cyyNew.h5", &cij[(N+1)*M], params);
+	    save_hdf5_state("./output/cxyNew.h5", &cij[2*(N+1)*M], params);
+
+	    printf("\nFORCE END THE DEBUGGING RUN\n");
+	    break;
+	    #endif // MYDEBUG
+
+	    
+	} else {
+	    // TIME INDEPENDENT PRESSURE GRADIENT
+	    // ----------------------------------
+	    
+	    step_conformation_linear_Crank_Nicolson(cijOld, cijNL, psiOld, cijOld,
+						0.5*dt, scr, params);
+	    step_sf_linear_SI_Crank_Nicolson_visco(psiOld, psiNL, cijOld, cijNL, psiOld,
+			    forcing, forcingN, 0.5*dt, timeStep, hopsList, scr, params);
+
+	    #ifdef MYDEBUG 
+	    save_hdf5_state("./output/cxxN.h5", &cijNL[0], params);
+	    save_hdf5_state("./output/cyyN.h5", &cijNL[(N+1)*M], params);
+	    save_hdf5_state("./output/cxyN.h5", &cijNL[2*(N+1)*M], params);
+
+	    printf("\nFORCE END THE DEBUGGING RUN\n");
+	    break;
+	    #endif
+
+	    step_conformation_linear_Crank_Nicolson(cijOld, cij, psiNL, cijNL, dt, scr, params);
+
+	    step_sf_linear_SI_Crank_Nicolson_visco(psiOld, psi, cijOld, cij, psiNL,
+				forcing, forcingN, dt, timeStep, opsList, scr, params);
+
+	}
+
+	//=========================================================================================
+
+	// OUTPUT DATA 
+	// -----------
+	
 	if (((timeStep+1) % stepsPerFrame) == 0 )
 	{
 
-	    time = (timeStep + 1)*dt;
+	    time = (timeStep + 1.0)*dt;
+
 	    double normPSI1 = 0;
 	    double normPSI0 = 0;
+
+	    // u
+	    single_dy(&psi[ind(0,0)], scr.U0, params);
+	    single_dy(&psi[ind(1,0)], scr.u, params);
+
+	    // v = -dxdpsi
+	    single_dx(&psi[ind(1,0)], scr.v, 1, params);
 
 	    for (j=0; j<M; j++)
 	    {

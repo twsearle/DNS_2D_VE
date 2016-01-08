@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral linear time stepping code
 #
-#   Last modified: Tue  5 Jan 17:36:00 2016
+#   Last modified: Fri  8 Jan 18:01:58 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -521,12 +521,12 @@ def oscillatory_flow():
 
             Cxy[i,j] = real( cxy_cmplx )
 
-            Cxx[i,j] = (1.0/(1.0+2.j*De))*(Wi/pi)*(cxy_cmplx*dyu_cmplx)
-            Cxx[i,j] += (1.0/(1.0-2.j*De))*(Wi/pi)*(conj(cxy_cmplx)*conj(dyu_cmplx)) 
+            cxx_cmplx = (1.0/(1.0+2.j*De))*(Wi/pi)*(cxy_cmplx*dyu_cmplx)
+            cxx_cmplx += (1.0/(1.0-2.j*De))*(Wi/pi)*(conj(cxy_cmplx)*conj(dyu_cmplx)) 
 
-            Cxx[i,j] += 1. + (Wi/pi)*( cxy_cmplx*conj(dyu_cmplx) +
+            cxx_cmplx += 1. + (Wi/pi)*( cxy_cmplx*conj(dyu_cmplx) +
                                        conj(cxy_cmplx)*dyu_cmplx ) 
-            Cxx[i,j] = real(Cxx[i,j])
+            Cxx[i,j] = real(cxx_cmplx)
 
     del y, i, j
 
@@ -684,10 +684,10 @@ elif args.flow_type==1:
 elif args.flow_type==2:
     # --------------- OSCILLATORY FLOW -----------------
     PSI, Cxx, Cyy, Cxy, forcing, CNSTS['P'] = oscillatory_flow()
-    Ubase, Cxybase, Cxxbase = give_base_profile(Wi,0)
+    #Ubase, Cxybase, Cxxbase = give_base_profile(Wi,0)
 
-    Cxx[N*M:(N+1)*M] = Cxxbase
-    Cxy[N*M:(N+1)*M] = Cxybase
+    #Cxx[N*M:(N+1)*M] = Cxxbase
+    #Cxy[N*M:(N+1)*M] = Cxybase
     
 
 else:
@@ -698,7 +698,6 @@ else:
 # ---------------------PERTURBATION-----------------------------------------
 
 psiLam = copy(PSI)
-
 
 perAmp = 1.0e-6
 
@@ -824,7 +823,19 @@ stepsPerFrame = numTimeSteps/numFrames
 # Run program in C
 
 # pass the flow variables and the time iteration settings to the C code
+cargs = ["./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
+         "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
+         "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
+         "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
+         "{0:e}".format(CNSTS["beta"]), "-D",
+         "{0:e}".format(CNSTS["De"]),
+         "-P", "{0:e}".format(CNSTS["P"]),
+         "-t", "{0:e}".format(CNSTS["dt"]),
+         "-s", "{0:d}".format(stepsPerFrame), "-T",
+         "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime)]
+
 if dealiasing:
+    cargs.append("-d")
 
     print "./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
@@ -836,28 +847,7 @@ if dealiasing:
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
              "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime), "-d"
 
-    cargs = ["./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
-             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
-             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
-             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-D",
-             "{0:e}".format(CNSTS["De"]),
-             "-P", "{0:e}".format(CNSTS["P"]),
-             "-t", "{0:e}".format(CNSTS["dt"]),
-             "-s", "{0:d}".format(stepsPerFrame), "-T",
-             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime), "-d"]
-
 else:
-    cargs = ["./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
-             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
-             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
-             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-D",
-             "{0:e}".format(CNSTS["De"]),
-             "-P", "{0:e}".format(CNSTS["P"]),
-             "-t", "{0:e}".format(CNSTS["dt"]),
-             "-s", "{0:d}".format(stepsPerFrame), "-T",
-             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime)]
 
     print "./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
              "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
@@ -869,6 +859,9 @@ else:
              "-t", "{0:e}".format(CNSTS["dt"]),\
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
              "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime)
+
+if args.flow_type==2:
+    cargs.append("-O")
 
 subprocess.call(cargs)
 

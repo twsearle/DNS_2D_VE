@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 11 Nov 11:33:20 2015
+// Last modified: Fri  8 Jan 11:16:48 2016
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -59,6 +59,7 @@ struct flow_params {
     int N;
     int M;
     int dealiasing;
+    int oscillatory_flow;
     int Nf;
     int Mf;
     double kx;
