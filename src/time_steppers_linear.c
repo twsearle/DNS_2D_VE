@@ -10,7 +10,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri  8 Jan 16:35:56 2016
+// Last modified: Wed 13 Jan 11:12:33 2016
 
 #include"fields_1D.h"
 #include"fields_IO.h"
@@ -798,14 +798,14 @@ void step_conformation_linear_oscil(
     // Cyy*dyV
     fft_cheby_convolve(&cijNL[(N+1)*M + ind(0,0)], scr.dyv, scr.cyydyv, scr, params);
 
-    // vgrad*Cyy
+    // vgrad*Cyy = Udxcyy + vdyCyy
     single_dx(&cijNL[(N+1)*M + ind(1,0)], scr.scratch, 1,  params);
     fft_cheby_convolve(scr.U0, scr.scratch, scr.scratch, scr, params);
 
     single_dy(&cijNL[(N+1)*M + ind(0,0)], scr.scratch2, params);
     fft_cheby_convolve(scr.v, scr.scratch2, scr.scratch2, scr, params);
 
-    for (i=0; i<N+1; i++)
+    for (i=0; i<M; i++)
     {
 	scr.vgradcyy[i] = scr.scratch[i] + scr.scratch2[i];
     }
@@ -869,7 +869,7 @@ void step_conformation_linear_oscil(
 	cij[(N+1)*M + ind(1,j)] = old_fac*cijOld[(N+1)*M + ind(1,j)];
 	cij[(N+1)*M + ind(1,j)] += dt*2.*scr.cxydxv[j]; 
 	cij[(N+1)*M + ind(1,j)] += dt*2.*scr.cyydyv[j];
-	cij[(N+1)*M + ind(1,j)] += - dt*scr.vgradcyy[j];
+	//cij[(N+1)*M + ind(1,j)] += - dt*scr.vgradcyy[j];
 
 	cij[(N+1)*M + ind(1,j)] *= new_fac;
 	
@@ -1151,8 +1151,8 @@ void step_sf_linear_SI_oscil_visco(
 	scr.RHSvec[j] += - params.Re*dt*scr.udxlplpsi[j];
 	scr.RHSvec[j] += - params.Re*dt*scr.vdylplpsi[j];
 	scr.RHSvec[j] += + BFac*scr.lplpsi[j];
-	scr.RHSvec[j] += 0.5*dt*forcing[ind(1,j)];
-	scr.RHSvec[j] += 0.5*dt*forcingN[ind(1,j)];
+	//scr.RHSvec[j] += 0.5*dt*forcing[ind(1,j)];
+	//scr.RHSvec[j] += 0.5*dt*forcingN[ind(1,j)];
     }
 
     //impose BCs
@@ -1299,13 +1299,29 @@ void calc_base_cij(
     to_cheby_spectral(scr.scratchp2, &cij[0], scr, params);
     // cxy
     to_cheby_spectral(scr.scratchp3, &cij[2*(N+1)*M], scr, params);
+
+    /*
+    for (i=0; i<params.M; i++)
+    {
+	cij[ind(0,i)] = 0.0;
+	cij[2*(N+1)*M + ind(0,i)] = 0.0;
+    }
+
+    // Cxy = Wi * U'
+    cij[2*(N+1)*M + ind(0,1)] = Wi * -2.0 * cos(time);
+    // Cxx = Wi^2 * U'^2
+    cij[ind(0,0)] = (Wi*Wi * 2.0) * cos(time)*cos(time) + 1.0;
+    cij[ind(0,2)] = Wi*Wi * 2.0 * cos(time)*cos(time);
+    */
     
     // mean flow, so must have zero imaginary part!
     for (i=0; i<params.M; i++)
     {
 	cij[ind(0,i)] = creal(cij[ind(0,i)]);
+	cij[(N+1)*M + ind(0,i)] = 0.0;
 	cij[2*(N+1)*M + ind(0,i)] = creal(cij[2*(N+1)*M + ind(0,i)]);
     }
+    cij[(N+1)*M + ind(0,0)] = 1.0;
 
 }
 
@@ -1356,7 +1372,23 @@ void calc_base_sf(
 
     // psi
     to_cheby_spectral(scr.scratchp1, &psi[0], scr, params);
-    
+
+    // Poiseuille flow
+    /*
+    for (i=0; i<params.M; i++)
+    {
+	psi[ind(0,i)] = 0;
+    }
+
+    psi[ind(0,0)] = 2.0/3.0 * cos(time);
+               
+    psi[ind(0,1)] = 3.0/4.0 * cos(time);
+               
+    psi[ind(0,2)] = 0.0 * cos(time);
+               
+    psi[ind(0,3)] = -1.0/12.0 * cos(time);
+    */
+
     for (i=0; i<params.M; i++)
     {
 	psi[ind(0,i)] = creal(psi[ind(0,i)]);

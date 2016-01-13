@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri  8 Jan 17:26:30 2016
+// Last modified: Wed 13 Jan 15:43:04 2016
 
 /* Program Description:
  *
@@ -411,9 +411,11 @@ int main(int argc, char **argv)
 
     printf("%e\t%e\t%e\t%e\t\n", 0.0, KE_tot, KE0, KE1);
 
-    scr.scratch[0] = log(cabs((0.5*M_PI/params.Wi)*cij[2*(N+1)*M + ind(1,1)]));
-    scr.scratch[1] = log(cabs((0.5*M_PI/params.Wi)*cij[ind(1,2)]));
-    printf("%f %20.18f %20.18f\n", time , creal(scr.scratch[0]), creal(scr.scratch[1]));
+    // **** STUPID TEST *****
+    //scr.scratch[0] = log(cabs((0.5*M_PI/params.Wi)*cij[2*(N+1)*M + ind(1,1)]));
+    //scr.scratch[1] = log(cabs((0.5*M_PI/params.Wi)*cij[ind(1,2)]));
+    //printf("%f %20.18f %20.18f\n", 0.0, creal(scr.scratch[0]), creal(scr.scratch[1]));
+    //fprintf(tracefp, "%f %20.18f %20.18f\n", 0.0, creal(scr.scratch[0]), creal(scr.scratch[1]));
 
     for (timeStep=0; timeStep<numTimeSteps; timeStep++)
     {
@@ -525,6 +527,10 @@ int main(int argc, char **argv)
 
 	    calc_base_sf(psi, (timeStep+1.0)*dt, scr, params);
 
+	    //scr.scratch[0] = log(cabs((0.5*M_PI/params.Wi)*cij[2*(N+1)*M + ind(1,1)]));
+	    //scr.scratch[1] = log(cabs((0.5*M_PI/params.Wi)*cij[ind(1,2)]));
+	    //fprintf(tracefp, "%f %20.18f %20.18f\n", (timeStep+1.0)*dt, creal(scr.scratch[0]), creal(scr.scratch[1]));
+
 	    #ifdef MYDEBUG 
 	    // output when debugging
 
@@ -627,10 +633,12 @@ int main(int argc, char **argv)
     
 	    KE_tot = KE0 + KE1;
 
-	    // printf("%e\t%e\t%e\t%e\t\n", time, KE_tot, KE0, KE1);
-	    scr.scratch[0] = log(cabs((0.5*M_PI/params.Wi)*cij[2*(N+1)*M + ind(1,1)]));
-	    scr.scratch[1] = log(cabs((0.5*M_PI/params.Wi)*cij[ind(1,2)]));
-	    printf("%f %20.18f %20.18f\n", time , creal(scr.scratch[0]), creal(scr.scratch[1]));
+	    printf("%e\t%e\t%e\t%e\t\n", time, KE_tot, KE0, KE1);
+
+	    // **** STUPID TESTS ****
+	    // scr.scratch[0] = log(cabs((0.5*M_PI/params.Wi)*cij[2*(N+1)*M + ind(1,1)]));
+	    // scr.scratch[1] = log(cabs((0.5*M_PI/params.Wi)*cij[ind(1,2)]));
+	    // printf("%f %20.18f %20.18f\n", time , creal(scr.scratch[0]), creal(scr.scratch[1]));
 	    
             save_hdf5_snapshot_visco(&hdf5fp, &filetype_id, &datatype_id,
 		psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], time, params);

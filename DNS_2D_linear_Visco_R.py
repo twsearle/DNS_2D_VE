@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral linear time stepping code
 #
-#   Last modified: Fri 18 Dec 17:49:00 2015
+#   Last modified: Wed 13 Jan 15:05:24 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -217,6 +217,76 @@ def decide_resolution(vec, NOld, MOld, CNSTS):
 
     return ovec
 
+def stupid_transform(GLreal, CNSTS):
+    """
+    apply the Chebyshev transform the stupid way.
+    """
+
+    M = CNSTS['M']
+
+    out = zeros(M)
+
+    for i in range(M):
+        out[i] += (1./(M-1.))*GLreal[0]
+        for j in range(1,M-1):
+            out[i] += (2./(M-1.))*GLreal[j]*cos(pi*i*j/(M-1))
+        out[i] += (1./(M-1.))*GLreal[M-1]*cos(pi*i)
+    del i,j
+
+    out[0] = out[0]/2.
+    out[M-1] = out[M-1]/2.
+
+    return out
+
+def stupid_transform_i(GLspec, CNSTS):
+    """
+    apply the Chebyshev transform the stupid way.
+    """
+
+    M = CNSTS['M']
+    Mf = CNSTS['Mf']
+
+    out = zeros(Mf, dtype='complex')
+
+    for i in range(Mf):
+        out[i] += GLspec[0]
+        for j in range(1,M-1):
+            out[i] += GLspec[j]*cos(pi*i*j/(Mf-1))
+        out[i] += GLspec[M-1]*cos(pi*i)
+    del i,j
+
+    return out
+
+def x_independent_profile(PSI):
+    """
+     I think these are the equations for the x independent stresses from the base
+     profile.
+    """
+
+    dyu = dot(SMDYY, PSI[N*M:(N+1)*M])
+    Cyy = zeros(vecLen, dtype='complex')
+    Cyy[N*M] += 1.0
+    Cxy = zeros(vecLen, dtype='complex')
+    Cxy[N*M:(N+1)*M] = Wi*dyu
+    Cxx = zeros(vecLen, dtype='complex')
+    Cxx[N*M:(N+1)*M] = 2*Wi*Wi*dot(cheb_prod_mat(dyu), dyu)
+    Cxx[N*M] += 1.0
+
+    return (Cxx, Cyy, Cxy)
+
+def cheb_prod_mat(velA):
+    """Function to return a matrix for left-multiplying two Chebychev vectors"""
+
+    D = zeros((M, M), dtype='complex')
+
+    for n in range(M):
+        for m in range(-M+1,M):     # Bottom of range is inclusive
+            itr = abs(n-m)
+            if (itr < M):
+                D[n, abs(m)] += 0.5*oneOverC[n]*CFunc[itr]*CFunc[abs(m)]*velA[itr]
+    del m, n, itr
+    return D
+
 def form_operators(dt):
     PsiOpInvList = []
 
@@ -339,77 +409,6 @@ def form_oscil_operators(dt):
 
     PsiOpInvList = array(PsiOpInvList)
     return PsiOpInvList
-
-def stupid_transform(GLreal, CNSTS):
-    """
-    apply the Chebyshev transform the stupid way.
-    """
-
-    M = CNSTS['M']
-
-    out = zeros(M)
-
-    for i in range(M):
-        out[i] += (1./(M-1.))*GLreal[0]
-        for j in range(1,M-1):
-            out[i] += (2./(M-1.))*GLreal[j]*cos(pi*i*j/(M-1))
-        out[i] += (1./(M-1.))*GLreal[M-1]*cos(pi*i)
-    del i,j
-
-    out[0] = out[0]/2.
-    out[M-1] = out[M-1]/2.
-
-    return out
-
-def stupid_transform_i(GLspec, CNSTS):
-    """
-    apply the Chebyshev transform the stupid way.
-    """
-
-    M = CNSTS['M']
-    Mf = CNSTS['Mf']
-
-    out = zeros(Mf, dtype='complex')
-
-    for i in range(Mf):
-        out[i] += GLspec[0]
-        for j in range(1,M-1):
-            out[i] += GLspec[j]*cos(pi*i*j/(Mf-1))
-        out[i] += GLspec[M-1]*cos(pi*i)
-    del i,j
-
-    return out
-
-def x_independent_profile(PSI):
-    """
-     I think these are the equations for the x independent stresses from the base
-     profile.
-    """
-
-    dyu = dot(SMDYY, PSI[N*M:(N+1)*M])
-    Cyy = zeros(vecLen, dtype='complex')
-    Cyy[N*M] += 1.0
-    Cxy = zeros(vecLen, dtype='complex')
-    Cxy[N*M:(N+1)*M] = Wi*dyu
-    Cxx = zeros(vecLen, dtype='complex')
-    Cxx[N*M:(N+1)*M] = 2*Wi*Wi*dot(cheb_prod_mat(dyu), dyu)
-    Cxx[N*M] += 1.0
-
-    return (Cxx, Cyy, Cxy)
-
-def cheb_prod_mat(velA):
-    """Function to return a matrix for left-multiplying two Chebychev vectors"""
-
-    D = zeros((M, M), dtype='complex')
-
-    for n in range(M):
-        for m in range(-M+1,M):     # Bottom of range is inclusive
-            itr = abs(n-m)
-            if (itr < M):
-                D[n, abs(m)] += 0.5*oneOverC[n]*CFunc[itr]*CFunc[abs(m)]*velA[itr]
-    del m, n, itr
-    return D
-
 def poiseuille_flow():
     PSI = zeros((2*N+1)*M, dtype='complex')
 
@@ -483,9 +482,11 @@ def oscillatory_flow():
     y_points = cos(pi*arange(Mf)/(Mf-1))
 
     tmp = beta + (1-beta) / (1 + 1.j*De)
+    print 'tmp', tmp
     alpha = sqrt( (1.j*pi*Re*De) / (2*Wi*tmp) )
-
+    print 'alpha', alpha
     Chi = real( (1-1.j)*(1 - tanh(alpha) / alpha) )
+    print 'Chi', Chi 
 
     # the coefficient for the forcing
     P = (0.5*pi)**2 * (Re*De) / (Chi*Wi)
@@ -506,12 +507,12 @@ def oscillatory_flow():
 
             Cxy[i,j] = real( cxy_cmplx )
 
-            Cxx[i,j] = (1.0/(1.0+2.j*De))*(Wi/pi)*(cxy_cmplx*dyu_cmplx)
-            Cxx[i,j] += (1.0/(1.0-2.j*De))*(Wi/pi)*(conj(cxy_cmplx)*conj(dyu_cmplx)) 
+            cxx_cmplx = (1.0/(1.0+2.j*De))*(Wi/pi)*(cxy_cmplx*dyu_cmplx)
+            cxx_cmplx += (1.0/(1.0-2.j*De))*(Wi/pi)*(conj(cxy_cmplx)*conj(dyu_cmplx)) 
 
-            Cxx[i,j] += 1. + (Wi/pi)*( cxy_cmplx*conj(dyu_cmplx) +
+            cxx_cmplx += 1. + (Wi/pi)*( cxy_cmplx*conj(dyu_cmplx) +
                                        conj(cxy_cmplx)*dyu_cmplx ) 
-            Cxx[i,j] = real(Cxx[i,j])
+            Cxx[i,j] = real(cxx_cmplx)
 
     del y, i, j
 
@@ -531,6 +532,20 @@ def oscillatory_flow():
 
     forcing = zeros((M,2*N+1), dtype='complex')
     forcing[0,0] = P
+
+    # VERRRYYY IMPORTANT! accidentally introducing tiny imaginary part to linear
+    # code
+    PSI[N*M:(N+1)*M] = real(PSI[N*M:(N+1)*M])
+    Cxx[N*M:(N+1)*M] = real(Cxx[N*M:(N+1)*M])
+    Cxy[N*M:(N+1)*M] = real(Cxy[N*M:(N+1)*M])
+    Cyy[N*M:(N+1)*M] = real(Cyy[N*M:(N+1)*M])
+
+    Cxx[(N+1)*M:] = 0.0
+    Cxx[:N*M] = 0.0
+    Cyy[(N+1)*M:] = 0.0
+    Cyy[:N*M] = 0.0
+    Cxy[(N+1)*M:] = 0.0
+    Cxy[:N*M] = 0.0
 
     return PSI, Cxx, Cyy, Cxy, forcing, P
 
@@ -558,8 +573,10 @@ NumTimeSteps\t= {NT}
 
 #kxList = r_[17.0:33.0:1.0]
 #kxList = r_[33.0:64.0:1.0]
-kxList = concatenate((r_[2.0:20.0:2.0], r_[20.0:130.0:10.0]))
+#kxList = concatenate((r_[2.0:20.0:2.0], r_[20.0:130.0:10.0]))
 #kxList = r_[2.0:64.0:2.0]
+kxList = r_[2.0:8.0:1.0]
+#kxList=[4.0]
 
 stabOutStream = open('stability.dat', 'w')
 
@@ -569,7 +586,6 @@ for kx in kxList:
           'Re': Re, 'Wi': Wi, 'beta': beta, 'De':De, 'kx': kx,'time': totTime,
          'dt':dt, 'P': 1.0,
           'dealiasing':dealiasing}
-
     # SET UP
 
     vecLen = (2*N+1)*M
@@ -620,6 +636,7 @@ for kx in kxList:
     elif args.flow_type==2:
         # --------------- OSCILLATORY FLOW -----------------
         PSI, Cxx, Cyy, Cxy, forcing, CNSTS['P'] = oscillatory_flow()
+        
 
     else:
         print "flow type unspecified"
@@ -630,36 +647,47 @@ for kx in kxList:
 
     psiLam = copy(PSI)
 
+    perAmp = 1.0e-6
 
-    perAmp = 1e-7
+    #rn = (10.0**(-1))*(0.5-rand(5))
+    #rn = (10.0**(-1))*array([-0.43,-0.234,0.2134,-0.134,0.7653683])
+    #rSpace = zeros(M, dtype='complex')
+    #y = 2.0*arange(M)/(M-1.0) -1.0
+    #
+    ### sinusoidal
+    #rSpace =  perAmp*sin(1.0 * pi * y) * rn[0]
+    #rSpace += perAmp*sin(2.0 * pi * y) * rn[1]
+    #rSpace += perAmp*sin(3.0 * pi * y) * rn[2]
+    ### cosinusoidal 
+    #rSpace += perAmp*cos(1.0 * 0.5*pi * y) * rn[3]
+    #rSpace += perAmp*cos(3.0 * 0.5*pi * y) * rn[4]
+    #
+   
+    ### low order eigenfunction of biharmonic operator
+    ###rSpace = (sin(pscale * y)/(pscale*cos(pscale)) - sinh(gam*y)/(gam*cosh(gam))) * rn[0]
+    ##
+    #PSI[(N+1)*M:(N+2)*M] = stupid_transform(rSpace, CNSTS)
+    #PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
 
-    rn = (10.0**(-1))*(0.5-rand(5))
-    rSpace = zeros(M, dtype='complex')
-    y = 2.0*arange(M)/(M-1.0) -1.0
+    # perturbation used in pythonic test code.
+    Cxx[(N+1)*M + 2] = perAmp * (Wi*2./pi)
+    Cxx[(N-1)*M + 2] = perAmp * (Wi*2./pi)
 
-    ## sinusoidal
-    rSpace =  perAmp*sin(1.0 * 2.0*pi * y) * rn[0]
-    rSpace += perAmp*sin(2.0 * 2.0*pi * y) * rn[1]
-    rSpace += perAmp*sin(3.0 * 2.0*pi * y) * rn[2]
-    ## cosinusoidal 
-    rSpace += perAmp*cos(1.0 * 2.0*pi * y) * rn[3]
-    rSpace += perAmp*cos(2.0 * 2.0*pi * y) * rn[4]
+    Cxy[(N+1)*M + 1] = perAmp * (Wi*2./pi)
+    Cxy[(N-1)*M + 1] = perAmp * (Wi*2./pi)
 
-    ## low order eigenfunction of biharmonic operator
-    #rSpace = (sin(pscale * y)/(pscale*cos(pscale)) - sinh(gam*y)/(gam*cosh(gam))) * rn[0]
 
-    PSI[(N+1)*M:(N+2)*M] =stupid_transform(rSpace, CNSTS)
-    PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
 
     # ----------------------------------------------------------------------------
-
+    print type(psiLam)
+    print shape(psiLam)
 
     ##  output forcing and the streamfunction corresponding to the initial stress
     f = h5py.File("laminar.h5", "w")
     dset = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
     psiLam = psiLam.reshape(2*N+1, M).T
     psiLam = ifftshift(psiLam, axes=1)
-    dset[...] = psiLam.T.flatten()
+    dset[...] = array(psiLam).T.flatten()
     f.close()
 
     f = h5py.File("forcing.h5", "w")
@@ -734,7 +762,19 @@ for kx in kxList:
     # Run program in C
 
     # pass the flow variables and the time iteration settings to the C code
+    cargs = ["./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
+             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
+             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
+             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
+             "{0:e}".format(CNSTS["beta"]), "-D",
+             "{0:e}".format(CNSTS["De"]),
+             "-P", "{0:e}".format(CNSTS["P"]),
+             "-t", "{0:e}".format(CNSTS["dt"]),
+             "-s", "{0:d}".format(stepsPerFrame), "-T",
+             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime)]
+
     if dealiasing:
+        cargs.append("-d")
 
         print "./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
                  "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
@@ -746,28 +786,7 @@ for kx in kxList:
                  "-s", "{0:d}".format(stepsPerFrame), "-T",\
                  "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime), "-d"
 
-        cargs = ["./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
-                 "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
-                 "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
-                 "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-                 "{0:e}".format(CNSTS["beta"]), "-D",
-                 "{0:e}".format(CNSTS["De"]),
-                 "-P", "{0:e}".format(CNSTS["P"]),
-                 "-t", "{0:e}".format(CNSTS["dt"]),
-                 "-s", "{0:d}".format(stepsPerFrame), "-T",
-                 "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime), "-d"]
-
     else:
-        cargs = ["./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
-                 "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
-                 "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
-                 "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-                 "{0:e}".format(CNSTS["beta"]), "-D",
-                 "{0:e}".format(CNSTS["De"]),
-                 "-P", "{0:e}".format(CNSTS["P"]),
-                 "-t", "{0:e}".format(CNSTS["dt"]),
-                 "-s", "{0:d}".format(stepsPerFrame), "-T",
-                 "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime)]
 
         print "./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
                  "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
@@ -780,7 +799,11 @@ for kx in kxList:
                  "-s", "{0:d}".format(stepsPerFrame), "-T",\
                  "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime)
 
+    if args.flow_type==2:
+        cargs.append("-O")
+
     subprocess.call(cargs)
+
 
     # Read in data from the C code
 
@@ -801,8 +824,7 @@ for kx in kxList:
     elif np.isnan(tracePSInorm[-1, 2]):
         growthRate = float('nan')
     else:
-        growthRate = 0.5 * (logPsiNorm1[-1]-logPsiNorm1[0]) / (tracePSInorm[-1,0] -
-                                                           tracePSInorm[0,0])
+        growthRate = 0.5 * (logPsiNorm1[-1]-logPsiNorm1[0]) / (tracePSInorm[-1,0] - tracePSInorm[-frameIndex,0])
         if np.isinf(growthRate):
             growthRate = float('nan')
 

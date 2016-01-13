@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral linear time stepping code
 #
-#   Last modified: Fri  8 Jan 18:01:58 2016
+#   Last modified: Wed 13 Jan 11:56:02 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -454,7 +454,6 @@ def plug_like_flow():
     return PSI, Cxx, Cyy, Cxy, forcing
 
 def shear_layer_flow(delta=0.1):
-    
     y_points = cos(pi*arange(Mf)/(Mf-1))
 
     # Set initial streamfunction
@@ -486,6 +485,33 @@ def shear_layer_flow(delta=0.1):
     Cxx, Cyy, Cxy = x_independent_profile(PSI)
 
     return PSI, Cxx, Cyy, Cxy, forcing
+
+def poiseuille_oscil_flow():
+    """
+    Some flow variables must be calculated in realspace and then transformed
+    spectral space, Cyy =1.0 so it is easy.
+    """
+    PSI = zeros(M*(2*N+1), dtype='complex')
+    Cxx = zeros(M*(2*N+1), dtype='complex')
+    Cxy = zeros(M*(2*N+1), dtype='complex')
+
+    PSI[N*M]   += 2.0/3.0
+    PSI[N*M+1] += 3.0/4.0
+    PSI[N*M+2] += 0.0
+    PSI[N*M+3] += -1.0/12.0
+    
+    Cxy[N*M + 1] = Wi * -2.0 
+    Cxx[N*M] = Wi**2 * 2.0  + 1.0
+    Cxx[N*M+2] = Wi**2 * 2.0 
+
+    Cyy = zeros((2*N+1)*M, dtype='complex')
+    Cyy[N*M] = 1
+
+    forcing = zeros((M,2*N+1), dtype='complex')
+    forcing[0,0] = 2./Re
+    P = 1.
+
+    return PSI, Cxx, Cyy, Cxy, forcing, P
 
 def oscillatory_flow():
     """
@@ -684,6 +710,7 @@ elif args.flow_type==1:
 elif args.flow_type==2:
     # --------------- OSCILLATORY FLOW -----------------
     PSI, Cxx, Cyy, Cxy, forcing, CNSTS['P'] = oscillatory_flow()
+    #PSI, Cxx, Cyy, Cxy, forcing, CNSTS['P'] = poiseuille_oscil_flow()
     #Ubase, Cxybase, Cxxbase = give_base_profile(Wi,0)
 
     #Cxx[N*M:(N+1)*M] = Cxxbase
@@ -706,13 +733,13 @@ perAmp = 1.0e-6
 #rSpace = zeros(M, dtype='complex')
 #y = 2.0*arange(M)/(M-1.0) -1.0
 #
-### sinusoidal
-#rSpace =  perAmp*sin(1.0 * 2.0*pi * y) * rn[0]
-#rSpace += perAmp*sin(2.0 * 2.0*pi * y) * rn[1]
-#rSpace += perAmp*sin(3.0 * 2.0*pi * y) * rn[2]
+## sinusoidal
+#rSpace =  perAmp*sin(1.0 * pi * y) * rn[0]
+#rSpace += perAmp*sin(2.0 * pi * y) * rn[1]
+#rSpace += perAmp*sin(3.0 * pi * y) * rn[2]
 ### cosinusoidal 
-#rSpace += perAmp*cos(1.0 * 2.0*pi * y) * rn[3]
-#rSpace += perAmp*cos(2.0 * 2.0*pi * y) * rn[4]
+#rSpace += perAmp*cos(1.0 * 0.5*pi * y) * rn[3]
+#rSpace += perAmp*cos(3.0 * 0.5*pi * y) * rn[4]
 #
 #
 ## low order eigenfunction of biharmonic operator
@@ -741,14 +768,15 @@ Cxy[(N-1)*M + 1] = perAmp * (Wi*2./pi)
 print log(abs(perAmp))
 
 # ----------------------------------------------------------------------------
-
+print type(psiLam)
+print shape(psiLam)
 
 ##  output forcing and the streamfunction corresponding to the initial stress
 f = h5py.File("laminar.h5", "w")
 dset = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
 psiLam = psiLam.reshape(2*N+1, M).T
 psiLam = ifftshift(psiLam, axes=1)
-dset[...] = psiLam.T.flatten()
+dset[...] = array(psiLam).T.flatten()
 f.close()
 
 f = h5py.File("forcing.h5", "w")
