@@ -10,7 +10,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 13 Jan 11:12:33 2016
+// Last modified: Thu 14 Jan 12:24:38 2016
 
 #include"fields_1D.h"
 #include"fields_IO.h"
@@ -312,7 +312,7 @@ void step_conformation_linear_Crank_Nicolson(
     single_dy(&cijNL[(N+1)*M + ind(0,0)], scr.scratch2, params);
     fft_cheby_convolve(scr.v, scr.scratch2, scr.scratch2, scr, params);
 
-    for (i=0; i<N+1; i++)
+    for (i=0; i<M; i++)
     {
 	scr.vgradcyy[i] = scr.scratch[i] + scr.scratch2[i];
     }
