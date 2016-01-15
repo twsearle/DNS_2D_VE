@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral linear time stepping code
 #
-#   Last modified: Fri 15 Jan 13:47:00 2016
+#   Last modified: Fri 15 Jan 16:23:45 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -570,14 +570,13 @@ NumTimeSteps\t= {NT}
                    De=De, delta=delta,
                    dt=dt, NT=numTimeSteps, t=totTime)
 
-#kxList = r_[17.0:33.0:1.0]
-#kxList = r_[33.0:64.0:1.0]
 #kxList = concatenate((r_[2.0:20.0:2.0], r_[20.0:130.0:10.0]))
-#kxList = r_[2.0:64.0:2.0]
-#kxList = r_[2.0:8.0:1.0]
-kxList = r_[20.0:50.0:2.0]
+kxList = r_[0.2:10.0:0.2] # 50 points 
+#kxList = r_[10.0:41.0:1.0] # 30 points
 
-stabOutStream = open('stability.dat', 'w')
+stabOutStream = open(
+    './output/stability.dat',
+    'w')
 
 for kx in kxList:
     print kx
