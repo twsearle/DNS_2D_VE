@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 13 Jan 15:43:04 2016
+// Last modified: Fri 15 Jan 11:56:25 2016
 
 /* Program Description:
  *
@@ -61,14 +61,8 @@ int main(int argc, char **argv)
     flow_params params;
     int stepsPerFrame = 0;
     int numTimeSteps = 0;
-    int timeStep = 0;
     double dt = 0;
-    double time = 0;
     double initTime=0;
-    double KE0 = 1.0;
-    double KE1 = 0.0;
-    double KE_tot = 0.0;
-    double periods, phase;
 
     opterr = 0;
     int shortArg;
@@ -91,66 +85,66 @@ int main(int argc, char **argv)
 
     while ((shortArg = getopt (argc, argv, "OdN:M:U:k:R:W:b:D:P:t:s:T:i:")) != -1)
 	switch (shortArg)
-	  {
-	  case 'N':
-	    params.N = atoi(optarg);
-	    break;
-	  case 'M':
-	    params.M = atoi(optarg);
-	    break;
-	  case 'U':
-	    params.U0 = atof(optarg);
-	    break;
-	  case 'k':
-	    params.kx = atof(optarg);
-	    break;
-	  case 'R':
-	    params.Re = atof(optarg);
-	    break;
-	  case 'W':
-	    params.Wi = atof(optarg);
-	    break;
-	  case 'b':
-	    params.beta = atof(optarg);
-	    break;
-	  case 'D':
-	    params.De = atof(optarg);
-	    break;
-	  case 'P':
-	    params.P = atof(optarg);
-	    break;
-	  case 't':
-	    dt = atof(optarg);
-	    break;
-	  case 's':
-	    stepsPerFrame = atoi(optarg);
-	    break;
-	  case 'T':
-	    numTimeSteps = atoi(optarg);
-	    break;
-	  case 'i':
-	    initTime = atof(optarg);
-	    break;
-	  case 'd':
-	    params.dealiasing = 1;
-	    printf("Dealiasing on\n");
-	    break;
-	  case 'O':
-	    params.oscillatory_flow = 1;
-	    printf("oscillatory flow\n");
-	    break;
-	  case '?':
-	    fprintf (stderr, "Option -%c requires an argument.\n", optopt);
-	    if (isprint (optopt))
-	      fprintf (stderr, "Unknown option `-%c'.\n", optopt);
-	    else
-	      fprintf (stderr,
-		       "Unknown option character `\\x%x'.\n",
-		       optopt);
-	      return 1;
-	  default:
-	    abort ();
-	  }
+	{
+	    case 'N':
+		params.N = atoi(optarg);
+		break;
+	    case 'M':
+		params.M = atoi(optarg);
+		break;
+	    case 'U':
+		params.U0 = atof(optarg);
+		break;
+	    case 'k':
+		params.kx = atof(optarg);
+		break;
+	    case 'R':
+		params.Re = atof(optarg);
+		break;
+	    case 'W':
+		params.Wi = atof(optarg);
+		break;
+	    case 'b':
+		params.beta = atof(optarg);
+		break;
+	    case 'D':
+		params.De = atof(optarg);
+		break;
+	    case 'P':
+		params.P = atof(optarg);
+		break;
+	    case 't':
+		dt = atof(optarg);
+		break;
+	    case 's':
+		stepsPerFrame = atoi(optarg);
+		break;
+	    case 'T':
+		numTimeSteps = atoi(optarg);
+		break;
+	    case 'i':
+		initTime = atof(optarg);
+		break;
+	    case 'd':
+		params.dealiasing = 1;
+		printf("Dealiasing on\n");
+		break;
+	    case 'O':
+		params.oscillatory_flow = 1;
+		printf("oscillatory flow\n");
+		break;
+	    case '?':
+		fprintf (stderr, "Option -%c requires an argument.\n", optopt);
+		if (isprint (optopt))
+		    fprintf (stderr, "Unknown option `-%c'.\n", optopt);
+		else
+		    fprintf (stderr,
+			    "Unknown option character `\\x%x'.\n",
+			    optopt);
+		return 1;
+	    default:
+		abort ();
+	}
 
     if (params.dealiasing == 1)
     {
@@ -160,6 +154,32 @@ int main(int argc, char **argv)
 	params.Mf = params.M;
     }
 
+//    DNS_2D_linear_Visco(params.oscillatory_flow, params.dealiasing, params.N,
+//	    params.Nf, params.M, params.Mf, params.U0, params.kx, params.Re, params.Wi, params.beta,
+//	    params.De, params.P, dt, stepsPerFrame, numTimeSteps, initTime);
+//
+//}
+
+//void DNS_2D_linear_Visco(int oscilFlag, int dealiasFlag, int N, int Nf, int M, int Mf, double U0, double kx,
+//	double Re, double Wi, double beta, double De, double P, double dt, int
+//	stepsPerFrame, int numTimeSteps, double initTime)
+//{
+
+    //initTime = 0;
+    //flow_params params;
+    //params.N = N;
+    //params.M = M;
+    //params.Nf = Nf;
+    //params.Mf = Mf;
+    //params.U0 = U0;
+    //params.kx = kx;
+    //params.Re = Re; 
+    //params.Wi = Wi;
+    //params.beta =beta;
+    //params.De = De;
+    //params.P = P; 
+    //params.dealiasing = dealiasFlag;
+    //params.oscillatory_flow = oscilFlag;
 
 
     printf("PARAMETERS: ");
@@ -181,7 +201,14 @@ int main(int argc, char **argv)
     int i, j;
     int N = params.N;
     int M = params.M;
+    int Nf = params.Nf;
     int Mf = params.Mf;
+    double KE0 = 1.0;
+    double KE1 = 0.0;
+    double KE_tot = 0.0;
+    double periods, phase;
+    double time = initTime;
+    int timeStep;
 
 
     trace_fn = "./output/trace.dat";
@@ -193,13 +220,13 @@ int main(int argc, char **argv)
     // Variables for HDF5 output
     hid_t hdf5final, hdf5fp, datatype_id, filetype_id;
     herr_t status;
-    
+
     // create the datatype for scipy complex numbers
     datatype_id = H5Tcreate(H5T_COMPOUND, sizeof (complex_hdf));
     status = H5Tinsert(datatype_id, "r",
-                HOFFSET(complex_hdf, r), H5T_NATIVE_DOUBLE);
+	    HOFFSET(complex_hdf, r), H5T_NATIVE_DOUBLE);
     status = H5Tinsert(datatype_id, "i",
-                HOFFSET(complex_hdf, i), H5T_NATIVE_DOUBLE);
+	    HOFFSET(complex_hdf, i), H5T_NATIVE_DOUBLE);
 
     // create the filetype for the scipy complex numbers
     filetype_id = H5Tcreate(H5T_COMPOUND, 8 + 8);
@@ -222,11 +249,11 @@ int main(int argc, char **argv)
     fftw_plan phys_plan, spec_plan;
 
     unsigned fftwFlag;
-    #ifdef MYDEBUG 
+#ifdef MYDEBUG 
     fftwFlag = FFTW_ESTIMATE;
-    #else
+#else
     fftwFlag = FFTW_MEASURE;
-    #endif
+#endif
 
     // dynamically malloc array of complex numbers.
     tmpop = (complex_d*) fftw_malloc(M*M * sizeof(complex_d));
@@ -306,9 +333,9 @@ int main(int argc, char **argv)
     // Set up some dft plans
     printf("\n------\nSetting up fftw3 plans\n------\n");
     phys_plan = fftw_plan_dft_1d(2*Mf-2,  scr.scratchin, scr.scratchout,
-			 FFTW_BACKWARD, fftwFlag);
+	    FFTW_BACKWARD, fftwFlag);
     spec_plan = fftw_plan_dft_1d(2*Mf-2,  scr.scratchin, scr.scratchout,
-			 FFTW_FORWARD, fftwFlag);
+	    FFTW_FORWARD, fftwFlag);
 
     scr.phys_plan = &phys_plan;
     scr.spec_plan = &spec_plan;
@@ -319,7 +346,7 @@ int main(int argc, char **argv)
     load_hdf5_state("forcing.h5", forcing, params);
     // load the initial field from scipy
     load_hdf5_state_visco("initial_visco.h5", psi, &cij[0], &cij[(N+1)*M],
-				&cij[2*(N+1)*M], params);
+	    &cij[2*(N+1)*M], params);
     for (i=0; i<3*(N+1)*M; i++)
     {
 	cijOld[i] = cij[i];
@@ -353,7 +380,7 @@ int main(int argc, char **argv)
 
     }
 
-    #ifdef MYDEBUG
+#ifdef MYDEBUG
     for (i=0; i<N+1; i++) 
     {
 	char fn[30];
@@ -380,11 +407,11 @@ int main(int argc, char **argv)
     save_hdf5_state("./output/cyy.h5", &cij[(N+1)*M], params);
     save_hdf5_state("./output/cxy.h5", &cij[2*(N+1)*M], params);
     save_hdf5_state("./output/forcing.h5", &forcing[0], params);
-    #endif
-    
+#endif
+
     // BEGIN TIME STEPPING
     // -------------------
-    
+
     printf("\n------\nperforming the time iteration\n------\n");
     printf("\nTime:\t\tKE_tot:\t\tKE0:\t\tKE1:\n");
 
@@ -405,8 +432,8 @@ int main(int argc, char **argv)
     KE_tot = KE0 + KE1;
 
     save_hdf5_snapshot_visco(&hdf5fp, &filetype_id, &datatype_id,
-	psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], 0.0, params);
-     
+	    psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], 0.0, params);
+
     fprintf(tracefp, "%e\t%e\t%e\t%e\n", 0.0, KE_tot, KE0, KE1);
 
     printf("%e\t%e\t%e\t%e\t\n", 0.0, KE_tot, KE0, KE1);
@@ -423,25 +450,25 @@ int main(int argc, char **argv)
 	time = timeStep*dt;
 
 	// Reset temporary variables for the new timestep
-        for (i=0; i<3*(N+1)*M; i++)
-        {
-            cijOld[i] = cij[i];
-            cijNL[i] = cij[i];
-        }
-        for (i=0; i<(N+1)*M; i++)
-        {
-            psiOld[i] = psi[i];
-            psiNL[i] = psi[i];
-        }
+	for (i=0; i<3*(N+1)*M; i++)
+	{
+	    cijOld[i] = cij[i];
+	    cijNL[i] = cij[i];
+	}
+	for (i=0; i<(N+1)*M; i++)
+	{
+	    psiOld[i] = psi[i];
+	    psiNL[i] = psi[i];
+	}
 
 
 	// OSCILLATING PRESSURE GRADIENT
 	// ----------------------------------
-	
+
 	if (params.oscillatory_flow != 0)
 	{
 	    // Calculate forcing for the half step 
-	    
+
 	    periods = floor(initTime/(2.0*M_PI));
 	    phase = initTime - 2.0*M_PI*periods;
 
@@ -452,16 +479,16 @@ int main(int argc, char **argv)
 	    // (the *nl variables)
 
 	    step_conformation_linear_oscil(cijOld, cijNL, psiOld, cijOld,
-						0.5*dt, scr, params);
+		    0.5*dt, scr, params);
 
 	    calc_base_cij(cijNL, (timeStep+0.5)*dt, scr, params);
 
 	    step_sf_linear_SI_oscil_visco(psiOld, psiNL, cijOld, cijNL, psiOld,
-			    forcing, forcingN, 0.5*dt, timeStep, hopsList, scr, params);
+		    forcing, forcingN, 0.5*dt, timeStep, hopsList, scr, params);
 
 	    calc_base_sf(psiNL, (timeStep+0.5)*dt, scr, params);
 
-	    #ifdef MYDEBUG 
+#ifdef MYDEBUG 
 	    // output when debugging
 	    save_hdf5_state("./output/psiStar.h5", &psiNL[0], params);
 	    save_hdf5_state("./output/cxxStar.h5", &cijNL[0], params);
@@ -508,22 +535,22 @@ int main(int argc, char **argv)
 	    save_hdf5_arr("./output/cyydyu.h5", scr.cyydyu, M);
 
 
-	    #endif // MYDEBUG
+#endif // MYDEBUG
 
 	    // Calculate forcing for the full step 
-	    
+
 	    forcing[ind(0,0)] = params.P*cos(time+0.5*dt + phase);
 	    forcingN[ind(0,0)] = params.P*cos((timeStep+1.0)*dt + phase);
 
 
 	    // Calculate flow at new time step
-	    
+
 	    step_conformation_linear_oscil(cijOld, cij, psiNL, cijNL, dt, scr, params);
 
 	    calc_base_cij(cij, (timeStep+1.0)*dt, scr, params);
 
 	    step_sf_linear_SI_oscil_visco(psiOld, psi, cijOld, cij, psiNL,
-				forcing, forcingN, dt, timeStep, opsList, scr, params);
+		    forcing, forcingN, dt, timeStep, opsList, scr, params);
 
 	    calc_base_sf(psi, (timeStep+1.0)*dt, scr, params);
 
@@ -531,7 +558,7 @@ int main(int argc, char **argv)
 	    //scr.scratch[1] = log(cabs((0.5*M_PI/params.Wi)*cij[ind(1,2)]));
 	    //fprintf(tracefp, "%f %20.18f %20.18f\n", (timeStep+1.0)*dt, creal(scr.scratch[0]), creal(scr.scratch[1]));
 
-	    #ifdef MYDEBUG 
+#ifdef MYDEBUG 
 	    // output when debugging
 
 	    save_hdf5_arr("./output/dycxy0New.h5", &scr.dycxy0N[0], M);
@@ -562,31 +589,31 @@ int main(int argc, char **argv)
 
 	    printf("\nFORCE END THE DEBUGGING RUN\n");
 	    break;
-	    #endif // MYDEBUG
+#endif // MYDEBUG
 
-	    
+
 	} else {
 	    // TIME INDEPENDENT PRESSURE GRADIENT
 	    // ----------------------------------
-	    
-	    step_conformation_linear_Crank_Nicolson(cijOld, cijNL, psiOld, cijOld,
-						0.5*dt, scr, params);
-	    step_sf_linear_SI_Crank_Nicolson_visco(psiOld, psiNL, cijOld, cijNL, psiOld,
-			    forcing, forcingN, 0.5*dt, timeStep, hopsList, scr, params);
 
-	    #ifdef MYDEBUG 
+	    step_conformation_linear_Crank_Nicolson(cijOld, cijNL, psiOld, cijOld,
+		    0.5*dt, scr, params);
+	    step_sf_linear_SI_Crank_Nicolson_visco(psiOld, psiNL, cijOld, cijNL, psiOld,
+		    forcing, forcingN, 0.5*dt, timeStep, hopsList, scr, params);
+
+#ifdef MYDEBUG 
 	    save_hdf5_state("./output/cxxN.h5", &cijNL[0], params);
 	    save_hdf5_state("./output/cyyN.h5", &cijNL[(N+1)*M], params);
 	    save_hdf5_state("./output/cxyN.h5", &cijNL[2*(N+1)*M], params);
 
 	    printf("\nFORCE END THE DEBUGGING RUN\n");
 	    break;
-	    #endif
+#endif
 
 	    step_conformation_linear_Crank_Nicolson(cijOld, cij, psiNL, cijNL, dt, scr, params);
 
 	    step_sf_linear_SI_Crank_Nicolson_visco(psiOld, psi, cijOld, cij, psiNL,
-				forcing, forcingN, dt, timeStep, opsList, scr, params);
+		    forcing, forcingN, dt, timeStep, opsList, scr, params);
 
 	}
 
@@ -594,7 +621,7 @@ int main(int argc, char **argv)
 
 	// OUTPUT DATA 
 	// -----------
-	
+
 	if (((timeStep+1) % stepsPerFrame) == 0 )
 	{
 
@@ -618,7 +645,7 @@ int main(int argc, char **argv)
 
 	    fprintf(trace1mode, "%e\t%e\t%e\t%e\t%e\n", 
 		    time, creal(scr.scratch[3]), cimag(scr.scratch[3]),
-		     creal(scr.scratch2[3]), cimag(scr.scratch2[3]));
+		    creal(scr.scratch2[3]), cimag(scr.scratch2[3]));
 
 	    for (j=M-1; j>=0; j=j-1)
 	    {
@@ -630,7 +657,7 @@ int main(int argc, char **argv)
 
 	    KE0 = calc_cheby_KE_mode(scr.U0, scr.U0, 0, params) * (15.0/ 8.0) * 0.5;
 	    KE1 = calc_cheby_KE_mode(scr.u, scr.v, 1, params) * (15.0/ 8.0);
-    
+
 	    KE_tot = KE0 + KE1;
 
 	    printf("%e\t%e\t%e\t%e\t\n", time, KE_tot, KE0, KE1);
@@ -639,11 +666,11 @@ int main(int argc, char **argv)
 	    // scr.scratch[0] = log(cabs((0.5*M_PI/params.Wi)*cij[2*(N+1)*M + ind(1,1)]));
 	    // scr.scratch[1] = log(cabs((0.5*M_PI/params.Wi)*cij[ind(1,2)]));
 	    // printf("%f %20.18f %20.18f\n", time , creal(scr.scratch[0]), creal(scr.scratch[1]));
-	    
-            save_hdf5_snapshot_visco(&hdf5fp, &filetype_id, &datatype_id,
-		psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], time, params);
-             
-	    
+
+	    save_hdf5_snapshot_visco(&hdf5fp, &filetype_id, &datatype_id,
+		    psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], time, params);
+
+
 	    fprintf(tracefp, "%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1);
 
 	    fflush(tracePSI);
@@ -656,11 +683,11 @@ int main(int argc, char **argv)
     }
 
     // save the final state
-    
+
     hdf5final = H5Fcreate("output/final.h5", H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 
     save_hdf5_state_visco(&hdf5final,
-    &filetype_id, &datatype_id, psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], params);
+	    &filetype_id, &datatype_id, psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], params);
 
 
 
@@ -711,7 +738,7 @@ int main(int argc, char **argv)
     fftw_free(scr.RHSvec);
 
     fftw_free(trC );
-		   
+
     fftw_free(cijOld );
     fftw_free(cij );
     fftw_free(cijNL );
@@ -742,6 +769,6 @@ int main(int argc, char **argv)
 
 
     printf("quitting c program\n");
-
     return 0;
+
 }

@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral linear time stepping code
 #
-#   Last modified: Wed 13 Jan 15:05:24 2016
+#   Last modified: Fri 15 Jan 12:01:42 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -116,6 +116,8 @@ initTime = args.initTime
 
 El = 1182.44
 Re = Wi / El 
+# lower the precision until I figure out how to wrap python properly.
+Re = float("{0:.6e}".format(Re))
 
 if dealiasing:
     Nf = (3*N)/2 + 1
@@ -575,8 +577,8 @@ NumTimeSteps\t= {NT}
 #kxList = r_[33.0:64.0:1.0]
 #kxList = concatenate((r_[2.0:20.0:2.0], r_[20.0:130.0:10.0]))
 #kxList = r_[2.0:64.0:2.0]
-kxList = r_[2.0:8.0:1.0]
-#kxList=[4.0]
+#kxList = r_[2.0:8.0:1.0]
+kxList = r_[20.0:50.0:2.0]
 
 stabOutStream = open('stability.dat', 'w')
 
@@ -813,7 +815,7 @@ for kx in kxList:
     period = 2*pi
     time_per_frame = ( totTime / numFrames )
     frames_per_period = period / time_per_frame
-    frameIndex = floor(10.0*frames_per_period) +1
+    frameIndex = int(floor(10.0*frames_per_period) +1)
 
     logPsiNorm1 = log(tracePSInorm[-frameIndex:, 2])
 

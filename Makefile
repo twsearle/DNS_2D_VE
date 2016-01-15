@@ -54,6 +54,8 @@ all : 	$(N_OBJ) $(V_OBJ) $(N_LIN_OBJ) $(V_LIN_OBJ)
 	$(CC) -o DNS_2D_linear_Visco $(V_LIN_OBJ) $(CFLAGS) $(LIBFLAGS) $(MYFLAGS)
 
 clean :
-	rm -f ./obj/*.o DNS_2D_Visco DNS_2D_Newt test_fields test_fields_1D 
+	rm -f ./obj/*.o 
+	rm -f DNS_2D_Visco DNS_2D_Newt test_fields test_fields_1D 
+	rm -f DNS_2D_linear_Visco DNS_2D_linear_Newt 
 	rm -f ./operators/*.h5
 	rm -f ./initial.h5

@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral linear time stepping code
 #
-#   Last modified: Wed 13 Jan 11:56:02 2016
+#   Last modified: Fri 15 Jan 11:58:43 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -120,6 +120,11 @@ Wi = args.Wi
 De = args.De
 kx = args.kx
 initTime = args.initTime
+
+print Re
+Re = float("{.6e}".format(Re))
+print Re
+exit(1)
 
 if dealiasing:
     #Nf = (3*N)/2 + 1
@@ -852,41 +857,41 @@ stepsPerFrame = numTimeSteps/numFrames
 
 # pass the flow variables and the time iteration settings to the C code
 cargs = ["./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
-         "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
-         "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
-         "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-         "{0:e}".format(CNSTS["beta"]), "-D",
-         "{0:e}".format(CNSTS["De"]),
-         "-P", "{0:e}".format(CNSTS["P"]),
-         "-t", "{0:e}".format(CNSTS["dt"]),
+         "{0:d}".format(CNSTS["M"]),"-U", "{0:.6e}".format(CNSTS["U0"]), "-k",
+         "{0:.6e}".format(CNSTS["kx"]), "-R", "{0:.6e}".format(CNSTS["Re"]),
+         "-W", "{0:.6e}".format(CNSTS["Wi"]), "-b",
+         "{0:.6e}".format(CNSTS["beta"]), "-D",
+         "{0:.6e}".format(CNSTS["De"]),
+         "-P", "{0:.6e}".format(CNSTS["P"]),
+         "-t", "{0:.6e}".format(CNSTS["dt"]),
          "-s", "{0:d}".format(stepsPerFrame), "-T",
-         "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime)]
+         "{0:d}".format(numTimeSteps), "-i", "{0:.6e}".format(initTime)]
 
 if dealiasing:
     cargs.append("-d")
 
     print "./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
-             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
-             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
-             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
-             "{0:e}".format(CNSTS["beta"]), "-D", "{0:e}".format(CNSTS["De"]),\
-             "-P", "{0:e}".format(CNSTS["P"]), \
-             "-t", "{0:e}".format(CNSTS["dt"]),\
+             "{0:d}".format(CNSTS["M"]),"-U", "{0:.6e}".format(CNSTS["U0"]), "-k",\
+             "{0:.6e}".format(CNSTS["kx"]), "-R", "{0:.6e}".format(CNSTS["Re"]),\
+             "-W", "{0:.6e}".format(CNSTS["Wi"]), "-b",\
+             "{0:.6e}".format(CNSTS["beta"]), "-D", "{0:.6e}".format(CNSTS["De"]),\
+             "-P", "{0:.6e}".format(CNSTS["P"]), \
+             "-t", "{0:.6e}".format(CNSTS["dt"]),\
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
-             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime), "-d"
+             "{0:d}".format(numTimeSteps), "-i", "{0:.6e}".format(initTime), "-d"
 
 else:
 
     print "./DNS_2D_linear_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
-             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
-             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
-             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
-             "{0:e}".format(CNSTS["beta"]), "-De",\
-            "{0:e}".format(CNSTS[""]),\
-             "-P", "{0:e}".format(CNSTS["P"]), \
-             "-t", "{0:e}".format(CNSTS["dt"]),\
+             "{0:d}".format(CNSTS["M"]),"-U", "{0:.6e}".format(CNSTS["U0"]), "-k",\
+             "{0:.6e}".format(CNSTS["kx"]), "-R", "{0:.6e}".format(CNSTS["Re"]),\
+             "-W", "{0:.6e}".format(CNSTS["Wi"]), "-b",\
+             "{0:.6e}".format(CNSTS["beta"]), "-De",\
+            "{0:.6e}".format(CNSTS[""]),\
+             "-P", "{0:.6e}".format(CNSTS["P"]), \
+             "-t", "{0:.6e}".format(CNSTS["dt"]),\
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
-             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime)
+             "{0:d}".format(numTimeSteps), "-i", "{0:.6e}".format(initTime)
 
 if args.flow_type==2:
     cargs.append("-O")
