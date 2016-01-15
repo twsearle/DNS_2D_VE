@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri 15 Jan 11:56:25 2016
+// Last modified: Fri 15 Jan 14:14:47 2016
 
 /* Program Description:
  *
@@ -210,6 +210,7 @@ int main(int argc, char **argv)
     double time = initTime;
     int timeStep;
 
+    int save_traj = 0;
 
     trace_fn = "./output/trace.dat";
     traj_fn = "./output/traj.h5";
@@ -233,8 +234,11 @@ int main(int argc, char **argv)
     status = H5Tinsert(filetype_id, "r", 0, H5T_NATIVE_DOUBLE);
     status = H5Tinsert(filetype_id, "i", 8, H5T_NATIVE_DOUBLE);
 
-    // create Hdf5 output file
-    hdf5fp = H5Fcreate(traj_fn, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    if (save_traj==1)
+    {
+	// create Hdf5 output file
+	hdf5fp = H5Fcreate(traj_fn, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    }
 
     // field arrays are declared as pointers and then I malloc.
     complex_d *psi, *psiOld, *forcing;
@@ -431,8 +435,11 @@ int main(int argc, char **argv)
 
     KE_tot = KE0 + KE1;
 
+    if (save_traj==1)
+    {
     save_hdf5_snapshot_visco(&hdf5fp, &filetype_id, &datatype_id,
 	    psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], 0.0, params);
+    }
 
     fprintf(tracefp, "%e\t%e\t%e\t%e\n", 0.0, KE_tot, KE0, KE1);
 
@@ -660,15 +667,22 @@ int main(int argc, char **argv)
 
 	    KE_tot = KE0 + KE1;
 
-	    printf("%e\t%e\t%e\t%e\t\n", time, KE_tot, KE0, KE1);
+	    if (save_traj==1)
+	    {
+		printf("%e\t%e\t%e\t%e\t\n", time, KE_tot, KE0, KE1);
+	    }
 
 	    // **** STUPID TESTS ****
 	    // scr.scratch[0] = log(cabs((0.5*M_PI/params.Wi)*cij[2*(N+1)*M + ind(1,1)]));
 	    // scr.scratch[1] = log(cabs((0.5*M_PI/params.Wi)*cij[ind(1,2)]));
 	    // printf("%f %20.18f %20.18f\n", time , creal(scr.scratch[0]), creal(scr.scratch[1]));
+	    
 
-	    save_hdf5_snapshot_visco(&hdf5fp, &filetype_id, &datatype_id,
-		    psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], time, params);
+	    if (save_traj==1)
+	    {
+		save_hdf5_snapshot_visco(&hdf5fp, &filetype_id, &datatype_id,
+			psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], time, params);
+	    }
 
 
 	    fprintf(tracefp, "%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1);
@@ -676,7 +690,10 @@ int main(int argc, char **argv)
 	    fflush(tracePSI);
 	    fflush(trace1mode);
 	    fflush(tracefp);
-	    H5Fflush(hdf5fp, H5F_SCOPE_GLOBAL);
+	    if (save_traj==1)
+	    {
+		H5Fflush(hdf5fp, H5F_SCOPE_GLOBAL);
+	    }
 
 	}
 
@@ -698,8 +715,8 @@ int main(int argc, char **argv)
     // clean up hdf5
     status = H5Tclose(datatype_id);
     status = H5Tclose(filetype_id);
-    status = H5Fclose(hdf5fp);
     status = H5Fclose(hdf5final);
+    if (save_traj==1) { status = H5Fclose(hdf5fp); }
 
     // garbage collection
     fftw_destroy_plan(phys_plan);

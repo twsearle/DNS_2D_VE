@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral linear time stepping code
 #
-#   Last modified: Fri 15 Jan 11:58:43 2016
+#   Last modified: Fri 15 Jan 15:03:03 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -121,10 +121,7 @@ De = args.De
 kx = args.kx
 initTime = args.initTime
 
-print Re
-Re = float("{.6e}".format(Re))
-print Re
-exit(1)
+Re = float("{0:.6e}".format(Re))
 
 if dealiasing:
     #Nf = (3*N)/2 + 1
@@ -734,43 +731,34 @@ psiLam = copy(PSI)
 perAmp = 1.0e-6
 
 #rn = (10.0**(-1))*(0.5-rand(5))
-#rn = (10.0**(-1))*array([-0.43,-0.234,0.2134,-0.134,0.7653683])
-#rSpace = zeros(M, dtype='complex')
-#y = 2.0*arange(M)/(M-1.0) -1.0
-#
-## sinusoidal
-#rSpace =  perAmp*sin(1.0 * pi * y) * rn[0]
-#rSpace += perAmp*sin(2.0 * pi * y) * rn[1]
-#rSpace += perAmp*sin(3.0 * pi * y) * rn[2]
-### cosinusoidal 
-#rSpace += perAmp*cos(1.0 * 0.5*pi * y) * rn[3]
-#rSpace += perAmp*cos(3.0 * 0.5*pi * y) * rn[4]
-#
-#
-## low order eigenfunction of biharmonic operator
-##rSpace = (sin(pscale * y)/(pscale*cos(pscale)) - sinh(gam*y)/(gam*cosh(gam))) * rn[0]
-#
-#PSI[(N+1)*M:(N+2)*M] = stupid_transform(rSpace, CNSTS)
+rn = ones(5)
 
-#perturbation similar to that used in stupid code
-#rspace = perAmp*tanh(arange(Mf)*pi/(Mf-1.)) * (1.0 + 1.j);
-#ypoints = cos(arange(Mf)*pi/(Mf-1.))
-#rspace = perAmp*sin(2.0*pi*ypoints) * (1.0 + 1.j);
-#rspace += perAmp*sin(3.0*pi*ypoints) * (1.0 + 1.j);
-###rspace = perAmp*(arange(Mf)[::-1])*1.j
-#PSI[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(real(rspace), CNSTS)
-#PSI[(N+1)*M:(N+2)*M] += 1.j*f2d.forward_cheb_transform(imag(rspace), CNSTS)
-#
-#PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
+rSpace = zeros(Mf, dtype='complex')
+y = 2.0*arange(Mf)/(Mf-1.0) -1.0
+
+## sinusoidal
+rSpace =  perAmp*sin(1.0 * pi * y) * rn[0]
+rSpace += perAmp*sin(2.0 * pi * y) * rn[1]
+rSpace += perAmp*sin(3.0 * pi * y) * rn[2]
+
+## cosinusoidal 
+rSpace += perAmp*cos(1.0 * 0.5*pi * y) * rn[3]
+rSpace += perAmp*cos(3.0 * 0.5*pi * y) * rn[4]
+
+
+PSI[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(rSpace, CNSTS)
+PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
+#Cxx[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(rSpace, CNSTS)
+#Cxx[(N-1)*M:(N)*M] = conj(Cxx[(N+1)*M:(N+2)*M])
 
 # perturbation used in pythonic test code.
-Cxx[(N+1)*M + 2] = perAmp * (Wi*2./pi)
-Cxx[(N-1)*M + 2] = perAmp * (Wi*2./pi)
+#Cxx[(N+1)*M + 2] = perAmp * (Wi*2./pi)
+#Cxx[(N-1)*M + 2] = perAmp * (Wi*2./pi)
+#
+#Cxy[(N+1)*M + 1] = perAmp * (Wi*2./pi)
+#Cxy[(N-1)*M + 1] = perAmp * (Wi*2./pi)
 
-Cxy[(N+1)*M + 1] = perAmp * (Wi*2./pi)
-Cxy[(N-1)*M + 1] = perAmp * (Wi*2./pi)
-
-print log(abs(perAmp))
+#print log(abs(perAmp))
 
 # ----------------------------------------------------------------------------
 print type(psiLam)
