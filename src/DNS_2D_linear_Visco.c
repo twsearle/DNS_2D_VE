@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri 15 Jan 14:14:47 2016
+// Last modified: Mon 18 Jan 16:03:57 2016
 
 /* Program Description:
  *
@@ -198,6 +198,7 @@ int main(int argc, char **argv)
 
     FILE *tracefp, *tracePSI, *trace1mode;
     char *trace_fn, *traj_fn;
+    char trPSI_fn[100]=" ";
     int i, j;
     int N = params.N;
     int M = params.M;
@@ -215,7 +216,9 @@ int main(int argc, char **argv)
     trace_fn = "./output/trace.dat";
     traj_fn = "./output/traj.h5";
     tracefp = fopen(trace_fn, "w");
-    tracePSI = fopen("./output/tracePSI.dat", "w");
+
+    sprintf(trPSI_fn, "./output/tracePSI_kx%06.3f.dat", params.kx);
+    tracePSI = fopen(trPSI_fn, "w");
     trace1mode = fopen("./output/traceMode.dat", "w");
 
     // Variables for HDF5 output
