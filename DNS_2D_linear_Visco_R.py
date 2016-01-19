@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral linear time stepping code
 #
-#   Last modified: Fri 15 Jan 16:23:45 2016
+#   Last modified: Tue 19 Jan 12:21:51 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -802,7 +802,7 @@ for kx in kxList:
 
     # Read in data from the C code
 
-    tracePSInorm  = genfromtxt('./output/tracePSI.dat', 'double')
+    tracePSInorm  = genfromtxt('./output/tracePSI_kx{0:06.3f}.dat'.format(CNSTS["kx"]), 'double')
 
     # calculate timestep 10 periods ago.
     period = 2*pi
