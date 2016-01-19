@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral linear time stepping code
 #
-#   Last modified: Tue 19 Jan 12:21:51 2016
+#   Last modified: Tue 19 Jan 18:41:16 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -81,6 +81,13 @@ totTime = config.getfloat('Time Iteration', 'totTime')
 numFrames = config.getint('Time Iteration', 'numFrames')
 dealiasing = config.getboolean('Time Iteration', 'Dealiasing')
 
+dt = config.getfloat('Time Iteration', 'dt')
+
+kxInit = config.getfloat('Linear Stability', 'kxInit')
+kxFinal = config.getfloat('Linear Stability', 'kxFinal')
+kxStep = config.getfloat('Linear Stability', 'kxStep')
+
+
 fp.close()
 
 argparser = argparse.ArgumentParser()
@@ -97,6 +104,12 @@ argparser.add_argument("-Wi", type=float, default=Wi,
                 help='Override Weissenberg number of the config file')
 argparser.add_argument("-initTime", type=float, default=0.0, 
                 help='Start simulation from a different time')
+argparser.add_argument("-kxInit", type=float, default=kxInit, 
+                help='Initial wavenumber for time iteration linear stability')
+argparser.add_argument("-kxStep", type=float, default=kxStep, 
+                help='Step wavenumber for time iteration linear stability')
+argparser.add_argument("-kxFinal", type=float, default=kxFinal, 
+                help='Final wavenumber for time iteration linear stability')
 tmp = """simulation type, 
             0: Poiseuille
             1: Shear Layer
@@ -570,13 +583,32 @@ NumTimeSteps\t= {NT}
                    De=De, delta=delta,
                    dt=dt, NT=numTimeSteps, t=totTime)
 
-#kxList = concatenate((r_[2.0:20.0:2.0], r_[20.0:130.0:10.0]))
-kxList = r_[0.2:10.0:0.2] # 50 points 
+stabFilename = './output/stability.dat'
+
+# check progress
+try:
+    with open(stabFilename, 'rb') as f:
+        f.seek(-2, 2)            # Jump to the second last byte.
+        while f.read(1) != "\n": # Until EOL is found...
+            f.seek(-2, 1)        # ...jump back the read byte plus one more.
+        lastLine = f.readline() 
+        kxLast = float(lastLine.split()[0])
+       
+    # resume output at the last kx + the difference
+    print 'resuming instability calculation'
+    kxList = r_[kxLast:kxFinal+kxStep:kxStep]
+
+except IOError:
+# else start from the supplied initial kx
+    print 'beginning new stability file.'
+    kxList= r_[kxInit:kxFinal+kxStep:kxStep]
+
+#kxList = r_[0.2:10.0:0.2] # 50 points 
 #kxList = r_[10.0:41.0:1.0] # 30 points
 
-stabOutStream = open(
-    './output/stability.dat',
-    'w')
+# open the file for appending
+stabOutStream = open('./output/stability.dat','a')
+
 
 for kx in kxList:
     print kx
