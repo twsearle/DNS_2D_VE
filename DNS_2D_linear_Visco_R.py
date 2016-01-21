@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral linear time stepping code
 #
-#   Last modified: Tue 19 Jan 18:41:16 2016
+#   Last modified: Thu 21 Jan 11:28:39 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -593,10 +593,14 @@ try:
             f.seek(-2, 1)        # ...jump back the read byte plus one more.
         lastLine = f.readline() 
         kxLast = float(lastLine.split()[0])
+
+    if kxLast == kxFinal:
+        print 'instability calculation already finished'
+        exit(1)
        
     # resume output at the last kx + the difference
     print 'resuming instability calculation'
-    kxList = r_[kxLast:kxFinal+kxStep:kxStep]
+    kxList = r_[kxLast+kxStep:kxFinal+kxStep:kxStep]
 
 except IOError:
 # else start from the supplied initial kx
