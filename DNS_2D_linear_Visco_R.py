@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral linear time stepping code
 #
-#   Last modified: Thu 21 Jan 11:28:39 2016
+#   Last modified: Fri 22 Jan 16:34:47 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -841,10 +841,11 @@ for kx in kxList:
     tracePSInorm  = genfromtxt('./output/tracePSI_kx{0:06.3f}.dat'.format(CNSTS["kx"]), 'double')
 
     # calculate timestep 10 periods ago.
+    numPeriods = 20.0
     period = 2*pi
     time_per_frame = ( totTime / numFrames )
     frames_per_period = period / time_per_frame
-    frameIndex = int(floor(10.0*frames_per_period) +1)
+    frameIndex = int(floor(numPeriods*frames_per_period) +1)
 
     logPsiNorm1 = log(tracePSInorm[-frameIndex:, 2])
 

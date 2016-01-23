@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 18 Jan 16:03:57 2016
+// Last modified: Sat 23 Jan 12:22:38 2016
 
 /* Program Description:
  *
@@ -690,17 +690,25 @@ int main(int argc, char **argv)
 
 	    fprintf(tracefp, "%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1);
 
-	    fflush(tracePSI);
-	    fflush(trace1mode);
-	    fflush(tracefp);
-	    if (save_traj==1)
+	    // make sure file flush doesn't happen too often
+	    if (((timeStep+1) % 100) == 0 )
 	    {
-		H5Fflush(hdf5fp, H5F_SCOPE_GLOBAL);
+
+		fflush(tracePSI);
+		fflush(trace1mode);
+		fflush(tracefp);
+
+		if (save_traj==1)
+		{
+		    H5Fflush(hdf5fp, H5F_SCOPE_GLOBAL);
+		}
 	    }
+
 
 	}
 
     }
+
 
     // save the final state
 
