@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Tue  5 Jan 11:37:17 2016
+#   Last modified: Thu 28 Jan 14:15:12 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -823,7 +823,7 @@ psiLam = copy(PSI)
 #PSI[(N)*M+1] += lsd *(155./64. - 4. )
 #PSI[(N)*M+0] += lsd *(1./8) 
 
-perAmp = 1e-6
+perAmp = 0#1e-12
 #y = 2.0*arange(M)/(M-1.0) -1.0
 
 #for n in range(1,N+1-N/3):
@@ -964,51 +964,34 @@ stepsPerFrame = numTimeSteps/numFrames
 # Run program in C
 
 # pass the flow variables and the time iteration settings to the C code
+
+# pass the flow variables and the time iteration settings to the C code
+cargs = ["./DNS_2D_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
+         "{0:d}".format(CNSTS["M"]),"-U", "{0:.6e}".format(CNSTS["U0"]), "-k",
+         "{0:.6e}".format(CNSTS["kx"]), "-R", "{0:.6e}".format(CNSTS["Re"]),
+         "-W", "{0:.6e}".format(CNSTS["Wi"]), "-b",
+         "{0:.6e}".format(CNSTS["beta"]), "-D",
+         "{0:.6e}".format(CNSTS["De"]),
+         "-P", "{0:.6e}".format(CNSTS["P"]),
+         "-t", "{0:.6e}".format(CNSTS["dt"]),
+         "-s", "{0:d}".format(stepsPerFrame), "-T",
+         "{0:d}".format(numTimeSteps), "-i", "{0:.6e}".format(initTime)]
+
+if args.flow_type==2:
+    cargs.append("-O")
+
 if dealiasing:
+    cargs.append("-d")
 
     print "./DNS_2D_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
-             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
-             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
-             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
-             "{0:e}".format(CNSTS["beta"]), "-D", "{0:e}".format(CNSTS["De"]),\
-             "-P", "{0:e}".format(CNSTS["P"]), \
-             "-t", "{0:e}".format(CNSTS["dt"]),\
+             "{0:d}".format(CNSTS["M"]),"-U", "{0:.6e}".format(CNSTS["U0"]), "-k",\
+             "{0:.6e}".format(CNSTS["kx"]), "-R", "{0:.6e}".format(CNSTS["Re"]),\
+             "-W", "{0:.6e}".format(CNSTS["Wi"]), "-b",\
+             "{0:.6e}".format(CNSTS["beta"]), "-D", "{0:.6e}".format(CNSTS["De"]),\
+             "-P", "{0:.6e}".format(CNSTS["P"]), \
+             "-t", "{0:.6e}".format(CNSTS["dt"]),\
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
-             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime), "-d"
-
-    cargs = ["./DNS_2D_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
-             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
-             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
-             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-D",
-             "{0:e}".format(CNSTS["De"]),
-             "-P", "{0:e}".format(CNSTS["P"]),
-             "-t", "{0:e}".format(CNSTS["dt"]),
-             "-s", "{0:d}".format(stepsPerFrame), "-T",
-             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime), "-d"]
-
-else:
-    cargs = ["./DNS_2D_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
-             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",
-             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),
-             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",
-             "{0:e}".format(CNSTS["beta"]), "-D",
-             "{0:e}".format(CNSTS["De"]),
-             "-P", "{0:e}".format(CNSTS["P"]),
-             "-t", "{0:e}".format(CNSTS["dt"]),
-             "-s", "{0:d}".format(stepsPerFrame), "-T",
-             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime)]
-
-    print "./DNS_2D_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
-             "{0:d}".format(CNSTS["M"]),"-U", "{0:e}".format(CNSTS["U0"]), "-k",\
-             "{0:e}".format(CNSTS["kx"]), "-R", "{0:e}".format(CNSTS["Re"]),\
-             "-W", "{0:e}".format(CNSTS["Wi"]), "-b",\
-             "{0:e}".format(CNSTS["beta"]), "-De",\
-            "{0:e}".format(CNSTS[""]),\
-             "-P", "{0:e}".format(CNSTS["P"]), \
-             "-t", "{0:e}".format(CNSTS["dt"]),\
-             "-s", "{0:d}".format(stepsPerFrame), "-T",\
-             "{0:d}".format(numTimeSteps), "-i", "{0:e}".format(initTime)
+             "{0:d}".format(numTimeSteps), "-i", "{0:.6e}".format(initTime), "-d"
 
 subprocess.call(cargs)
 

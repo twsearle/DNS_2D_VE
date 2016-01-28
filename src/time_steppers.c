@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu 10 Dec 16:44:31 2015
+// Last modified: Thu 28 Jan 14:27:29 2016
 
 #include"fields_2D.h"
 #include"fields_IO.h"
@@ -1169,7 +1169,7 @@ void step_sf_SI_oscil_visco(
 	scr.RHSvec[M-2] = 0;
 	scr.RHSvec[M-1] = 0;
 
-	//#ifdef MYDEBUG
+	#ifdef MYDEBUG
 	if(timeStep==0)
 	{
 	    char fn[30];
@@ -1177,7 +1177,7 @@ void step_sf_SI_oscil_visco(
 	    printf("writing %s\n", fn);
 	    save_hdf5_arr(fn, &scr.RHSvec[0], M);
 	}
-	//#endif
+	#endif
 
 	// perform dot product to calculate new streamfunction.
 	for (j=M-1; j>=0; j=j-1)
