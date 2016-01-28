@@ -10,7 +10,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu 14 Jan 12:24:38 2016
+// Last modified: Thu 28 Jan 14:59:28 2016
 
 #include"fields_1D.h"
 #include"fields_IO.h"
@@ -1367,8 +1367,6 @@ void calc_base_sf(
 	//printf("psi %f+%fI\n", creal(scr.scratchp1[i]), cimag(scr.scratchp1[i]));
 
     }
-
-    save_hdf5_arr("./output/psibase.h5", &scr.scratchp1[0], M);
 
     // psi
     to_cheby_spectral(scr.scratchp1, &psi[0], scr, params);

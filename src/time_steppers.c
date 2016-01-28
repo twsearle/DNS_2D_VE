@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu 28 Jan 14:27:29 2016
+// Last modified: Thu 28 Jan 16:03:23 2016
 
 #include"fields_2D.h"
 #include"fields_IO.h"
@@ -1395,3 +1395,168 @@ void equilibriate_stress(
     free(trC);
 }
 
+void calc_base_cij(
+	complex_d *cij, double time, flow_scratch scr, flow_params params)
+{
+
+    if (params.oscillatory_flow == 0) 
+    {
+	printf("NOT OSCILLATORY FLOW!");
+	exit(1);
+    }
+
+    int i,j;
+    int N = params.N;
+    int M = params.M;
+    int Nf = params.Nf;
+    int Mf = params.Mf;
+
+    double Re = params.Re;
+    double Wi = params.Wi;
+    double De = params.De;
+    double beta = params.beta;
+    double y;
+
+    complex_d tmp = beta + (1.-beta) / (1. + 1.*I*De);
+    //printf("tmp %16.14f+%16.14fI\n", creal(tmp), cimag(tmp));
+
+    complex_d alpha = csqrt( (I*M_PI*Re*De) / (2.*Wi*tmp) );
+    //printf("alpha %16.14f+%16.14fI\n", creal(alpha), cimag(alpha));
+
+    complex_d Chi = creal( (1.-I)*(1. - ctanh(alpha) / alpha) );
+    //printf("Chi %16.14f+%16.14fI\n", creal(Chi), cimag(Chi));
+
+    complex_d dyu_cmplx = 0;
+    complex_d cxy_cmplx = 0;
+    complex_d cxx_cmplx = 0;
+
+
+    for(i=0; i<params.Mf; i++)
+    {
+        y = cos(M_PI*i/(params.Mf-1.));
+
+
+        dyu_cmplx = M_PI/(2.*I*Chi) *(-alpha*csinh(alpha*y)/(ccosh(alpha)));
+        cxy_cmplx = (1.0/(1.0+I*De)) * ((2*Wi/M_PI) * dyu_cmplx);
+
+        cxx_cmplx = (1.0/(1.0+2.*I*De))*(Wi/M_PI)*(cxy_cmplx*dyu_cmplx)*cexp(2.*I*time);
+	cxx_cmplx +=(1.0/(1.0-2.*I*De))*(Wi/M_PI)*(conj(cxy_cmplx)*conj(dyu_cmplx))*cexp(-2.*I*time); 
+        cxx_cmplx += 1. + (params.Wi/M_PI)*( cxy_cmplx*conj(dyu_cmplx) + conj(cxy_cmplx)*dyu_cmplx ); 
+
+	for(j=0; j<2*params.Nf+1; j++)
+	{
+        scr.scratchp3[indfft(j,i)] = creal( cxy_cmplx * cexp(I*time) );
+        scr.scratchp2[indfft(j,i)] = creal(cxx_cmplx);
+	}
+    }
+
+    // cxx
+    to_spectral_r(scr.scratchp2, &scr.scratch[0], scr, params);
+    // cxy
+    to_spectral_r(scr.scratchp3, &scr.scratch2[0], scr, params);
+
+    for(j=0; j<M; j++)
+    {
+	cij[ind(0,j)] = scr.scratch[j];
+	cij[2*(N+1)*M + ind(0,j)] = scr.scratch2[j];
+    }
+    /*
+    for (i=0; i<params.M; i++)
+    {
+	cij[ind(0,i)] = 0.0;
+	cij[2*(N+1)*M + ind(0,i)] = 0.0;
+    }
+
+    // Cxy = Wi * U'
+    cij[2*(N+1)*M + ind(0,1)] = Wi * -2.0 * cos(time);
+    // Cxx = Wi^2 * U'^2
+    cij[ind(0,0)] = (Wi*Wi * 2.0) * cos(time)*cos(time) + 1.0;
+    cij[ind(0,2)] = Wi*Wi * 2.0 * cos(time)*cos(time);
+    */
+    
+    // mean flow, so must have zero imaginary part!
+    for (i=0; i<params.M; i++)
+    {
+	cij[ind(0,i)] = creal(cij[ind(0,i)]);
+	cij[(N+1)*M + ind(0,i)] = 0.0;
+	cij[2*(N+1)*M + ind(0,i)] = creal(cij[2*(N+1)*M + ind(0,i)]);
+    }
+    cij[(N+1)*M + ind(0,0)] = 1.0;
+
+}
+
+void calc_base_sf(
+	complex_d *psi, double time, flow_scratch scr, flow_params params)
+{
+    if (params.oscillatory_flow == 0) 
+    {
+	printf("NOT OSCILLATORY FLOW!");
+	exit(1);
+    }
+    int i, j;
+    int N = params.N;
+    int M = params.M;
+    int Nf = params.Nf;
+    int Mf = params.Mf;
+
+    double Re = params.Re;
+    double Wi = params.Wi;
+    double De = params.De;
+    double beta = params.beta;
+    double y;
+
+    complex_d tmp = beta + (1.-beta) / (1. + 1.*I*De);
+    //printf("tmp %16.14f+%16.14fI\n", creal(tmp), cimag(tmp));
+
+    complex_d alpha = csqrt( (I*M_PI*Re*De) / (2.*Wi*tmp) );
+    //printf("alpha %16.14f+%16.14fI\n", creal(alpha), cimag(alpha));
+
+    complex_d Chi = creal( (1.-I)*(1. - ctanh(alpha) / alpha) );
+    //printf("Chi %16.14f+%16.14fI\n", creal(Chi), cimag(Chi));
+
+    complex_d psi_im = 0;
+
+    for(i=0; i<params.Mf; i++)
+    {
+	y = cos(M_PI*i/(params.Mf-1.));
+
+	psi_im = M_PI/(2.*I*Chi) *( y - csinh(alpha*y)/(alpha*ccosh(alpha))
+				      + csinh(alpha*-1.)/(alpha*ccosh(alpha)) );
+
+	for(j=0; j<2*params.Nf+1; j++)
+	{
+	    scr.scratchp1[indfft(j,i)] = creal(psi_im * cexp(I*time));
+	    //printf("psi %f+%fI\n", creal(scr.scratchp1[i]), cimag(scr.scratchp1[i]));
+	}
+    }
+
+    // psi
+    to_spectral_r(scr.scratchp1, &scr.scratch[0], scr, params);
+
+    for(i=0; i<M; i++)
+    {
+	psi[ind(0,i)] = scr.scratch[ind(0,i)];
+    }
+
+    // Poiseuille flow
+    /*
+    for (i=0; i<params.M; i++)
+    {
+	psi[ind(0,i)] = 0;
+    }
+
+    psi[ind(0,0)] = 2.0/3.0 * cos(time);
+               
+    psi[ind(0,1)] = 3.0/4.0 * cos(time);
+               
+    psi[ind(0,2)] = 0.0 * cos(time);
+               
+    psi[ind(0,3)] = -1.0/12.0 * cos(time);
+    */
+
+    for (i=0; i<params.M; i++)
+    {
+	psi[ind(0,i)] = creal(psi[ind(0,i)]);
+    }
+
+}

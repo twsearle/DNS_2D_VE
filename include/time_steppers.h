@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Wed 11 Nov 11:06:59 2015
+// Last modified: Thu 28 Jan 14:55:42 2016
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -47,6 +47,12 @@ void equilibriate_stress(
 	complex_d *cijNL, double dt,flow_scratch scr, flow_params params, hid_t
 	*file_id, hid_t *filetype_id, hid_t *datatype_id
 	);
+
+void calc_base_cij(
+	complex_d *cij, double time, flow_scratch scr, flow_params params);
+
+void calc_base_sf(
+	complex_d *psi, double time, flow_scratch scr, flow_params params);
 
 #endif // TIME_STEPPERS_H
 

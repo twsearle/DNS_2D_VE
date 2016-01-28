@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Sat 23 Jan 12:22:38 2016
+// Last modified: Thu 28 Jan 15:54:25 2016
 
 /* Program Description:
  *
@@ -424,6 +424,9 @@ int main(int argc, char **argv)
 
     // calculate and output t=0 quantities
     // u
+    calc_base_cij(cij, 0.0, scr, params);
+    calc_base_sf(psi, 0.0, scr, params);
+
     single_dy(&psi[ind(0,0)], scr.U0, params);
     single_dy(&psi[ind(1,0)], scr.u, params);
 

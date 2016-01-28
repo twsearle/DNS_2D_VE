@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu 28 Jan 14:26:49 2016
+// Last modified: Thu 28 Jan 16:05:02 2016
 
 /* Program Description:
  *
@@ -321,6 +321,7 @@ int main(int argc, char **argv)
 
     scr.scratchp1 = (double*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(double));
     scr.scratchp2 = (double*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(double));
+    scr.scratchp3 = (double*) fftw_malloc((2*Mf-2)*(2*Nf+1) * sizeof(double));
 
     scr.RHSvec = (complex_d*) fftw_malloc(M * sizeof(complex_d));
 
@@ -422,6 +423,13 @@ int main(int argc, char **argv)
     //	    		&hdf5fp, &filetype_id, &datatype_id);
     #endif
 
+    // Cant get the oscillatory laminar flow working in python, so I did it here
+    if (params.oscillatory_flow != 0)
+    {
+	calc_base_cij(cij, 0.0, scr, params);
+	calc_base_sf(psi, 0.0, scr, params);
+    }
+
     save_hdf5_snapshot_visco(&hdf5fp, &filetype_id, &datatype_id,
 	 psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], 0.0, params);
 
@@ -429,6 +437,35 @@ int main(int argc, char **argv)
     // perform the time iteration
     printf("\n------\nperforming the time iteration\n------\n");
     printf("\nTime\t\tKE_tot\t\t KE0\t\t KE1\t\t EE0\n");
+
+    dy(psi, scr.u, params);
+
+    // v
+    dx(psi, scr.v, params);
+    for(i=0; i<N+1; i++)
+    {
+	for(j=0; j<M; j++)
+	{
+	    scr.v[ind(i,j)] = -scr.v[ind(i,j)];
+	}
+    }
+    KE0 = calc_KE_mode(scr.u, scr.v, 0, params) * (15.0/ 8.0);
+    KE1 = calc_KE_mode(scr.u, scr.v, 1, params) * (15.0/ 8.0);
+    KE2 = calc_KE_mode(scr.u, scr.v, 2, params) * (15.0/ 8.0);
+
+    KE_xdepend = KE1 + KE2; 
+    for (i=3; i<N+1; i++)
+    {
+	KE_xdepend += calc_KE_mode(scr.u, scr.v, i, params) * (15.0/ 8.0);
+    }
+
+    KE_tot = KE0 + KE_xdepend;
+    posdefck = trC_tensor(cij, trC, scr, params);
+    calc_EE_mode(&trC[0], 0, params);
+    EE0 = calc_EE_mode(&trC[0], 0, params);
+
+    printf("%e\t%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1, EE0);
+    fprintf(tracefp, "%e\t%e\t%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1, KE2, KE_xdepend);
 
     for (timeStep=0; timeStep<numTimeSteps; timeStep++)
     {
@@ -715,6 +752,7 @@ int main(int argc, char **argv)
     fftw_free(scr.scratchout);
     fftw_free(scr.scratchp1);
     fftw_free(scr.scratchp2);
+    fftw_free(scr.scratchp3);
     fftw_free(scr.dyyypsi);
     fftw_free(scr.d4ypsi);
     fftw_free(scr.d4xpsi);

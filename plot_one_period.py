@@ -25,7 +25,7 @@ kx = config.getfloat('General', 'kx')
 Nf = 4*N
 Mf = 2*M
 
-varName = 'cxx'
+varName = 'psi'
 
 dt = config.getfloat('Time Iteration', 'dt')
 totTime = config.getfloat('Time Iteration', 'totTime')

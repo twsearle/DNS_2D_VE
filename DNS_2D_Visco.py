@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Thu 28 Jan 14:15:12 2016
+#   Last modified: Thu 28 Jan 15:48:52 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -604,48 +604,51 @@ def oscillatory_flow():
     y_points = cos(pi*arange(Mf)/(Mf-1))
 
     tmp = beta + (1-beta) / (1 + 1.j*De)
+    print 'tmp', tmp
     alpha = sqrt( (1.j*pi*Re*De) / (2*Wi*tmp) )
-
+    print 'alpha', alpha
     Chi = real( (1-1.j)*(1 - tanh(alpha) / alpha) )
+    print 'Chi', Chi 
 
     # the coefficient for the forcing
     P = (0.5*pi)**2 * (Re*De) / (Chi*Wi)
 
-    PSI = zeros((Mf, 2*Nf+1), dtype='d')
-    Cxx = zeros((Mf, 2*Nf+1), dtype='d')
-    Cxy = zeros((Mf, 2*Nf+1), dtype='d')
+    PSI = zeros(Mf, dtype='d')
+    Cxx = zeros(Mf, dtype='d')
+    Cxy = zeros(Mf, dtype='d')
 
     for i in range(Mf):
         y =y_points[i]
-        for j in range(2*Nf+1):
-            psi_im = pi/(2.j*Chi) *(y-sinh(alpha*y)/(alpha*cosh(alpha))\
-                                     + sinh(alpha*-1)/(alpha*cosh(alpha)) )
-            PSI[i,j] = real(psi_im)
 
-            dyu_cmplx = pi/(2.j*Chi) *(-alpha*sinh(alpha*y)/(cosh(alpha)))
-            cxy_cmplx = (1.0/(1.0+1.j*De)) * ((2*Wi/pi) * dyu_cmplx) 
+        psi_im = pi/(2.j*Chi) *(y-sinh(alpha*y)/(alpha*cosh(alpha))\
+                                 + sinh(alpha*-1)/(alpha*cosh(alpha)) )
+        PSI[i] = real(psi_im)
 
-            Cxy[i,j] = real( cxy_cmplx )
+        dyu_cmplx = pi/(2.j*Chi) *(-alpha*sinh(alpha*y)/(cosh(alpha)))
+        cxy_cmplx = (1.0/(1.0+1.j*De)) * ((2*Wi/pi) * dyu_cmplx) 
 
-            Cxx[i,j] = (1.0/(1.0+2.j*De))*(Wi/pi)*(cxy_cmplx*dyu_cmplx)
-            Cxx[i,j] += (1.0/(1.0-2.j*De))*(Wi/pi)*(conj(cxy_cmplx)*conj(dyu_cmplx)) 
+        Cxy[i] = real( cxy_cmplx )
 
-            Cxx[i,j] += 1. + (Wi/pi)*( cxy_cmplx*conj(dyu_cmplx) +
-                                       conj(cxy_cmplx)*dyu_cmplx ) 
-            Cxx[i,j] = real(Cxx[i,j])
+        cxx_cmplx = (1.0/(1.0+2.j*De))*(Wi/pi)*(cxy_cmplx*dyu_cmplx)
+        cxx_cmplx += (1.0/(1.0-2.j*De))*(Wi/pi)*(conj(cxy_cmplx)*conj(dyu_cmplx)) 
 
-    del y, i, j
+        cxx_cmplx += 1. + (Wi/pi)*( cxy_cmplx*conj(dyu_cmplx) +
+                                   conj(cxy_cmplx)*dyu_cmplx ) 
+        Cxx[i] = real(cxx_cmplx)
+
+    del y, i
 
     # transform to spectral space.
-    PSI = f2d.to_spectral(PSI, CNSTS)
-    PSI = fftshift(PSI, axes=1)
-    PSI = PSI.T.flatten()
-    Cxx = f2d.to_spectral(Cxx, CNSTS)
-    Cxx = fftshift(Cxx, axes=1)
-    Cxx = Cxx.T.flatten()
-    Cxy = f2d.to_spectral(Cxy, CNSTS)
-    Cxy = fftshift(Cxy, axes=1)
-    Cxy = Cxy.T.flatten()
+    PSI0 = f2d.forward_cheb_transform(PSI, CNSTS)
+    Cxx0 = f2d.forward_cheb_transform(Cxx, CNSTS)
+    Cxy0 = f2d.forward_cheb_transform(Cxy, CNSTS)
+
+    PSI = zeros((2*N+1)*M, dtype='complex')
+    PSI[N*M:(N+1)*M] = PSI0
+    Cxx = zeros((2*N+1)*M, dtype='complex')
+    Cxx[N*M:(N+1)*M] = Cxx0
+    Cxy = zeros((2*N+1)*M, dtype='complex')
+    Cxy[N*M:(N+1)*M] = Cxy0
 
     Cyy = zeros((2*N+1)*M, dtype='complex')
     Cyy[N*M] = 1
@@ -660,6 +663,8 @@ def oscillatory_flow():
     Cxy[N*M:(N+1)*M] = real(Cxy[N*M:(N+1)*M])
     Cyy[N*M:(N+1)*M] = real(Cyy[N*M:(N+1)*M])
 
+    PSI[(N+1)*M:] = 0.0
+    PSI[:N*M] = 0.0
     Cxx[(N+1)*M:] = 0.0
     Cxx[:N*M] = 0.0
     Cyy[(N+1)*M:] = 0.0
@@ -845,24 +850,11 @@ perAmp = 0#1e-12
 #    PSI[(N+n)*M:(N+n+1)*M] =stupid_transform(rSpace, CNSTS)
 #    PSI[(N-n)*M:(N-n+1)*M] = conj(PSI[(N+n)*M:(N+n+1)*M])
 
-#perturbation similar to that used in stupid code
-#rspace = perAmp*tanh(arange(Mf)*pi/(Mf-1.)) * (1.0 + 1.j);
-ypoints = cos(arange(Mf)*pi/(Mf-1.))
-rspace = perAmp*sin(2.0*pi*ypoints) * (1.0 + 1.j);
-rspace += perAmp*sin(3.0*pi*ypoints) * (1.0 + 1.j);
-##rspace = perAmp*(arange(Mf)[::-1])*1.j
-PSI[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(real(rspace), CNSTS)
-PSI[(N+1)*M:(N+2)*M] += 1.j*f2d.forward_cheb_transform(imag(rspace), CNSTS)
-
-PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
-
 #Cxx[(N+1)*M + 2] = perAmp * (Wi*2./pi)
 #Cxx[(N-1)*M + 2] = perAmp * (Wi*2./pi)
 #
 #Cxy[(N+1)*M + 1] = perAmp * (Wi*2./pi)
 #Cxy[(N-1)*M + 1] = perAmp * (Wi*2./pi)
-
-print log(abs(perAmp))
 
 #f = h5py.File("linear_evec.h5","r")
 #

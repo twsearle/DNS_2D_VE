@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu  1 Oct 14:37:12 2015
+// Last modified: Thu 28 Jan 14:56:39 2016
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -85,7 +85,7 @@ struct flow_scratch {
 
     fftw_complex *scratchin, *scratchout;
 
-    double *scratchp1, *scratchp2;
+    double *scratchp1, *scratchp2, *scratchp3;
 
     fftw_complex *RHSvec;
     
