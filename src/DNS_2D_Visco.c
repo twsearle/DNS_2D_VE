@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu 28 Jan 16:05:02 2016
+// Last modified: Fri 29 Jan 10:42:57 2016
 
 /* Program Description:
  *
@@ -77,6 +77,10 @@ int main(int argc, char **argv)
 
     int periods = 0;
     double phase = 0;
+
+    double normPSI1 = 0;
+    double normPSI2 = 0;
+    double normPSI0 = 0;
 
     double KE0 = 1.0;
     double KE1 = 0.0;
@@ -467,6 +471,19 @@ int main(int argc, char **argv)
     printf("%e\t%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1, EE0);
     fprintf(tracefp, "%e\t%e\t%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1, KE2, KE_xdepend);
 
+    // calculate norm u excluding the Poiseuille terms
+    for (j=M-1; j>=0; j=j-1)
+    {
+	if (j > 3)
+	{
+	    normPSI0 += creal(psi[ind(0,j)]*psi[ind(0,j)]); 
+	}
+	normPSI1 += creal(psi[ind(1,j)]*conj(psi[ind(1,j)])); 
+	normPSI2 += creal(psi[ind(2,j)]*conj(psi[ind(2,j)])); 
+    }
+
+    fprintf(tracePSI, "%e\t%e\t%e\t%e\t\n", 0.0, normPSI0, normPSI1, normPSI2);
+
     for (timeStep=0; timeStep<numTimeSteps; timeStep++)
     {
 
@@ -616,10 +633,6 @@ int main(int argc, char **argv)
 
 	    time = (timeStep + 1)*dt;
 
-            double normPSI1 = 0;
-            double normPSI2 = 0;
-            double normPSI0 = 0;
-
             for (i=0; i<N+1; i++)
             {
         	for (j=0; j<M; j++)
@@ -637,6 +650,9 @@ int main(int argc, char **argv)
         	      creal(scr.scratch[ind(2,6)]), cimag(scr.scratch[ind(2,6)]));
 
 	    // calculate norm u excluding the Poiseuille terms
+	    normPSI0 = 0.0;
+	    normPSI1 = 0.0;
+	    normPSI2 = 0.0;
             for (j=M-1; j>=0; j=j-1)
             {
 		if (j > 3)

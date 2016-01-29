@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Thu 28 Jan 15:48:52 2016
+#   Last modified: Fri 29 Jan 10:46:15 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -828,33 +828,30 @@ psiLam = copy(PSI)
 #PSI[(N)*M+1] += lsd *(155./64. - 4. )
 #PSI[(N)*M+0] += lsd *(1./8) 
 
-perAmp = 0#1e-12
-#y = 2.0*arange(M)/(M-1.0) -1.0
+perAmp = 1e-10
 
-#for n in range(1,N+1-N/3):
-#    #rn = (10.0**(-(n**2)))*(0.5-rand(5))
-#    rn = (10.0**(-n))*array([-0.43,-0.234,0.2134,-0.134,0.7653683])
-#    rSpace = zeros(M, dtype='complex')
+#rSpace = zeros(Mf, dtype='complex')
+#rn = ones(5)
+#y = 2.0*arange(Mf)/(Mf-1.0) -1.0
 #
-#    ## sinusoidal
-#    rSpace =  perAmp*sin(1.0 * 2.0*pi * y) * rn[0]
-#    rSpace += perAmp*sin(2.0 * 2.0*pi * y) * rn[1]
-#    rSpace += perAmp*sin(3.0 * 2.0*pi * y) * rn[2]
-#    ## cosinusoidal 
-#    rSpace += perAmp*cos(1.0 * 2.0*pi * y) * rn[3]
-#    rSpace += perAmp*cos(2.0 * 2.0*pi * y) * rn[4]
+### sinusoidal
+#rSpace =  perAmp*sin(1.0 * pi * y) * rn[0]
+#rSpace += perAmp*sin(2.0 * pi * y) * rn[1]
+#rSpace += perAmp*sin(3.0 * pi * y) * rn[2]
 #
-#    ## low order eigenfunction of biharmonic operator
-#    #rSpace = (sin(pscale * y)/(pscale*cos(pscale)) - sinh(gam*y)/(gam*cosh(gam))) * rn[0]
+### cosinusoidal 
+#rSpace += perAmp*cos(1.0 * 0.5*pi * y) * rn[3]
+#rSpace += perAmp*cos(3.0 * 0.5*pi * y) * rn[4]
 #
-#    PSI[(N+n)*M:(N+n+1)*M] =stupid_transform(rSpace, CNSTS)
-#    PSI[(N-n)*M:(N-n+1)*M] = conj(PSI[(N+n)*M:(N+n+1)*M])
+#
+#PSI[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(rSpace, CNSTS)
+#PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
 
-#Cxx[(N+1)*M + 2] = perAmp * (Wi*2./pi)
-#Cxx[(N-1)*M + 2] = perAmp * (Wi*2./pi)
-#
-#Cxy[(N+1)*M + 1] = perAmp * (Wi*2./pi)
-#Cxy[(N-1)*M + 1] = perAmp * (Wi*2./pi)
+Cxx[(N+1)*M + 2] = perAmp * (Wi*2./pi)
+Cxx[(N-1)*M + 2] = perAmp * (Wi*2./pi)
+
+Cxy[(N+1)*M + 1] = perAmp * (Wi*2./pi)
+Cxy[(N-1)*M + 1] = perAmp * (Wi*2./pi)
 
 #f = h5py.File("linear_evec.h5","r")
 #

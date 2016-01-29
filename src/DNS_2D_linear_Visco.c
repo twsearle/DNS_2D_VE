@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu 28 Jan 15:54:25 2016
+// Last modified: Fri 29 Jan 10:43:21 2016
 
 /* Program Description:
  *
@@ -210,6 +210,8 @@ int main(int argc, char **argv)
     double periods, phase;
     double time = initTime;
     int timeStep;
+    double normPSI1 = 0;
+    double normPSI0 = 0;
 
     int save_traj = 0;
 
@@ -450,6 +452,13 @@ int main(int argc, char **argv)
     fprintf(tracefp, "%e\t%e\t%e\t%e\n", 0.0, KE_tot, KE0, KE1);
 
     printf("%e\t%e\t%e\t%e\t\n", 0.0, KE_tot, KE0, KE1);
+    for (j=M-1; j>=0; j=j-1)
+    {
+	normPSI0 += creal(psi[ind(0,j)]*conj(psi[ind(0,j)])); 
+	normPSI1 += creal(psi[ind(1,j)]*conj(psi[ind(1,j)])); 
+    }
+
+    fprintf(tracePSI, "%e\t%e\t%e\n", time, normPSI0, normPSI1);
 
     // **** STUPID TEST *****
     //scr.scratch[0] = log(cabs((0.5*M_PI/params.Wi)*cij[2*(N+1)*M + ind(1,1)]));
@@ -640,8 +649,8 @@ int main(int argc, char **argv)
 
 	    time = (timeStep + 1.0)*dt;
 
-	    double normPSI1 = 0;
-	    double normPSI0 = 0;
+	    normPSI0 = 0.0;
+	    normPSI1 = 0.0;
 
 	    // u
 	    single_dy(&psi[ind(0,0)], scr.U0, params);
