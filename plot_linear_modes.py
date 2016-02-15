@@ -339,25 +339,25 @@ plot_snapshot(Cyy0, cyyReal, 0, varName='Cyy')
 fig = plt.figure(figsize=(5.0,3.0))
 Uobj = Flow(fig, U0, uReal)
 anim = animation.FuncAnimation(fig, Uobj.plot_step,
-                               frames=numSteps, interval=100, blit=True)
+                               frames=numSteps, interval=100, blit=False)
 anim.save('uReal.mp4', fps=20, extra_args=['-vcodec', 'libx264'])
 fig.clf()
 
 Cxxobj = Flow(fig, Cxx0, cxxReal)
 anim = animation.FuncAnimation(fig, Cxxobj.plot_step,
-                               frames=numSteps, interval=100, blit=True)
+                               frames=numSteps, interval=100, blit=False)
 anim.save('cxxReal.mp4', fps=20, extra_args=['-vcodec', 'libx264'])
 fig.clf()
 
 Cxyobj = Flow(fig, Cxy0, cxyReal)
 anim = animation.FuncAnimation(fig, Cxyobj.plot_step,
-                               frames=numSteps, interval=100, blit=True)
+                               frames=numSteps, interval=100, blit=False)
 anim.save('cxyReal.mp4', fps=20, extra_args=['-vcodec', 'libx264'])
 fig.clf()
 
 Cyyobj = Flow(fig, Cyy0, cyyReal)
 anim = animation.FuncAnimation(fig, Cyyobj.plot_step,
-                               frames=numSteps, interval=100, blit=True)
+                               frames=numSteps, interval=100, blit=False)
 anim.save('cyyReal.mp4', fps=20, extra_args=['-vcodec', 'libx264'])
 fig.clf()
 

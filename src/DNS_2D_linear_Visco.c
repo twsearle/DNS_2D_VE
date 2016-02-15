@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri 29 Jan 10:43:21 2016
+// Last modified: Mon  8 Feb 12:27:47 2016
 
 /* Program Description:
  *
@@ -213,7 +213,7 @@ int main(int argc, char **argv)
     double normPSI1 = 0;
     double normPSI0 = 0;
 
-    int save_traj = 0;
+    int save_traj = 1;
 
     trace_fn = "./output/trace.dat";
     traj_fn = "./output/traj.h5";

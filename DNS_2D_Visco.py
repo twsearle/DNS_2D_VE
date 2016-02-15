@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Fri 29 Jan 10:46:15 2016
+#   Last modified: Thu 11 Feb 15:30:34 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -129,8 +129,8 @@ assert (totTime / dt) - float(numTimeSteps) == 0, "Non-integer number of timeste
 assert Wi != 0.0, "cannot have Wi = 0!"
 assert args.flow_type < 3, "flow type unspecified!" 
 
-NOld = 3 
-MOld = 40
+NOld = 1 
+MOld = 64
 
 CNSTS = {'NOld': NOld, 'MOld': MOld, 'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0,
           'Re': Re, 'Wi': Wi, 'beta': beta, 'De':De, 'kx': kx,'time': totTime,
@@ -674,6 +674,16 @@ def oscillatory_flow():
 
     return PSI, Cxx, Cyy, Cxy, forcing, P
 
+def format_evector(inArr, N, M):
+
+    outArr = zeros((M, 2*N+1), dtype='complex') 
+    outArr[:, 1] = inArr.reshape(2,M).T[:,1]
+    outArr[:, 2] = conj(outArr[:, 1])
+    outArr = fftshift(outArr, axes=1)
+    outArr = outArr.T.flatten()
+
+    return outArr
+
 # -----------------------------------------------------------------------------
 # MAIN
 # -----------------------------------------------------------------------------
@@ -739,59 +749,6 @@ Cyy = zeros((2*N+1)*M,dtype='complex')
 Cxy = zeros((2*N+1)*M,dtype='complex')
 
 
-## Read in stream function from file
-#(PSI, Cxx, Cyy, Cxy, Nu) = pickle.load(open(inFileName,'r'))
-#PSI = decide_resolution(PSI, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
-#Cxx = decide_resolution(Cxx, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
-#Cyy = decide_resolution(Cyy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
-#Cxy = decide_resolution(Cxy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
-#psiLam = copy(PSI)
-#print inFileName
-
-#f = h5py.File("final.h5","r")
-#
-#PSI = array(f["psi"])
-#Cxx = array(f["cxx"])
-#Cyy = array(f["cyy"])
-#Cxy = array(f["cxy"])
-#
-#f.close()
-#
-#tmp = PSI.reshape((N+1, M)).T
-#PSI = zeros((M, 2*N+1), dtype='complex')
-#PSI[:, :N+1] = tmp
-#for n in range(1, N+1):
-#    PSI[:, 2*N+1 - n] = conj(PSI[:, n])
-#PSI = fftshift(PSI, axes=1)
-#PSI = PSI.T.flatten()
-#
-#tmp = Cxx.reshape((N+1, M)).T
-#Cxx = zeros((M, 2*N+1), dtype='complex')
-#Cxx[:, :N+1] = tmp
-#for n in range(1, N+1):
-#    Cxx[:, 2*N+1 - n] = conj(Cxx[:, n])
-#Cxx = fftshift(Cxx, axes=1)
-#Cxx = Cxx.T.flatten()
-#
-#tmp = Cyy.reshape((N+1, M)).T
-#Cyy = zeros((M, 2*N+1), dtype='complex')
-#Cyy[:, :N+1] = tmp
-#for n in range(1, N+1):
-#    Cyy[:, 2*N+1 - n] = conj(Cyy[:, n])
-#Cyy = fftshift(Cyy, axes=1)
-#Cyy = Cyy.T.flatten()
-#
-#tmp = Cxy.reshape((N+1, M)).T
-#Cxy = zeros((M, 2*N+1), dtype='complex')
-#Cxy[:, :N+1] = tmp
-#for n in range(1, N+1):
-#    Cxy[:, 2*N+1 - n] = conj(Cxy[:, n])
-#Cxy = fftshift(Cxy, axes=1)
-#Cxy = Cxy.T.flatten()
-#
-#psiLam = copy(PSI)
-
-
 if args.flow_type==0:
     # --------------- POISEUILLE -----------------
     PSI, Cxx, Cyy, Cxy, forcing = poiseuille_flow()
@@ -812,6 +769,59 @@ else:
 
 psiLam = copy(PSI)
 
+# Read in stream function from file
+#(PSI, Cxx, Cyy, Cxy, Nu) = pickle.load(open(inFileName,'r'))
+#PSI = decide_resolution(PSI, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+#Cxx = decide_resolution(Cxx, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+#Cyy = decide_resolution(Cyy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+#Cxy = decide_resolution(Cxy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+#psiLam = copy(PSI)
+#print inFileName
+#
+f = h5py.File("final.h5","r")
+
+PSI = array(f["psi"])
+Cxx = array(f["cxx"])
+Cyy = array(f["cyy"])
+Cxy = array(f["cxy"])
+
+f.close()
+
+tmp = PSI.reshape((N+1, M)).T
+PSI = zeros((M, 2*N+1), dtype='complex')
+PSI[:, :N+1] = tmp
+for n in range(1, N+1):
+    PSI[:, 2*N+1 - n] = conj(PSI[:, n])
+PSI = fftshift(PSI, axes=1)
+PSI = PSI.T.flatten()
+
+tmp = Cxx.reshape((N+1, M)).T
+Cxx = zeros((M, 2*N+1), dtype='complex')
+Cxx[:, :N+1] = tmp
+for n in range(1, N+1):
+    Cxx[:, 2*N+1 - n] = conj(Cxx[:, n])
+Cxx = fftshift(Cxx, axes=1)
+Cxx = Cxx.T.flatten()
+
+tmp = Cyy.reshape((N+1, M)).T
+Cyy = zeros((M, 2*N+1), dtype='complex')
+Cyy[:, :N+1] = tmp
+for n in range(1, N+1):
+    Cyy[:, 2*N+1 - n] = conj(Cyy[:, n])
+Cyy = fftshift(Cyy, axes=1)
+Cyy = Cyy.T.flatten()
+
+tmp = Cxy.reshape((N+1, M)).T
+Cxy = zeros((M, 2*N+1), dtype='complex')
+Cxy[:, :N+1] = tmp
+for n in range(1, N+1):
+    Cxy[:, 2*N+1 - n] = conj(Cxy[:, n])
+Cxy = fftshift(Cxy, axes=1)
+Cxy = Cxy.T.flatten()
+
+psiLam = copy(PSI)
+
+
 ### ----------------------- PERTURBATIONS ------------------------------------
 
 #PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
@@ -828,7 +838,7 @@ psiLam = copy(PSI)
 #PSI[(N)*M+1] += lsd *(155./64. - 4. )
 #PSI[(N)*M+0] += lsd *(1./8) 
 
-perAmp = 1e-10
+#perAmp = 1e-10
 
 #rSpace = zeros(Mf, dtype='complex')
 #rn = ones(5)
@@ -847,29 +857,32 @@ perAmp = 1e-10
 #PSI[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(rSpace, CNSTS)
 #PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
 
-Cxx[(N+1)*M + 2] = perAmp * (Wi*2./pi)
-Cxx[(N-1)*M + 2] = perAmp * (Wi*2./pi)
-
-Cxy[(N+1)*M + 1] = perAmp * (Wi*2./pi)
-Cxy[(N-1)*M + 1] = perAmp * (Wi*2./pi)
+#Cxx[(N+1)*M + 2] = perAmp * (Wi*2./pi)
+#Cxx[(N-1)*M + 2] = perAmp * (Wi*2./pi)
+#
+#Cxy[(N+1)*M + 1] = perAmp * (Wi*2./pi)
+#Cxy[(N-1)*M + 1] = perAmp * (Wi*2./pi)
 
 #f = h5py.File("linear_evec.h5","r")
 #
-#PSIlin = array(f["psi"]).reshape(2,M).T
-#Cxxlin = array(f["cxx"]).reshape(2,M).T
-#Cyylin = array(f["cyy"]).reshape(2,M).T
-#Cxylin = array(f["cxy"]).reshape(2,M).T
+#PSIlin = format_evector(array(f["psi"]), NOld, MOld)
+#Cxxlin = format_evector(array(f["cxx"]), NOld, MOld)
+#Cyylin = format_evector(array(f["cyy"]), NOld, MOld)
+#Cxylin = format_evector(array(f["cxy"]), NOld, MOld)
 #
 #f.close()
-#perAmp = 2.e-4 / linalg.norm(PSIlin[:,1])
-#PSI[(N+1)*M:(N+2)*M] = perAmp * PSIlin[:,1]
-#PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
-#Cxx[(N+1)*M:(N+2)*M] = perAmp * Cxxlin[:,1]
-#Cxx[(N-1)*M:(N)*M] = conj(Cxx[(N+1)*M:(N+2)*M])
-#Cyy[(N+1)*M:(N+2)*M] = perAmp * Cyylin[:,1] 
-#Cyy[(N-1)*M:(N)*M] = conj(Cyy[(N+1)*M:(N+2)*M])
-#Cxy[(N+1)*M:(N+2)*M] = perAmp * Cxylin[:,1] 
-#Cxy[(N-1)*M:(N)*M] = conj(Cxy[(N+1)*M:(N+2)*M])
+#
+#PSIlin = increase_resolution(PSIlin, NOld, MOld, CNSTS)
+#Cxxlin = increase_resolution(Cxxlin, NOld, MOld, CNSTS)
+#Cyylin = increase_resolution(Cyylin, NOld, MOld, CNSTS)
+#Cxylin = increase_resolution(Cxylin, NOld, MOld, CNSTS)
+#
+#perAmp = 1.e-2 / linalg.norm(PSIlin[(N+1)*M:(N+2)*M])
+#
+#PSI = PSI + perAmp*PSIlin
+#Cxx = Cxx + perAmp*Cxxlin
+#Cyy = Cyy + perAmp*Cyylin
+#Cxy = Cxy + perAmp*Cxylin
 
 # ----------------------------------------------------------------------------
 
