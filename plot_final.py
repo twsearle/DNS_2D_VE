@@ -54,8 +54,8 @@ totTime = config.getfloat('Time Iteration', 'totTime')
 numFrames = config.getint('Time Iteration', 'numFrames')
 dealiasing = config.getboolean('Time Iteration', 'Dealiasing')
 
-Nf = 50
-Mf = 100
+Nf = 2*N
+Mf = 2*M
 
 fp.close()
 
@@ -73,8 +73,9 @@ else:
     #inFileName = args.path + "/traj.h5".format()
     #inFileName = args.path + "/initial_linear.h5".format()
     #inFileName2 = "./initial_full.h5".format()
-    inFileName = args.path + "/linear_final.h5".format()
+    #inFileName = args.path + "/linear_final.h5".format()
     #inFileName2 = "./full_final.h5".format()
+    inFileName = args.path + "/output/final.h5".format()
     print 'Reading from: ', inFileName
     twsFileName = args.path + "/pf-N{N}-M{M}-kx{kx}-Re{Re}-b{beta}-Wi{Wi}.pickle".format(**kwargs)
 

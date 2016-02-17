@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri 29 Jan 10:42:57 2016
+// Last modified: Wed 17 Feb 14:11:10 2016
 
 /* Program Description:
  *
@@ -427,11 +427,15 @@ int main(int argc, char **argv)
     //	    		&hdf5fp, &filetype_id, &datatype_id);
     #endif
 
+    periods = floor(initTime/(2.0*M_PI));
+    phase = initTime - 2.0*M_PI*periods;
+
+
     // Cant get the oscillatory laminar flow working in python, so I did it here
     if (params.oscillatory_flow != 0)
     {
-	calc_base_cij(cij, 0.0, scr, params);
-	calc_base_sf(psi, 0.0, scr, params);
+	calc_base_cij(cij, phase + 0.0, scr, params);
+	calc_base_sf(psi, phase + 0.0, scr, params);
     }
 
     save_hdf5_snapshot_visco(&hdf5fp, &filetype_id, &datatype_id,
@@ -522,9 +526,6 @@ int main(int argc, char **argv)
 	if (params.oscillatory_flow != 0)
 	{
 	    // OSCILLATING PRESSURE GRADIENT
-	    periods = floor(initTime/(2.0*M_PI));
-	    phase = initTime - 2.0*M_PI*periods;
-
 	    forcing[ind(0,0)] = params.P*cos((timeStep)*dt + phase);
 	    forcingN[ind(0,0)] = params.P*cos((timeStep+0.5)*dt + phase);
 

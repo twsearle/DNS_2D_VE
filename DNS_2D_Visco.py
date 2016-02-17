@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Thu 11 Feb 15:30:34 2016
+#   Last modified: Wed 17 Feb 14:52:22 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -778,48 +778,48 @@ psiLam = copy(PSI)
 #psiLam = copy(PSI)
 #print inFileName
 #
-f = h5py.File("final.h5","r")
-
-PSI = array(f["psi"])
-Cxx = array(f["cxx"])
-Cyy = array(f["cyy"])
-Cxy = array(f["cxy"])
-
-f.close()
-
-tmp = PSI.reshape((N+1, M)).T
-PSI = zeros((M, 2*N+1), dtype='complex')
-PSI[:, :N+1] = tmp
-for n in range(1, N+1):
-    PSI[:, 2*N+1 - n] = conj(PSI[:, n])
-PSI = fftshift(PSI, axes=1)
-PSI = PSI.T.flatten()
-
-tmp = Cxx.reshape((N+1, M)).T
-Cxx = zeros((M, 2*N+1), dtype='complex')
-Cxx[:, :N+1] = tmp
-for n in range(1, N+1):
-    Cxx[:, 2*N+1 - n] = conj(Cxx[:, n])
-Cxx = fftshift(Cxx, axes=1)
-Cxx = Cxx.T.flatten()
-
-tmp = Cyy.reshape((N+1, M)).T
-Cyy = zeros((M, 2*N+1), dtype='complex')
-Cyy[:, :N+1] = tmp
-for n in range(1, N+1):
-    Cyy[:, 2*N+1 - n] = conj(Cyy[:, n])
-Cyy = fftshift(Cyy, axes=1)
-Cyy = Cyy.T.flatten()
-
-tmp = Cxy.reshape((N+1, M)).T
-Cxy = zeros((M, 2*N+1), dtype='complex')
-Cxy[:, :N+1] = tmp
-for n in range(1, N+1):
-    Cxy[:, 2*N+1 - n] = conj(Cxy[:, n])
-Cxy = fftshift(Cxy, axes=1)
-Cxy = Cxy.T.flatten()
-
-psiLam = copy(PSI)
+#f = h5py.File("final.h5","r")
+#
+#PSI = array(f["psi"])
+#Cxx = array(f["cxx"])
+#Cyy = array(f["cyy"])
+#Cxy = array(f["cxy"])
+#
+#f.close()
+#
+#tmp = PSI.reshape((N+1, M)).T
+#PSI = zeros((M, 2*N+1), dtype='complex')
+#PSI[:, :N+1] = tmp
+#for n in range(1, N+1):
+#    PSI[:, 2*N+1 - n] = conj(PSI[:, n])
+#PSI = fftshift(PSI, axes=1)
+#PSI = PSI.T.flatten()
+#
+#tmp = Cxx.reshape((N+1, M)).T
+#Cxx = zeros((M, 2*N+1), dtype='complex')
+#Cxx[:, :N+1] = tmp
+#for n in range(1, N+1):
+#    Cxx[:, 2*N+1 - n] = conj(Cxx[:, n])
+#Cxx = fftshift(Cxx, axes=1)
+#Cxx = Cxx.T.flatten()
+#
+#tmp = Cyy.reshape((N+1, M)).T
+#Cyy = zeros((M, 2*N+1), dtype='complex')
+#Cyy[:, :N+1] = tmp
+#for n in range(1, N+1):
+#    Cyy[:, 2*N+1 - n] = conj(Cyy[:, n])
+#Cyy = fftshift(Cyy, axes=1)
+#Cyy = Cyy.T.flatten()
+#
+#tmp = Cxy.reshape((N+1, M)).T
+#Cxy = zeros((M, 2*N+1), dtype='complex')
+#Cxy[:, :N+1] = tmp
+#for n in range(1, N+1):
+#    Cxy[:, 2*N+1 - n] = conj(Cxy[:, n])
+#Cxy = fftshift(Cxy, axes=1)
+#Cxy = Cxy.T.flatten()
+#
+#psiLam = copy(PSI)
 
 
 ### ----------------------- PERTURBATIONS ------------------------------------
@@ -838,8 +838,8 @@ psiLam = copy(PSI)
 #PSI[(N)*M+1] += lsd *(155./64. - 4. )
 #PSI[(N)*M+0] += lsd *(1./8) 
 
-#perAmp = 1e-10
-
+#perAmp = 1e-8
+#
 #rSpace = zeros(Mf, dtype='complex')
 #rn = ones(5)
 #y = 2.0*arange(Mf)/(Mf-1.0) -1.0
@@ -863,26 +863,26 @@ psiLam = copy(PSI)
 #Cxy[(N+1)*M + 1] = perAmp * (Wi*2./pi)
 #Cxy[(N-1)*M + 1] = perAmp * (Wi*2./pi)
 
-#f = h5py.File("linear_evec.h5","r")
-#
-#PSIlin = format_evector(array(f["psi"]), NOld, MOld)
-#Cxxlin = format_evector(array(f["cxx"]), NOld, MOld)
-#Cyylin = format_evector(array(f["cyy"]), NOld, MOld)
-#Cxylin = format_evector(array(f["cxy"]), NOld, MOld)
-#
-#f.close()
-#
-#PSIlin = increase_resolution(PSIlin, NOld, MOld, CNSTS)
-#Cxxlin = increase_resolution(Cxxlin, NOld, MOld, CNSTS)
-#Cyylin = increase_resolution(Cyylin, NOld, MOld, CNSTS)
-#Cxylin = increase_resolution(Cxylin, NOld, MOld, CNSTS)
-#
-#perAmp = 1.e-2 / linalg.norm(PSIlin[(N+1)*M:(N+2)*M])
-#
-#PSI = PSI + perAmp*PSIlin
-#Cxx = Cxx + perAmp*Cxxlin
-#Cyy = Cyy + perAmp*Cyylin
-#Cxy = Cxy + perAmp*Cxylin
+f = h5py.File("linear_evec.h5","r")
+
+PSIlin = format_evector(array(f["psi"]), NOld, MOld)
+Cxxlin = format_evector(array(f["cxx"]), NOld, MOld)
+Cyylin = format_evector(array(f["cyy"]), NOld, MOld)
+Cxylin = format_evector(array(f["cxy"]), NOld, MOld)
+
+f.close()
+
+PSIlin = increase_resolution(PSIlin, NOld, MOld, CNSTS)
+Cxxlin = increase_resolution(Cxxlin, NOld, MOld, CNSTS)
+Cyylin = increase_resolution(Cyylin, NOld, MOld, CNSTS)
+Cxylin = increase_resolution(Cxylin, NOld, MOld, CNSTS)
+
+perAmp = 1.e-18 / linalg.norm(PSIlin[(N+1)*M:(N+2)*M])
+
+PSI = PSI + perAmp*PSIlin
+Cxx = Cxx + perAmp*Cxxlin
+Cyy = Cyy + perAmp*Cyylin
+Cxy = Cxy + perAmp*Cxylin
 
 # ----------------------------------------------------------------------------
 

@@ -4,6 +4,7 @@ from scipy import fftpack
 from numpy.fft import fftshift, ifftshift
 from scipy.fftpack import dct as dct
 import matplotlib
+from matplotlib import pyplot
 matplotlib.use('tkAgg')
 import matplotlib.animation
 
@@ -278,7 +279,7 @@ if n != None:
 
     anim = matplotlib.animation.FuncAnimation(fig, animate, init_func=init,
                                               frames=numFrames,
-                                  interval=1, blit=True)
+                                  interval=1, blit=False)
 
 else:
     fig = matplotlib.pyplot.figure(figsize=(15,4.5), tight_layout=True)
@@ -329,7 +330,7 @@ else:
     anim = matplotlib.animation.FuncAnimation(fig, animate_all,
                                               init_func=init_all,
                                               frames=numFrames,
-                                  interval=1, blit=True)
+                                  interval=1, blit=False)
 
 f.close()
 

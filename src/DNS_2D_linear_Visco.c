@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon  8 Feb 12:27:47 2016
+// Last modified: Wed 17 Feb 16:32:37 2016
 
 /* Program Description:
  *
@@ -213,7 +213,7 @@ int main(int argc, char **argv)
     double normPSI1 = 0;
     double normPSI0 = 0;
 
-    int save_traj = 1;
+    int save_traj = 0;
 
     trace_fn = "./output/trace.dat";
     traj_fn = "./output/traj.h5";
@@ -424,10 +424,13 @@ int main(int argc, char **argv)
     printf("\n------\nperforming the time iteration\n------\n");
     printf("\nTime:\t\tKE_tot:\t\tKE0:\t\tKE1:\n");
 
+    periods = floor(initTime/(2.0*M_PI));
+    phase = initTime - 2.0*M_PI*periods;
+
     // calculate and output t=0 quantities
     // u
-    calc_base_cij(cij, 0.0, scr, params);
-    calc_base_sf(psi, 0.0, scr, params);
+    calc_base_cij(cij, phase +  0.0, scr, params);
+    calc_base_sf(psi, phase +  0.0, scr, params);
 
     single_dy(&psi[ind(0,0)], scr.U0, params);
     single_dy(&psi[ind(1,0)], scr.u, params);
@@ -454,11 +457,14 @@ int main(int argc, char **argv)
     printf("%e\t%e\t%e\t%e\t\n", 0.0, KE_tot, KE0, KE1);
     for (j=M-1; j>=0; j=j-1)
     {
-	normPSI0 += creal(psi[ind(0,j)]*conj(psi[ind(0,j)])); 
+	if (j > 3)
+	{
+	    normPSI0 += creal(psi[ind(0,j)]*psi[ind(0,j)]); 
+	}
 	normPSI1 += creal(psi[ind(1,j)]*conj(psi[ind(1,j)])); 
     }
 
-    fprintf(tracePSI, "%e\t%e\t%e\n", time, normPSI0, normPSI1);
+    fprintf(tracePSI, "%e\t%e\t%e\n", 0.0, normPSI0, normPSI1);
 
     // **** STUPID TEST *****
     //scr.scratch[0] = log(cabs((0.5*M_PI/params.Wi)*cij[2*(N+1)*M + ind(1,1)]));
@@ -491,11 +497,8 @@ int main(int argc, char **argv)
 	{
 	    // Calculate forcing for the half step 
 
-	    periods = floor(initTime/(2.0*M_PI));
-	    phase = initTime - 2.0*M_PI*periods;
-
-	    forcing[ind(0,0)] = params.P*cos(time + phase);
-	    forcingN[ind(0,0)] = params.P*cos((timeStep+0.5)*dt + phase);
+	    //forcing[ind(0,0)] = params.P*cos(time + phase);
+	    //forcingN[ind(0,0)] = params.P*cos((timeStep+0.5)*dt + phase);
 
 	    // calculate the half-step variables for the nonlinear terms
 	    // (the *nl variables)
@@ -503,12 +506,12 @@ int main(int argc, char **argv)
 	    step_conformation_linear_oscil(cijOld, cijNL, psiOld, cijOld,
 		    0.5*dt, scr, params);
 
-	    calc_base_cij(cijNL, (timeStep+0.5)*dt, scr, params);
+	    calc_base_cij(cijNL, phase + (timeStep+0.5)*dt, scr, params);
 
 	    step_sf_linear_SI_oscil_visco(psiOld, psiNL, cijOld, cijNL, psiOld,
 		    forcing, forcingN, 0.5*dt, timeStep, hopsList, scr, params);
 
-	    calc_base_sf(psiNL, (timeStep+0.5)*dt, scr, params);
+	    calc_base_sf(psiNL, phase + (timeStep+0.5)*dt, scr, params);
 
 #ifdef MYDEBUG 
 	    // output when debugging
@@ -561,20 +564,20 @@ int main(int argc, char **argv)
 
 	    // Calculate forcing for the full step 
 
-	    forcing[ind(0,0)] = params.P*cos(time+0.5*dt + phase);
-	    forcingN[ind(0,0)] = params.P*cos((timeStep+1.0)*dt + phase);
+	    //forcing[ind(0,0)] = params.P*cos(time+0.5*dt + phase);
+	    //forcingN[ind(0,0)] = params.P*cos((timeStep+1.0)*dt + phase);
 
 
 	    // Calculate flow at new time step
 
 	    step_conformation_linear_oscil(cijOld, cij, psiNL, cijNL, dt, scr, params);
 
-	    calc_base_cij(cij, (timeStep+1.0)*dt, scr, params);
+	    calc_base_cij(cij, phase + (timeStep+1.0)*dt, scr, params);
 
 	    step_sf_linear_SI_oscil_visco(psiOld, psi, cijOld, cij, psiNL,
 		    forcing, forcingN, dt, timeStep, opsList, scr, params);
 
-	    calc_base_sf(psi, (timeStep+1.0)*dt, scr, params);
+	    calc_base_sf(psi, phase + (timeStep+1.0)*dt, scr, params);
 
 	    //scr.scratch[0] = log(cabs((0.5*M_PI/params.Wi)*cij[2*(N+1)*M + ind(1,1)]));
 	    //scr.scratch[1] = log(cabs((0.5*M_PI/params.Wi)*cij[ind(1,2)]));
@@ -671,7 +674,10 @@ int main(int argc, char **argv)
 
 	    for (j=M-1; j>=0; j=j-1)
 	    {
-		normPSI0 += creal(psi[ind(0,j)]*conj(psi[ind(0,j)])); 
+		if (j > 3)
+		{
+		    normPSI0 += creal(psi[ind(0,j)]*psi[ind(0,j)]); 
+		}
 		normPSI1 += creal(psi[ind(1,j)]*conj(psi[ind(1,j)])); 
 	    }
 
