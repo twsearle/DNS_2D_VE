@@ -10,7 +10,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu 28 Jan 14:59:28 2016
+// Last modified: Fri 19 Feb 16:58:57 2016
 
 #include"fields_1D.h"
 #include"fields_IO.h"
@@ -804,7 +804,7 @@ void step_conformation_linear_oscil(
 
     single_dy(&cijNL[(N+1)*M + ind(0,0)], scr.scratch2, params);
     fft_cheby_convolve(scr.v, scr.scratch2, scr.scratch2, scr, params);
-
+    
     for (i=0; i<M; i++)
     {
 	scr.vgradcyy[i] = scr.scratch[i] + scr.scratch2[i];
@@ -816,7 +816,7 @@ void step_conformation_linear_oscil(
     // CyydyU = Cyydyu + cyydyU
     fft_cheby_convolve(&cijNL[(N+1)*M + ind(0,0)], scr.dyu, scr.cyydyu, scr, params);
     fft_cheby_convolve(&cijNL[(N+1)*M + ind(1,0)], scr.d2yPSI0, scr.scratch, scr, params);
-    for (i =0; i<M; i++)
+    for (i=0; i<M; i++)
     {
 	scr.cyydyu[i] += scr.scratch[i];
     }
@@ -869,7 +869,7 @@ void step_conformation_linear_oscil(
 	cij[(N+1)*M + ind(1,j)] = old_fac*cijOld[(N+1)*M + ind(1,j)];
 	cij[(N+1)*M + ind(1,j)] += dt*2.*scr.cxydxv[j]; 
 	cij[(N+1)*M + ind(1,j)] += dt*2.*scr.cyydyv[j];
-	//cij[(N+1)*M + ind(1,j)] += - dt*scr.vgradcyy[j];
+	cij[(N+1)*M + ind(1,j)] += - dt*scr.vgradcyy[j];
 
 	cij[(N+1)*M + ind(1,j)] *= new_fac;
 	
@@ -977,36 +977,6 @@ void step_sf_linear_SI_oscil_visco(
     {
         scr.vdylplpsi[j] = scr.d3yPSI0[j];
     }
-
-    // SCREW WITH EVERYTHING
-    //double cumsum=0;
-    //for (j=0; j<M; j++)
-    //{
-    //    cumsum += cimag(scr.d3yPSI0[j]);
-    //    //cumsum += cimag(psi[j]);
-    //}
-    //printf("SUM %e \n", cumsum); 
-    //cumsum = 0.0;
-    //for (j=0; j<M; j++)
-    //{
-    //    cumsum += creal(scr.v[j]);
-    //}
-    //printf("SUM %e \n", cumsum); 
-    //fft_cheby_convolve(scr.v, scr.v, scr.scratch, scr, params);
-    //fft_cheby_convolve(scr.d3yPSI0, scr.d3yPSI0, scr.scratch2, scr, params);
-    //
-    ////fft_cheby_convolve(scr.v, scr.lplpsi, scr.scratch, scr, params);
-
-    //char file1[50];
-    //char file2[50];
-    //char file3[50];
-    //sprintf(file1, "./output/v%d.h5", timeStep);
-    //sprintf(file2, "./output/d3ypsi%d.h5", timeStep);
-    //sprintf(file3, "./output/vdylplpsi%d.h5", timeStep);
-
-    //// save_hdf5_arr(file1, &scr.v[0], M);
-    //// save_hdf5_arr(file2, &scr.scratch2[0], M);
-    //// save_hdf5_arr(file3, &scr.vdylplpsi[0], M);
 
     #ifdef MYDEBUG
     if(timeStep==0)

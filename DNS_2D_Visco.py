@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Wed 17 Feb 14:52:22 2016
+#   Last modified: Thu 18 Feb 12:46:32 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -130,7 +130,7 @@ assert Wi != 0.0, "cannot have Wi = 0!"
 assert args.flow_type < 3, "flow type unspecified!" 
 
 NOld = 1 
-MOld = 64
+MOld = 192
 
 CNSTS = {'NOld': NOld, 'MOld': MOld, 'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0,
           'Re': Re, 'Wi': Wi, 'beta': beta, 'De':De, 'kx': kx,'time': totTime,
@@ -838,8 +838,8 @@ psiLam = copy(PSI)
 #PSI[(N)*M+1] += lsd *(155./64. - 4. )
 #PSI[(N)*M+0] += lsd *(1./8) 
 
-#perAmp = 1e-8
-#
+perAmp = 1e-10
+
 #rSpace = zeros(Mf, dtype='complex')
 #rn = ones(5)
 #y = 2.0*arange(Mf)/(Mf-1.0) -1.0
@@ -857,32 +857,32 @@ psiLam = copy(PSI)
 #PSI[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(rSpace, CNSTS)
 #PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
 
-#Cxx[(N+1)*M + 2] = perAmp * (Wi*2./pi)
-#Cxx[(N-1)*M + 2] = perAmp * (Wi*2./pi)
+Cxx[(N+1)*M + 2] = perAmp * (Wi*2./pi)
+Cxx[(N-1)*M + 2] = perAmp * (Wi*2./pi)
+
+Cxy[(N+1)*M + 1] = perAmp * (Wi*2./pi)
+Cxy[(N-1)*M + 1] = perAmp * (Wi*2./pi)
+
+#f = h5py.File("linear_evec.h5","r")
 #
-#Cxy[(N+1)*M + 1] = perAmp * (Wi*2./pi)
-#Cxy[(N-1)*M + 1] = perAmp * (Wi*2./pi)
-
-f = h5py.File("linear_evec.h5","r")
-
-PSIlin = format_evector(array(f["psi"]), NOld, MOld)
-Cxxlin = format_evector(array(f["cxx"]), NOld, MOld)
-Cyylin = format_evector(array(f["cyy"]), NOld, MOld)
-Cxylin = format_evector(array(f["cxy"]), NOld, MOld)
-
-f.close()
-
-PSIlin = increase_resolution(PSIlin, NOld, MOld, CNSTS)
-Cxxlin = increase_resolution(Cxxlin, NOld, MOld, CNSTS)
-Cyylin = increase_resolution(Cyylin, NOld, MOld, CNSTS)
-Cxylin = increase_resolution(Cxylin, NOld, MOld, CNSTS)
-
-perAmp = 1.e-18 / linalg.norm(PSIlin[(N+1)*M:(N+2)*M])
-
-PSI = PSI + perAmp*PSIlin
-Cxx = Cxx + perAmp*Cxxlin
-Cyy = Cyy + perAmp*Cyylin
-Cxy = Cxy + perAmp*Cxylin
+#PSIlin = format_evector(array(f["psi"]), NOld, MOld)
+#Cxxlin = format_evector(array(f["cxx"]), NOld, MOld)
+#Cyylin = format_evector(array(f["cyy"]), NOld, MOld)
+#Cxylin = format_evector(array(f["cxy"]), NOld, MOld)
+#
+#f.close()
+#
+#PSIlin = increase_resolution(PSIlin, NOld, MOld, CNSTS)
+#Cxxlin = increase_resolution(Cxxlin, NOld, MOld, CNSTS)
+#Cyylin = increase_resolution(Cyylin, NOld, MOld, CNSTS)
+#Cxylin = increase_resolution(Cxylin, NOld, MOld, CNSTS)
+#
+#perAmp = 1.e-18 / linalg.norm(PSIlin[(N+1)*M:(N+2)*M])
+#
+#PSI = PSI + perAmp*PSIlin
+#Cxx = Cxx + perAmp*Cxxlin
+#Cyy = Cyy + perAmp*Cyylin
+#Cxy = Cxy + perAmp*Cxylin
 
 # ----------------------------------------------------------------------------
 

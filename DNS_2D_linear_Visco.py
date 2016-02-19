@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral linear time stepping code
 #
-#   Last modified: Thu 28 Jan 14:51:23 2016
+#   Last modified: Fri 19 Feb 17:02:04 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -728,7 +728,7 @@ else:
 
 psiLam = copy(PSI)
 
-perAmp = 1.0e-6
+perAmp = 1.0e-10
 
 #rn = (10.0**(-1))*(0.5-rand(5))
 rn = ones(5)
@@ -746,17 +746,23 @@ rSpace += perAmp*cos(1.0 * 0.5*pi * y) * rn[3]
 rSpace += perAmp*cos(3.0 * 0.5*pi * y) * rn[4]
 
 
-PSI[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(rSpace, CNSTS)
-PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
+#PSI[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(rSpace, CNSTS)
+#PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
 #Cxx[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(rSpace, CNSTS)
 #Cxx[(N-1)*M:(N)*M] = conj(Cxx[(N+1)*M:(N+2)*M])
 
 # perturbation used in pythonic test code.
 #Cxx[(N+1)*M + 2] = perAmp * (Wi*2./pi)
 #Cxx[(N-1)*M + 2] = perAmp * (Wi*2./pi)
-#
+
 #Cxy[(N+1)*M + 1] = perAmp * (Wi*2./pi)
 #Cxy[(N-1)*M + 1] = perAmp * (Wi*2./pi)
+
+#Cxx[(N+1)*M:(N+2)*M-2] = perAmp * (Wi*2./pi)
+#Cxx[(N-1)*M:N*M-2] = perAmp * (Wi*2./pi)
+#
+#Cxy[(N+1)*M:(N+2)*M-2] = perAmp * (Wi*2./pi)
+#Cxy[(N-1)*M:N*M-2] = perAmp * (Wi*2./pi)
 
 #print log(abs(perAmp))
 

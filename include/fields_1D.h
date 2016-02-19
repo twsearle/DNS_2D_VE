@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Tue  5 Jan 16:42:00 2016
+// Last modified: Fri 19 Feb 13:21:26 2016
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -70,6 +70,9 @@ struct lin_flow_scratch {
     fftw_complex *RHSvec;
     
     fftw_plan *phys_plan, *spec_plan;
+    // A stupid fix. I began by only carrying a pointer to the plan but have
+    // decided to switch to carrying the full plan
+    fftw_plan act_phys_plan, act_spec_plan;
 };
 
 #endif // FIELDS_1D_C_H
