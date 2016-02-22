@@ -236,6 +236,14 @@ def plot_modes(arr_ti, arrname, time, CNSTS):
         xlabel('y')
         ylabel('$Re[{0}_{1}]$'.format(arrname, n))
 
+        if n ==1:
+            if arrname == "\psi" :
+                savetxt(args.path + "/{0}_mode1.dat".format("psi"), 
+                       real(vstack((y, ti_mode)).T))
+            else:
+                savetxt(args.path + "/{0}_mode1.dat".format(arrname),
+                       real(vstack((y, ti_mode)).T))
+
     for n in range(3):
 
         ti_mode = stupid_transform_i(arr_ti[:, n], CNSTS)

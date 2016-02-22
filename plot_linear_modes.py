@@ -256,7 +256,6 @@ def plot_snapshot(data0, data1, tStep, varName):
     line0.set_data(y, data0[tstep, :])
     line1.set_data(y, data1[tstep, :])
 
-    
     plt.savefig('{varName}_snapshot.pdf'.format(varName=varName))
     plt.close()
 
