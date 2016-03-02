@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral linear time stepping code
 #
-#   Last modified: Mon 22 Feb 11:56:31 2016
+#   Last modified: Tue 23 Feb 12:11:48 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -121,6 +121,10 @@ De = args.De
 kx = args.kx
 initTime = args.initTime
 
+print 'CHANGING THE REYNOLDS NUMBER!!!!'
+Re = Wi / 1182.44
+print Re
+
 Re = float("{0:.6e}".format(Re))
 
 if dealiasing:
@@ -142,6 +146,7 @@ CNSTS = {'NOld': NOld, 'MOld': MOld, 'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0,
           'Re': Re, 'Wi': Wi, 'beta': beta, 'De':De, 'kx': kx,'time': totTime,
          'dt':dt, 'P': 1.0,
           'dealiasing':dealiasing}
+
 
 #outPath1 = "./Re{Re}_b{beta}_Wi{Wi}/".format(**CNSTS)
 #outPath2 = "kx_{kx}_M{M}_dt{dt}".format(**CNSTS)
@@ -606,7 +611,7 @@ def easy_perturbation(PSI, Cxx, Cyy, Cxy, perAmp=1.0e-10):
     Cxy[(N-1)*M + 1] = perAmp * (Wi*2./pi)
 
     print log(abs(perAmp))
-    
+
     return PSI,Cxx,Cyy,Cxy
 
 def simple_perturbation(PSI, Cxx, Cyy, Cxy, perAmp=1.0e-10):
@@ -741,7 +746,6 @@ psiLam = copy(PSI)
 
 #PSI, Cxx, Cyy, Cxy = easy_perturbation(PSI, Cxx, Cyy, Cxy, perAmp=1.0e-10)
 #PSI, Cxx, Cyy, Cxy = simple_perturbation(PSI, Cxx, Cyy, Cxy, perAmp=1.0e-10)
-
 PSI, Cxx, Cyy, Cxy = BC_safe_perturbation(PSI, Cxx, Cyy, Cxy, perAmp=1.0e-10)
 
 # ----------------------------------------------------------------------------

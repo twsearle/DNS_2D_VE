@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral linear time stepping code
 #
-#   Last modified: Fri 22 Jan 16:34:47 2016
+#   Last modified: Mon 22 Feb 12:04:45 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -561,6 +561,65 @@ def oscillatory_flow():
 
     return PSI, Cxx, Cyy, Cxy, forcing, P
 
+def easy_perturbation(PSI, Cxx, Cyy, Cxy, perAmp=1.0e-10):
+    """
+    perturb just the second Chebyshev of the xx conformation and the first of the
+    xy conformation.
+
+    perturbation used in pythonic test code.
+
+    """
+    Cxx[(N+1)*M + 2] = perAmp * (Wi*2./pi)
+    Cxx[(N-1)*M + 2] = perAmp * (Wi*2./pi)
+
+    Cxy[(N+1)*M + 1] = perAmp * (Wi*2./pi)
+    Cxy[(N-1)*M + 1] = perAmp * (Wi*2./pi)
+
+    print log(abs(perAmp))
+
+    return PSI,Cxx,Cyy,Cxy
+
+def simple_perturbation(PSI, Cxx, Cyy, Cxy, perAmp=1.0e-10):
+    """ 
+    Slightly better perturbation to catch more errors.
+    """
+
+    Cxx[(N+1)*M:(N+2)*M-2] = perAmp * (Wi*2./pi)
+    Cxx[(N-1)*M:N*M-2] = perAmp * (Wi*2./pi)
+
+    Cxy[(N+1)*M:(N+2)*M-2] = perAmp * (Wi*2./pi)
+    Cxy[(N-1)*M:N*M-2] = perAmp * (Wi*2./pi)
+
+    return PSI, Cxx, Cyy, Cxy
+
+def BC_safe_perturbation(PSI, Cxx, Cyy, Cxy, perAmp=1.0e-10):
+    """
+    Perturbation which satisfies the bc's
+    """
+
+    #rn = (10.0**(-1))*(0.5-rand(5))
+    rn = ones(5)
+
+    rSpace = zeros(Mf, dtype='complex')
+    y = 2.0*arange(Mf)/(Mf-1.0) -1.0
+
+    ## sinusoidal
+    rSpace =  perAmp*sin(1.0 * pi * y) * rn[0]
+    rSpace += perAmp*sin(2.0 * pi * y) * rn[1]
+    rSpace += perAmp*sin(3.0 * pi * y) * rn[2]
+
+    ## cosinusoidal 
+    rSpace += perAmp*cos(1.0 * 0.5*pi * y) * rn[3]
+    rSpace += perAmp*cos(3.0 * 0.5*pi * y) * rn[4]
+
+
+    PSI[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(rSpace, CNSTS)
+    PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
+    Cxx[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(rSpace, CNSTS)
+    Cxx[(N-1)*M:(N)*M] = conj(Cxx[(N+1)*M:(N+2)*M])
+
+    return PSI, Cxx, Cyy, Cxy
+
 # -----------------------------------------------------------------------------
 # MAIN
 # -----------------------------------------------------------------------------
@@ -681,34 +740,9 @@ for kx in kxList:
 
     psiLam = copy(PSI)
 
-    perAmp = 1.0e-6
-
-    #rn = (10.0**(-1))*(0.5-rand(5))
-    rn = ones(5)
-
-    rSpace = zeros(Mf, dtype='complex')
-    y = 2.0*arange(Mf)/(Mf-1.0) -1.0
-    
-    ## sinusoidal
-    rSpace =  perAmp*sin(1.0 * pi * y) * rn[0]
-    rSpace += perAmp*sin(2.0 * pi * y) * rn[1]
-    rSpace += perAmp*sin(3.0 * pi * y) * rn[2]
-
-    ## cosinusoidal 
-    rSpace += perAmp*cos(1.0 * 0.5*pi * y) * rn[3]
-    rSpace += perAmp*cos(3.0 * 0.5*pi * y) * rn[4]
-    
-   
-    PSI[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(rSpace, CNSTS)
-    PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
-
-    # perturbation used in pythonic test code.
-    #Cxx[(N+1)*M + 2] = perAmp * (Wi*2./pi)
-    #Cxx[(N-1)*M + 2] = perAmp * (Wi*2./pi)
-
-    #Cxy[(N+1)*M + 1] = perAmp * (Wi*2./pi)
-    #Cxy[(N-1)*M + 1] = perAmp * (Wi*2./pi)
-
+    #PSI, Cxx, Cyy, Cxy = easy_perturbation(PSI, Cxx, Cyy, Cxy, perAmp=1.0e-6)
+    #PSI, Cxx, Cyy, Cxy = simple_perturbation(PSI, Cxx, Cyy, Cxy, perAmp=1.0e-6)
+    PSI, Cxx, Cyy, Cxy = BC_safe_perturbation(PSI, Cxx, Cyy, Cxy, perAmp=1.0e-6)
 
 
     # ----------------------------------------------------------------------------

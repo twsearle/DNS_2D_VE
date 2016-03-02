@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri 19 Feb 13:46:49 2016
+// Last modified: Mon 22 Feb 16:27:41 2016
 
 /* Program Description:
  *
@@ -597,7 +597,8 @@ void output_macro_state(complex_d *psi, complex_d *cij, double phase, double tim
 
     fprintf(tracePSI, "%e\t%e\t%e\n", time, normPSI0, normPSI1);
     fprintf(traceKE, "%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1);
-    printf("%e\t%e\t%e\t%e\t\n", time, KE_tot, KE0, KE1);
+    //printf("%e\t%e\t%e\t%e\t\n", time, KE_tot, KE0, KE1);
+    
     // **** STUPID TEST *****
     //scr.scratch[0] = log(cabs((0.5*M_PI/params.Wi)*cij[2*(N+1)*M + ind(1,1)]));
     //scr.scratch[1] = log(cabs((0.5*M_PI/params.Wi)*cij[ind(1,2)]));

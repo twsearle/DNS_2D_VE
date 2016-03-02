@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Thu 18 Feb 12:46:32 2016
+#   Last modified: Wed  2 Mar 15:44:38 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -116,6 +116,12 @@ beta = args.b
 Wi = args.Wi
 kx = args.kx
 initTime = args.initTime
+
+print 'CHANGING THE REYNOLDS NUMBER!!!!'
+Re = Wi / 1182.44
+print Re
+
+Re = float("{0:.6e}".format(Re))
 
 if dealiasing:
     Nf = (3*N)/2 + 1
@@ -840,28 +846,28 @@ psiLam = copy(PSI)
 
 perAmp = 1e-10
 
-#rSpace = zeros(Mf, dtype='complex')
-#rn = ones(5)
-#y = 2.0*arange(Mf)/(Mf-1.0) -1.0
-#
-### sinusoidal
-#rSpace =  perAmp*sin(1.0 * pi * y) * rn[0]
-#rSpace += perAmp*sin(2.0 * pi * y) * rn[1]
-#rSpace += perAmp*sin(3.0 * pi * y) * rn[2]
-#
-### cosinusoidal 
-#rSpace += perAmp*cos(1.0 * 0.5*pi * y) * rn[3]
-#rSpace += perAmp*cos(3.0 * 0.5*pi * y) * rn[4]
-#
-#
-#PSI[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(rSpace, CNSTS)
-#PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
+rSpace = zeros(Mf, dtype='complex')
+rn = ones(5)
+y = 2.0*arange(Mf)/(Mf-1.0) -1.0
 
-Cxx[(N+1)*M + 2] = perAmp * (Wi*2./pi)
-Cxx[(N-1)*M + 2] = perAmp * (Wi*2./pi)
+## sinusoidal
+rSpace =  perAmp*sin(1.0 * pi * y) * rn[0]
+rSpace += perAmp*sin(2.0 * pi * y) * rn[1]
+rSpace += perAmp*sin(3.0 * pi * y) * rn[2]
 
-Cxy[(N+1)*M + 1] = perAmp * (Wi*2./pi)
-Cxy[(N-1)*M + 1] = perAmp * (Wi*2./pi)
+## cosinusoidal 
+rSpace += perAmp*cos(1.0 * 0.5*pi * y) * rn[3]
+rSpace += perAmp*cos(3.0 * 0.5*pi * y) * rn[4]
+
+
+PSI[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(rSpace, CNSTS)
+PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
+
+#Cxx[(N+1)*M + 2] = perAmp * (Wi*2./pi)
+#Cxx[(N-1)*M + 2] = perAmp * (Wi*2./pi)
+#
+#Cxy[(N+1)*M + 1] = perAmp * (Wi*2./pi)
+#Cxy[(N-1)*M + 1] = perAmp * (Wi*2./pi)
 
 #f = h5py.File("linear_evec.h5","r")
 #

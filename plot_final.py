@@ -77,7 +77,8 @@ else:
     #inFileName2 = "./full_final.h5".format()
     inFileName = args.path + "/output/final.h5".format()
     print 'Reading from: ', inFileName
-    twsFileName = args.path + "/pf-N{N}-M{M}-kx{kx}-Re{Re}-b{beta}-Wi{Wi}.pickle".format(**kwargs)
+
+    #twsFileName = args.path + "/pf-N{N}-M{M}-kx{kx}-Re{Re}-b{beta}-Wi{Wi}.pickle".format(**kwargs)
 
 
 CNSTS = kwargs
@@ -368,8 +369,8 @@ for n in range(1,N+1):
     cxy_ti[:, n] = phase_factor**n*cxy_ti[:, n]
     cxy_ti[:, 2*N+1-n] = phase_factor**(-n)*cxy_ti[:, 2*N+1-n]
 
-#y = cos(pi*arange(Mf)/(Mf-1))
-y = 2.0*arange(Mf)/(Mf-1.) -1
+y = cos(pi*arange(Mf)/(Mf-1))
+#y = 2.0*arange(Mf)/(Mf-1.) -1
 
 # Compare mode by mode
 
