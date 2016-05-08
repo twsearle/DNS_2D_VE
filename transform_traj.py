@@ -31,8 +31,8 @@ Re = config.getfloat('General', 'Re')
 Wi = 0.0
 beta = 1.0
 kx = config.getfloat('General', 'kx')
-Nf = 50
-Mf = 100
+Nf = 4*N
+Mf = M
 
 dt = config.getfloat('Time Iteration', 'dt')
 totTime = config.getfloat('Time Iteration', 'totTime')

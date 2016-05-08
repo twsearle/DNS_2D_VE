@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 22 Feb 16:28:05 2016
+// Last modified: Sun  1 May 13:49:01 2016
 
 /* Program Description:
  *
@@ -705,7 +705,7 @@ int main(int argc, char **argv)
             printf("%e\t%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1, EE0);
 
             save_hdf5_snapshot_visco(&hdf5fp, &filetype_id, &datatype_id,
-		 psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], time, params);
+	    	 psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], time, params);
              
             fprintf(tracefp, "%e\t%e\t%e\t%e\t%e\t%e\n", time, KE_tot, KE0, KE1, KE2, KE_xdepend);
             fflush(tracePSI);

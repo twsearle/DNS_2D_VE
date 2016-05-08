@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Wed  2 Mar 15:44:38 2016
+#   Last modified: Sun  8 May 11:15:50 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -135,8 +135,8 @@ assert (totTime / dt) - float(numTimeSteps) == 0, "Non-integer number of timeste
 assert Wi != 0.0, "cannot have Wi = 0!"
 assert args.flow_type < 3, "flow type unspecified!" 
 
-NOld = 1 
-MOld = 192
+NOld = 2 
+MOld = 320
 
 CNSTS = {'NOld': NOld, 'MOld': MOld, 'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0,
           'Re': Re, 'Wi': Wi, 'beta': beta, 'De':De, 'kx': kx,'time': totTime,
@@ -784,48 +784,53 @@ psiLam = copy(PSI)
 #psiLam = copy(PSI)
 #print inFileName
 #
-#f = h5py.File("final.h5","r")
-#
-#PSI = array(f["psi"])
-#Cxx = array(f["cxx"])
-#Cyy = array(f["cyy"])
-#Cxy = array(f["cxy"])
-#
-#f.close()
-#
-#tmp = PSI.reshape((N+1, M)).T
-#PSI = zeros((M, 2*N+1), dtype='complex')
-#PSI[:, :N+1] = tmp
-#for n in range(1, N+1):
-#    PSI[:, 2*N+1 - n] = conj(PSI[:, n])
-#PSI = fftshift(PSI, axes=1)
-#PSI = PSI.T.flatten()
-#
-#tmp = Cxx.reshape((N+1, M)).T
-#Cxx = zeros((M, 2*N+1), dtype='complex')
-#Cxx[:, :N+1] = tmp
-#for n in range(1, N+1):
-#    Cxx[:, 2*N+1 - n] = conj(Cxx[:, n])
-#Cxx = fftshift(Cxx, axes=1)
-#Cxx = Cxx.T.flatten()
-#
-#tmp = Cyy.reshape((N+1, M)).T
-#Cyy = zeros((M, 2*N+1), dtype='complex')
-#Cyy[:, :N+1] = tmp
-#for n in range(1, N+1):
-#    Cyy[:, 2*N+1 - n] = conj(Cyy[:, n])
-#Cyy = fftshift(Cyy, axes=1)
-#Cyy = Cyy.T.flatten()
-#
-#tmp = Cxy.reshape((N+1, M)).T
-#Cxy = zeros((M, 2*N+1), dtype='complex')
-#Cxy[:, :N+1] = tmp
-#for n in range(1, N+1):
-#    Cxy[:, 2*N+1 - n] = conj(Cxy[:, n])
-#Cxy = fftshift(Cxy, axes=1)
-#Cxy = Cxy.T.flatten()
-#
-#psiLam = copy(PSI)
+f = h5py.File("NL_t4000.h5","r")
+
+PSI = array(f["psi"])
+Cxx = array(f["cxx"])
+Cyy = array(f["cyy"])
+Cxy = array(f["cxy"])
+
+f.close()
+
+tmp = PSI.reshape((NOld+1, MOld)).T
+PSI = zeros((MOld, 2*NOld+1), dtype='complex')
+PSI[:, :NOld+1] = tmp
+for n in range(1, NOld+1):
+    PSI[:, 2*NOld+1 - n] = conj(PSI[:, n])
+PSI = fftshift(PSI, axes=1)
+PSI = PSI.T.flatten()
+
+tmp = Cxx.reshape((NOld+1, MOld)).T
+Cxx = zeros((MOld, 2*NOld+1), dtype='complex')
+Cxx[:, :NOld+1] = tmp
+for n in range(1, NOld+1):
+    Cxx[:, 2*NOld+1 - n] = conj(Cxx[:, n])
+Cxx = fftshift(Cxx, axes=1)
+Cxx = Cxx.T.flatten()
+
+tmp = Cyy.reshape((NOld+1, MOld)).T
+Cyy = zeros((MOld, 2*NOld+1), dtype='complex')
+Cyy[:, :NOld+1] = tmp
+for n in range(1, NOld+1):
+    Cyy[:, 2*NOld+1 - n] = conj(Cyy[:, n])
+Cyy = fftshift(Cyy, axes=1)
+Cyy = Cyy.T.flatten()
+
+tmp = Cxy.reshape((NOld+1, MOld)).T
+Cxy = zeros((MOld, 2*NOld+1), dtype='complex')
+Cxy[:, :NOld+1] = tmp
+for n in range(1, NOld+1):
+    Cxy[:, 2*NOld+1 - n] = conj(Cxy[:, n])
+Cxy = fftshift(Cxy, axes=1)
+Cxy = Cxy.T.flatten()
+
+PSI = increase_resolution(PSI, NOld, MOld, CNSTS)
+Cxx = increase_resolution(Cxx, NOld, MOld, CNSTS)
+Cyy = increase_resolution(Cyy, NOld, MOld, CNSTS)
+Cxy = increase_resolution(Cxy, NOld, MOld, CNSTS)
+
+psiLam = copy(PSI)
 
 
 ### ----------------------- PERTURBATIONS ------------------------------------
@@ -844,24 +849,24 @@ psiLam = copy(PSI)
 #PSI[(N)*M+1] += lsd *(155./64. - 4. )
 #PSI[(N)*M+0] += lsd *(1./8) 
 
-perAmp = 1e-10
+#perAmp = 1e-10
 
-rSpace = zeros(Mf, dtype='complex')
-rn = ones(5)
-y = 2.0*arange(Mf)/(Mf-1.0) -1.0
-
-## sinusoidal
-rSpace =  perAmp*sin(1.0 * pi * y) * rn[0]
-rSpace += perAmp*sin(2.0 * pi * y) * rn[1]
-rSpace += perAmp*sin(3.0 * pi * y) * rn[2]
-
-## cosinusoidal 
-rSpace += perAmp*cos(1.0 * 0.5*pi * y) * rn[3]
-rSpace += perAmp*cos(3.0 * 0.5*pi * y) * rn[4]
-
-
-PSI[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(rSpace, CNSTS)
-PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
+#rSpace = zeros(Mf, dtype='complex')
+#rn = ones(5)
+#y = 2.0*arange(Mf)/(Mf-1.0) -1.0
+#
+### sinusoidal
+#rSpace =  perAmp*sin(1.0 * pi * y) * rn[0]
+#rSpace += perAmp*sin(2.0 * pi * y) * rn[1]
+#rSpace += perAmp*sin(3.0 * pi * y) * rn[2]
+#
+### cosinusoidal 
+#rSpace += perAmp*cos(1.0 * 0.5*pi * y) * rn[3]
+#rSpace += perAmp*cos(3.0 * 0.5*pi * y) * rn[4]
+#
+#
+#PSI[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(rSpace, CNSTS)
+#PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
 
 #Cxx[(N+1)*M + 2] = perAmp * (Wi*2./pi)
 #Cxx[(N-1)*M + 2] = perAmp * (Wi*2./pi)
@@ -883,7 +888,7 @@ PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
 #Cyylin = increase_resolution(Cyylin, NOld, MOld, CNSTS)
 #Cxylin = increase_resolution(Cxylin, NOld, MOld, CNSTS)
 #
-#perAmp = 1.e-18 / linalg.norm(PSIlin[(N+1)*M:(N+2)*M])
+#perAmp = 1.e-2 / linalg.norm(PSIlin[(N+1)*M:(N+2)*M])
 #
 #PSI = PSI + perAmp*PSIlin
 #Cxx = Cxx + perAmp*Cxxlin
