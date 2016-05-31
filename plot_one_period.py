@@ -24,8 +24,9 @@ beta = config.getfloat('General', 'beta')
 kx = config.getfloat('General', 'kx')
 Nf = 4*N
 Mf = 2*M
+De = config.getfloat('Oscillatory Flow', 'De')
 
-varName = 'psi'
+varName = 'cxx'
 
 dt = config.getfloat('Time Iteration', 'dt')
 totTime = config.getfloat('Time Iteration', 'totTime')
@@ -213,6 +214,54 @@ def animate_all(i):
 
     return line0r, line0i, line1r, line1i, line2r, line2i, timetext
 
+
+def real_space_oscillatory_flow():
+    """
+    Calculate the base flow at t =0 for the oscillatory flow problem in real
+    space.
+    """
+
+    y = cos(pi*arange(Mf)/(Mf-1))
+
+    Re = Wi / 1182.44
+
+    tmp = beta + (1-beta) / (1 + 1.j*De)
+    print 'tmp', tmp
+    alpha = sqrt( (1.j*pi*Re*De) / (2*Wi*tmp) )
+    print 'alpha', alpha
+    Chi = real( (1-1.j)*(1 - tanh(alpha) / alpha) )
+    print 'Chi', Chi 
+
+    Psi_B = zeros((Mf, 2*Nf+1), dtype='d')
+    Cxy_B = zeros((Mf, 2*Nf+1), dtype='d')
+    Cxx_B = zeros((Mf, 2*Nf+1), dtype='d')
+    Cyy_B = zeros((Mf, 2*Nf+1), dtype='d')
+
+    for i in range(Mf):
+        for j in range(2*Nf+1):
+            psi_im = pi/(2.j*Chi) *(y[i]-sinh(alpha*y[i])/(alpha*cosh(alpha))\
+                                     + sinh(alpha*-1)/(alpha*cosh(alpha)) )
+            Psi_B[i,j] = real(psi_im)
+
+            dyu_cmplx = pi/(2.j*Chi) *(-alpha*sinh(alpha*y[i])/(cosh(alpha)))
+            cxy_cmplx = (1.0/(1.0+1.j*De)) * ((2*Wi/pi) * dyu_cmplx) 
+
+            Cxy_B[i,j] = real( cxy_cmplx )
+
+            cxx_cmplx = (1.0/(1.0+2.j*De))*(Wi/pi)*(cxy_cmplx*dyu_cmplx)
+            cxx_cmplx += (1.0/(1.0-2.j*De))*(Wi/pi)*(conj(cxy_cmplx)*conj(dyu_cmplx)) 
+
+            cxx_cmplx += 1. + (Wi/pi)*( cxy_cmplx*conj(dyu_cmplx) +
+                                       conj(cxy_cmplx)*dyu_cmplx ) 
+            Cxx_B[i,j] = real(cxx_cmplx)
+
+    del i, j
+
+    Cyy_B[:,0] = 1
+
+
+    return Psi_B, Cxx_B, Cyy_B, Cxy_B
+
 ##### MAIN ######
 
 print"=====================================\n"
@@ -260,8 +309,13 @@ init_i = backward_cheb_transform(imag(init_var_ti[:, 0]), CNSTS)
 final_r = backward_cheb_transform(real(final_var_ti[:, 0]), CNSTS)
 final_i = backward_cheb_transform(imag(final_var_ti[:, 0]), CNSTS)
 
+
+Psi_B, Cxx_B, Cyy_B, Cxy_B = real_space_oscillatory_flow()
+
 plt.plot(y,  init_r, 'r-')
 #plt.plot(y,  init_i, 'g-')
-plt.plot(y,  final_r, 'ro')
+#plt.plot(y,  final_r, 'ro')
 #plt.plot(y,  final_i, 'go')
+plt.plot(y,  Cxx_B[:,0], 'b.', linewidth=1, markersize=5)
+
 plt.show(block='True')

@@ -106,6 +106,11 @@ class Flow(object):
         self.line1.set_data(y, self.data1[i, :])
 
 
+def plot_step( i):
+
+    line0.set_data(y, self.data0[i, :])
+    line1.set_data(y, self.data1[i, :])
+
 
 def load_hdf5_snapshot(fp, time):
 
@@ -220,9 +225,6 @@ def calc_laminar_flow(y_points, t):
 def plot_snapshot(data0, data1, tStep, varName):
     fig = plt.figure(figsize=(5.0, 3.0))
 
-    data0 = data0
-    data1 = data1
-
     ax0 = fig.add_subplot(121)
 
     ax0.set_xlim([-1, 1]) 
@@ -302,16 +304,16 @@ for frameNum in range(low_frame,numFrames):
 
     psi = psi.reshape((N+1, M)).T
     # plot only the 1st mode
-    psi[:,0] = 0
+    #psi[:,0] = 0
     psi = hstack((psi, conj(psi[:, N:0:-1])))
     cxx = cxx.reshape((N+1, M)).T
-    cxx[:,0] = 0
+    #cxx[:,0] = 0
     cxx = hstack((cxx, conj(cxx[:, N:0:-1])))
     cxy = cxy.reshape((N+1, M)).T
-    cxy[:,0] = 0
+    #cxy[:,0] = 0
     cxy = hstack((cxy, conj(cxy[:, N:0:-1])))
     cyy = cyy.reshape((N+1, M)).T
-    cyy[:,0] = 0
+    #cyy[:,0] = 0
     cyy = hstack((cyy, conj(cyy[:, N:0:-1])))
 
     u = f2d.dy(psi, CNSTS) 
@@ -336,30 +338,49 @@ plot_snapshot(Cyy0, cyyReal, 0, varName='Cyy')
 # plot animations
 
 fig = plt.figure(figsize=(5.0,3.0))
-Uobj = Flow(fig, U0, uReal)
-anim = animation.FuncAnimation(fig, Uobj.plot_step,
-                               frames=numSteps, interval=100, blit=False)
+
+ims = []
+for i in range(numSteps):
+    ims.append(plt.plot(y, uReal[i,:],color='#1b9e77',linewidth=2.0),)
+
+anim = animation.ArtistAnimation(fig, ims, interval=100, blit=True)
 anim.save('uReal.mp4', fps=20, extra_args=['-vcodec', 'libx264'])
 fig.clf()
 
-Cxxobj = Flow(fig, Cxx0, cxxReal)
-anim = animation.FuncAnimation(fig, Cxxobj.plot_step,
-                               frames=numSteps, interval=100, blit=False)
+ims = []
+for i in range(numSteps):
+    ims.append(plt.plot(y, cxxReal[i,:],color='#1b9e77',linewidth=2.0),)
+
+anim = animation.ArtistAnimation(fig, ims, interval=100, blit=True)
 anim.save('cxxReal.mp4', fps=20, extra_args=['-vcodec', 'libx264'])
 fig.clf()
 
-Cxyobj = Flow(fig, Cxy0, cxyReal)
-anim = animation.FuncAnimation(fig, Cxyobj.plot_step,
-                               frames=numSteps, interval=100, blit=False)
+ims = []
+for i in range(numSteps):
+    ims.append(plt.plot(y, cxyReal[i,:],color='#1b9e77',linewidth=2.0),)
+
+anim = animation.ArtistAnimation(fig, ims, interval=100, blit=True)
 anim.save('cxyReal.mp4', fps=20, extra_args=['-vcodec', 'libx264'])
 fig.clf()
 
-Cyyobj = Flow(fig, Cyy0, cyyReal)
-anim = animation.FuncAnimation(fig, Cyyobj.plot_step,
-                               frames=numSteps, interval=100, blit=False)
+ims = []
+for i in range(numSteps):
+    ims.append(plt.plot(y, cyyReal[i,:],color='#1b9e77',linewidth=2.0),)
+
+anim = animation.ArtistAnimation(fig, ims, interval=100, blit=True)
 anim.save('cyyReal.mp4', fps=20, extra_args=['-vcodec', 'libx264'])
 fig.clf()
 
+not_positive_definite = less(cxxReal + cyyReal, zeros(shape(cxxReal))).astype(int)
 
+if any(not_positive_definite):
 
+    print 'Failed positive definiteness of conformation tensor, making movie'
+    ims = []
+    for i in range(numSteps):
+        ims.append(plt.plot(y, not_positive_definite[i,:],color='#1b9e77',linewidth=2.0),)
+
+    anim = animation.ArtistAnimation(fig, ims, interval=100, blit=True)
+    anim.save('not_positive_definite.mp4', fps=20, extra_args=['-vcodec', 'libx264'])
+    fig.clf()
 

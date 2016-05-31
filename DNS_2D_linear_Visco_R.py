@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral linear time stepping code
 #
-#   Last modified: Mon 22 Feb 12:04:45 2016
+#   Last modified: Thu 26 May 17:24:47 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -149,6 +149,9 @@ MOld = 40
 
 
 # -----------------------------------------------------------------------------
+
+def my_lin(t,a0,a1):
+    return a0+a1*t
 
 def mk_single_diffy():
     """Makes a matrix to differentiate a single vector of Chebyshev's, 
@@ -890,7 +893,20 @@ for kx in kxList:
     elif np.isnan(tracePSInorm[-1, 2]):
         growthRate = float('nan')
     else:
-        growthRate = 0.5 * (logPsiNorm1[-1]-logPsiNorm1[0]) / (tracePSInorm[-1,0] - tracePSInorm[-frameIndex,0])
+        # calculate timestep 100 periods ago.
+        period = 2*pi
+        time_per_frame = ( totTime / numFrames )
+        frames_per_period = period / time_per_frame
+        frameIndex = int(floor(100.0*frames_per_period)) +1
+
+        adjTime = tracePSInorm[-frameIndex:,0] #- tracePSInorm[-frameIndex,0]
+
+        poptr = [1, 0.1]
+
+        poptr, pcov = optimize.curve_fit(my_lin, adjTime,
+                                         log(1e12*tracePSInorm[-frameIndex:,2]), p0=poptr)
+
+        growthRate = 0.5*poptr[1]
         if np.isinf(growthRate):
             growthRate = float('nan')
 

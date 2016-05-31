@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Sun  8 May 11:15:50 2016
+#   Last modified: Tue 31 May 18:04:06 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -49,6 +49,8 @@ Outline:
 from scipy import *
 from scipy import linalg
 from scipy import optimize
+from scipy.fftpack import dct as dct
+
 from numpy.linalg import cond 
 from numpy.fft import fftshift, ifftshift
 from numpy.random import rand
@@ -135,7 +137,7 @@ assert (totTime / dt) - float(numTimeSteps) == 0, "Non-integer number of timeste
 assert Wi != 0.0, "cannot have Wi = 0!"
 assert args.flow_type < 3, "flow type unspecified!" 
 
-NOld = 2 
+NOld = 4 
 MOld = 320
 
 CNSTS = {'NOld': NOld, 'MOld': MOld, 'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0,
@@ -370,6 +372,34 @@ def stupid_transform_i(GLspec, CNSTS):
     del i,j
 
     return out
+
+def backward_cheb_transform(cSpec, CNSTS):
+    """
+    Use a DCT to transform a single array of Chebyshev polynomials to the
+    Gauss-Labatto grid.
+    """
+    # cleverer way, now works!
+    M = CNSTS['M']
+    Mf = CNSTS['Mf']
+
+    # Define the temporary vector for the transformation
+    tmp = zeros(Mf)
+
+    # The first half contains the vector on the Gauss-Labatto points * c_k
+    tmp[0] = real(cSpec[0])
+    tmp[1:M] = 0.5*real(cSpec[1:M])
+    tmp[Mf-1] = 2*tmp[Mf-1]
+
+    out = zeros(Mf, dtype='complex')
+    out = dct(tmp, type=1).astype('complex') 
+
+    tmp[0] = imag(cSpec[0])
+    tmp[1:M] = 0.5*imag(cSpec[1:M])
+    tmp[Mf-1] = 2*tmp[Mf-1]
+
+    out += dct(tmp, type=1) * 1.j
+
+    return out[0:Mf]
 
 def perturb(psi_, totEnergy, perKEestimate, sigma, gam):
     """
@@ -680,6 +710,93 @@ def oscillatory_flow():
 
     return PSI, Cxx, Cyy, Cxy, forcing, P
 
+def real_space_oscillatory_flow(time, CNSTS):
+    """
+    Calculate the base flow at t =0 for the oscillatory flow problem in real
+    space.
+    """
+
+    Mf = CNSTS['Mf']
+    Nf = CNSTS['Nf']
+
+    y = cos(pi*arange(Mf)/(Mf-1))
+
+    Re = Wi / 1182.44
+
+    tmp = beta + (1-beta) / (1 + 1.j*De)
+    #print 'tmp', tmp
+    alpha = sqrt( (1.j*pi*Re*De) / (2*Wi*tmp) )
+    #print 'alpha', alpha
+    Chi = real( (1-1.j)*(1 - tanh(alpha) / alpha) )
+    #print 'Chi', Chi 
+
+    Psi_B = zeros((Mf), dtype='d')
+    U_B = zeros((Mf), dtype='d')
+    Cxy_B = zeros((Mf), dtype='d')
+    Cxx_B = zeros((Mf), dtype='d')
+    Cyy_B = zeros((Mf), dtype='d')
+
+    for i in range(Mf):
+            psi_im = pi/(2.j*Chi)*(y[i] - sinh(alpha*y[i])/(alpha*cosh(alpha))
+                                        + sinh(alpha*-1)/(alpha*cosh(alpha))
+                                   )
+            Psi_B[i] = real(psi_im*exp(1.j*time))
+
+            u_cmplx = pi/(2.j*Chi) * (1. - cosh(alpha*y[i])/(cosh(alpha)))
+            U_B[i] = real(u_cmplx*exp(1.j*time))
+
+            dyu_cmplx = pi/(2.j*Chi) *(-alpha*sinh(alpha*y[i])/(cosh(alpha)))
+            cxy_cmplx = (1.0/(1.0+1.j*De)) * ((2*Wi/pi) * dyu_cmplx) 
+
+            Cxy_B[i] = real( cxy_cmplx*exp(1.j*time) )
+
+            cxx_cmplx = (1.0/(1.0+2.j*De))*(Wi/pi)*(cxy_cmplx*dyu_cmplx*exp(2.j*time))
+            cxx_cmplx += (1.0/(1.0-2.j*De))*(Wi/pi)*(conj(cxy_cmplx)*conj(dyu_cmplx))*exp(-2.j*time)
+
+            cxx_cmplx += 1. + (Wi/pi)*( cxy_cmplx*conj(dyu_cmplx) +
+                                       conj(cxy_cmplx)*dyu_cmplx ) 
+            Cxx_B[i] = real(cxx_cmplx)
+
+    Cyy_B[:] = 1
+
+
+    return U_B, Cxx_B, Cyy_B, Cxy_B
+
+def calculate_piston_phase(Psi, CNSTS):
+    """
+    Consider 2*pi worth of base flow trajectory data, and the same of the base
+    flow calculation in order to calculate the shift we need to apply to the
+    time, the phase factor, to make the trajectory time and the simulation time
+    match up again.
+    """
+
+    t_per_frame = 0.01
+    frames_per_t = 1. / t_per_frame
+    initTime = 0
+    finalTime = floor(frames_per_t * 2.*pi ) * t_per_frame
+
+    U_ti = dot(SMDY, Psi)
+
+    U_ti_B = real(backward_cheb_transform(U_ti, CNSTS))
+
+    timeArray = r_[initTime:finalTime+t_per_frame:t_per_frame]
+
+    checkArray = zeros((len(timeArray),2), dtype='d')
+
+    for i, time in enumerate(timeArray):
+
+        UB, _, _, _ = real_space_oscillatory_flow(time, CNSTS)
+
+        checkArray[i,0] = time 
+        checkArray[i,1] =  linalg.norm(abs(U_ti_B - UB))
+    
+
+    time_shift =  checkArray[argmin(checkArray[:,1]),0]
+
+    print 'piston_phase', time_shift
+
+    return time_shift
+
 def format_evector(inArr, N, M):
 
     outArr = zeros((M, 2*N+1), dtype='complex') 
@@ -784,7 +901,7 @@ psiLam = copy(PSI)
 #psiLam = copy(PSI)
 #print inFileName
 #
-f = h5py.File("NL_t4000.h5","r")
+f = h5py.File("NL_4_t14000.h5","r")
 
 PSI = array(f["psi"])
 Cxx = array(f["cxx"])
@@ -792,6 +909,7 @@ Cyy = array(f["cyy"])
 Cxy = array(f["cxy"])
 
 f.close()
+
 
 tmp = PSI.reshape((NOld+1, MOld)).T
 PSI = zeros((MOld, 2*NOld+1), dtype='complex')
@@ -831,6 +949,31 @@ Cyy = increase_resolution(Cyy, NOld, MOld, CNSTS)
 Cxy = increase_resolution(Cxy, NOld, MOld, CNSTS)
 
 psiLam = copy(PSI)
+
+relax_param = 1
+
+tmp = PSI[N*M:(N+1)*M]
+PSI = relax_param*PSI
+PSI[N*M:(N+1)*M] = tmp
+
+tmp = Cxx[N*M:(N+1)*M]
+Cxx = relax_param*Cxx
+Cxx[N*M:(N+1)*M] = tmp
+
+tmp = Cyy[N*M:(N+1)*M]
+Cyy = relax_param*Cyy
+Cyy[N*M:(N+1)*M] = tmp
+
+tmp = Cxy[N*M:(N+1)*M]
+Cxy = relax_param*Cxy
+Cxy[N*M:(N+1)*M] = tmp
+
+### Alter the initialisation time
+
+print 'Changing initialisation time, for oscillatory flow'
+piston_phase = calculate_piston_phase(PSI[N*M:(N+1)*M], CNSTS)
+
+initTime = piston_phase
 
 
 ### ----------------------- PERTURBATIONS ------------------------------------

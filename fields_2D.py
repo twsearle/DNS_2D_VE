@@ -801,11 +801,33 @@ def backward_cheb_transform(cSpec, CNSTS):
 
     return out[0:Mf]
 
-#def backward_cheb_transform_2(cSpec, CNSTS):
-#    """
-#    Use a DCT to transform a single array of Chebyshev polynomials to the
-#    Gauss-Labatto grid.
-#    """
+def backward_cheb_transform_2(cSpec, CNSTS):
+    """
+    Use a DCT to transform a single array of Chebyshev polynomials to the
+    Gauss-Labatto grid.
+    """
+    # cleverer way, now works!
+    M = CNSTS['M']
+    Mf = CNSTS['Mf']
+
+    # Define the temporary vector for the transformation
+    tmp = zeros(Mf)
+
+    # The first half contains the vector on the Gauss-Labatto points * c_k
+    tmp[0] = real(cSpec[0])
+    tmp[1:M] = 0.5*real(cSpec[1:M])
+    tmp[Mf-1] = 2*tmp[Mf-1]
+
+    out = zeros(Mf, dtype='complex')
+    out = dct(tmp, type=1).astype('complex') 
+
+    tmp[0] = imag(cSpec[0])
+    tmp[1:M] = 0.5*imag(cSpec[1:M])
+    tmp[Mf-1] = 2*tmp[Mf-1]
+
+    out += dct(tmp, type=1) * 1.j
+
+    return out[0:Mf]
 #
 #    Mf = CNSTS['Mf']
 #    M = CNSTS['M']
