@@ -1,7 +1,7 @@
 #------------------------------------------------------------------------------
 #   Colour map movies for the Oscillatory flow problem
 #
-#   Last modified: Tue 31 May 14:10:57 2016
+#   Last modified: Wed 22 Jun 10:56:49 2016
 #
 #------------------------------------------------------------------------------
 
@@ -84,10 +84,10 @@ def load_hdf5_flatform(fp, time):
     dataset_id = "/t{0:f}".format(time)
     print dataset_id
 
-    psi = array(f[dataset_id+"/psi"])
-    cxx = array(f[dataset_id+"/cxx"])
-    cyy = array(f[dataset_id+"/cyy"])
-    cxy = array(f[dataset_id+"/cxy"])
+    psi = array(fp[dataset_id+"/psi"])
+    cxx = array(fp[dataset_id+"/cxx"])
+    cyy = array(fp[dataset_id+"/cyy"])
+    cxy = array(fp[dataset_id+"/cxy"])
 
     psi = reshape_field(psi)
     cxx = reshape_field(cxx)

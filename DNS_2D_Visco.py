@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Tue 31 May 18:04:06 2016
+#   Last modified: Tue 21 Jun 10:22:45 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -119,9 +119,10 @@ Wi = args.Wi
 kx = args.kx
 initTime = args.initTime
 
-print 'CHANGING THE REYNOLDS NUMBER!!!!'
-Re = Wi / 1182.44
-print Re
+if args.flow_type == 2:
+    print 'CHANGING THE REYNOLDS NUMBER!!!!'
+    Re = Wi / 1182.44
+    print Re
 
 Re = float("{0:.6e}".format(Re))
 
@@ -137,7 +138,7 @@ assert (totTime / dt) - float(numTimeSteps) == 0, "Non-integer number of timeste
 assert Wi != 0.0, "cannot have Wi = 0!"
 assert args.flow_type < 3, "flow type unspecified!" 
 
-NOld = 4 
+NOld = N
 MOld = 320
 
 CNSTS = {'NOld': NOld, 'MOld': MOld, 'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0,
@@ -626,6 +627,8 @@ def shear_layer_flow(delta=0.1):
     
     del y, i, j
     forcing = f2d.to_spectral(forcing, CNSTS)
+    forcing[:,1:] = 0 
+    #forcing = real(forcing)
 
     Cxx, Cyy, Cxy = x_independent_profile(PSI)
 
@@ -901,7 +904,7 @@ psiLam = copy(PSI)
 #psiLam = copy(PSI)
 #print inFileName
 #
-f = h5py.File("NL_4_t14000.h5","r")
+f = h5py.File("input.h5","r")
 
 PSI = array(f["psi"])
 Cxx = array(f["cxx"])
@@ -943,10 +946,10 @@ for n in range(1, NOld+1):
 Cxy = fftshift(Cxy, axes=1)
 Cxy = Cxy.T.flatten()
 
-PSI = increase_resolution(PSI, NOld, MOld, CNSTS)
-Cxx = increase_resolution(Cxx, NOld, MOld, CNSTS)
-Cyy = increase_resolution(Cyy, NOld, MOld, CNSTS)
-Cxy = increase_resolution(Cxy, NOld, MOld, CNSTS)
+PSI = decide_resolution(PSI, NOld, MOld, CNSTS)
+Cxx = decide_resolution(Cxx, NOld, MOld, CNSTS)
+Cyy = decide_resolution(Cyy, NOld, MOld, CNSTS)
+Cxy = decide_resolution(Cxy, NOld, MOld, CNSTS)
 
 psiLam = copy(PSI)
 
@@ -968,7 +971,7 @@ tmp = Cxy[N*M:(N+1)*M]
 Cxy = relax_param*Cxy
 Cxy[N*M:(N+1)*M] = tmp
 
-### Alter the initialisation time
+## Alter the initialisation time
 
 print 'Changing initialisation time, for oscillatory flow'
 piston_phase = calculate_piston_phase(PSI[N*M:(N+1)*M], CNSTS)

@@ -1,7 +1,8 @@
 
 CFLAGS= -Wall -fpic -Iinclude $(TOBYCPATHS)
 LIBFLAGS= -lhdf5 -lhdf5_hl -lfftw3 -lm 
-MYFLAGS= -O3
+#MYFLAGS= -O3 #THIS BREAKS THINGS FOR SOME REASON
+MYFLAGS= #-O1 
 
 ODIR= obj
 SDIR= src

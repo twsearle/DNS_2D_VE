@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Sun  1 May 13:49:01 2016
+// Last modified: Sat 11 Jun 12:47:16 2016
 
 /* Program Description:
  *
@@ -575,6 +575,18 @@ int main(int argc, char **argv)
 
 	    }
 #endif  // MY_DEBUG
+
+	    //if (timestep%(2*params.Wi/dt)==0)
+	    //{
+		for(int i=1; i<(N+1)*M; i++)
+		{
+		    //forcing[i]	*= 0.5;
+		    //forcingN[i] *= 0.5;
+		    forcing[i]	*= 0.0;
+		    forcingN[i] *= 0.0;
+		}
+	    //printf("\n STEPPING THE FORCING DOWN \n");
+	    //}
 
 	    step_sf_SI_Crank_Nicolson_visco(psiOld, psiNL, cijOld, cijNL, psiOld,
 		    forcing, forcingN, 0.5*dt, timeStep, hopsList, scr, params);
