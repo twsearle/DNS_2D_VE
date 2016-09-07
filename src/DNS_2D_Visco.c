@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Sat 11 Jun 12:47:16 2016
+// Last modified: Tue  2 Aug 12:56:33 2016
 
 /* Program Description:
  *
@@ -578,13 +578,13 @@ int main(int argc, char **argv)
 
 	    //if (timestep%(2*params.Wi/dt)==0)
 	    //{
-		for(int i=1; i<(N+1)*M; i++)
-		{
-		    //forcing[i]	*= 0.5;
-		    //forcingN[i] *= 0.5;
-		    forcing[i]	*= 0.0;
-		    forcingN[i] *= 0.0;
-		}
+	    //  for(int i=1; i<(N+1)*M; i++)
+	//	{
+	//	    //forcing[i]	*= 0.5;
+	//	    //forcingN[i] *= 0.5;
+	//	    forcing[i]	*= 0.0;
+	//	    forcingN[i] *= 0.0;
+	//	}
 	    //printf("\n STEPPING THE FORCING DOWN \n");
 	    //}
 

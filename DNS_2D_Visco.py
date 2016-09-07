@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Tue 21 Jun 10:22:45 2016
+#   Last modified: Wed  7 Sep 16:13:55 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -139,12 +139,11 @@ assert Wi != 0.0, "cannot have Wi = 0!"
 assert args.flow_type < 3, "flow type unspecified!" 
 
 NOld = N
-MOld = 320
+MOld = M
 
 CNSTS = {'NOld': NOld, 'MOld': MOld, 'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0,
           'Re': Re, 'Wi': Wi, 'beta': beta, 'De':De, 'kx': kx,'time': totTime,
-         'dt':dt, 'P': 1.0,
-          'dealiasing':dealiasing}
+         'dt':dt, 'P': 1.0, 'initTime':initTime, 'dealiasing':dealiasing}
  
 kwargs=CNSTS
 inFileName = "pf-N{NOld}-M{MOld}-kx{kx}-Re{Re}-b{beta}-Wi{Wi}.pickle".format(**kwargs)
@@ -172,20 +171,17 @@ def mk_cheb_int():
     return integrator
 
 def append_save_array(array, fp):
-
     (rows, cols) = shape(array)
     for i in range(rows):
         for j in range(cols):
             fp.write('{0:15.8g}'.format(array[i,j]))
         fp.write('\n')
 
-
 def load_hdf5_state(filename):
     f = h5py.File(filename, "r")
     inarr = array(f["psi"])
     f.close()
     return inarr
-
 
 def increase_resolution(vec, NOld, MOld, CNSTS):
     """increase resolution from Nold, Mold to N, M and return the higher res
@@ -538,6 +534,90 @@ def perturb(psi_, totEnergy, perKEestimate, sigma, gam):
 
     return psi_
 
+def easy_perturbation(PSI, Cxx, Cyy, Cxy, perAmp=1.0e-10):
+    """
+    perturb just the second Chebyshev of the xx conformation and the first of the
+    xy conformation.
+
+    perturbation used in pythonic test code.
+
+    """
+    Cxx[(N+1)*M + 2] = perAmp * (Wi*2./pi)
+    Cxx[(N-1)*M + 2] = perAmp * (Wi*2./pi)
+
+    Cxy[(N+1)*M + 1] = perAmp * (Wi*2./pi)
+    Cxy[(N-1)*M + 1] = perAmp * (Wi*2./pi)
+
+    print log(abs(perAmp))
+
+    return PSI,Cxx,Cyy,Cxy
+
+def simple_perturbation(PSI, Cxx, Cyy, Cxy, perAmp=1.0e-10):
+    """ 
+    Slightly better perturbation to catch more errors.
+    """
+
+    Cxx[(N+1)*M:(N+2)*M-2] = perAmp * (Wi*2./pi)
+    Cxx[(N-1)*M:N*M-2] = perAmp * (Wi*2./pi)
+
+    Cxy[(N+1)*M:(N+2)*M-2] = perAmp * (Wi*2./pi)
+    Cxy[(N-1)*M:N*M-2] = perAmp * (Wi*2./pi)
+
+    return PSI, Cxx, Cyy, Cxy
+
+def BC_safe_perturbation(PSI, Cxx, Cyy, Cxy, perAmp=1.0e-10):
+    """
+    Perturbation which satisfies the bc's
+    """
+
+    #rn = (10.0**(-1))*(0.5-rand(5))
+    rn = ones(5)
+
+    rSpace = zeros(Mf, dtype='complex')
+    y = 2.0*arange(Mf)/(Mf-1.0) -1.0
+
+    ## sinusoidal
+    rSpace =  perAmp*sin(1.0 * pi * y) * rn[0]
+    rSpace += perAmp*sin(2.0 * pi * y) * rn[1]
+    rSpace += perAmp*sin(3.0 * pi * y) * rn[2]
+
+    ## cosinusoidal 
+    rSpace += perAmp*cos(1.0 * 0.5*pi * y) * rn[3]
+    rSpace += perAmp*cos(3.0 * 0.5*pi * y) * rn[4]
+
+
+    PSI[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(rSpace, CNSTS)
+    PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
+    Cxx[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(rSpace, CNSTS)
+    Cxx[(N-1)*M:(N)*M] = conj(Cxx[(N+1)*M:(N+2)*M])
+
+    return PSI, Cxx, Cyy, Cxy
+
+def eigenvector_perturbation(PSI, Cxx, Cyy, Cxy, "linear_evec.h5", Nev, Mev, CNSTS, perAmp=1.0e-2):
+    
+    f = h5py.File("linear_evec.h5","r")
+    
+    PSIlin = format_evector(array(f["psi"]), NEv, MEv)
+    Cxxlin = format_evector(array(f["cxx"]), NEv, MEv)
+    Cyylin = format_evector(array(f["cyy"]), NEv, MEv)
+    Cxylin = format_evector(array(f["cxy"]), NEv, MEv)
+    
+    f.close()
+    
+    PSIlin = increase_resolution(PSIlin, NEv, MEv, CNSTS)
+    Cxxlin = increase_resolution(Cxxlin, NEv, MEv, CNSTS)
+    Cyylin = increase_resolution(Cyylin, NEv, MEv, CNSTS)
+    Cxylin = increase_resolution(Cxylin, NEv, MEv, CNSTS)
+    
+    perAmp = perAmp / linalg.norm(PSIlin[(N+1)*M:(N+2)*M])
+    
+    PSI = PSI + perAmp*PSIlin
+    Cxx = Cxx + perAmp*Cxxlin
+    Cyy = Cyy + perAmp*Cyylin
+    Cxy = Cxy + perAmp*Cxylin
+
+return PSI, Cxx, Cyy, Cxy
+
 def x_independent_profile(PSI):
     """
      I think these are the equations for the x independent stresses from the base
@@ -599,7 +679,6 @@ def plug_like_flow():
     return PSI, Cxx, Cyy, Cxy, forcing
 
 def shear_layer_flow(delta=0.1):
-    
     y_points = cos(pi*arange(Mf)/(Mf-1))
 
     # Set initial streamfunction
@@ -634,14 +713,18 @@ def shear_layer_flow(delta=0.1):
 
     return PSI, Cxx, Cyy, Cxy, forcing
 
-def oscillatory_flow():
-    """
-    Some flow variables must be calculated in realspace and then transformed
-    spectral space, Cyy =1.0 so it is easy.
-    """
+def time_independent_flow_from_file(inFileName):
+    print inFileName
 
-    y_points = cos(pi*arange(Mf)/(Mf-1))
+    (PSI, Cxx, Cyy, Cxy, Nu) = pickle.load(open(inFileName,'r'))
+    PSI = decide_resolution(PSI, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+    Cxx = decide_resolution(Cxx, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+    Cyy = decide_resolution(Cyy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
+    Cxy = decide_resolution(Cxy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
 
+    return PSI, Cxx, Cyy, Cxy
+
+def coefficient_of_oscillatory_forcing():
     tmp = beta + (1-beta) / (1 + 1.j*De)
     print 'tmp', tmp
     alpha = sqrt( (1.j*pi*Re*De) / (2*Wi*tmp) )
@@ -651,6 +734,18 @@ def oscillatory_flow():
 
     # the coefficient for the forcing
     P = (0.5*pi)**2 * (Re*De) / (Chi*Wi)
+
+    return P
+
+def oscillatory_flow():
+    """
+    Some flow variables must be calculated in realspace and then transformed
+    spectral space, Cyy =1.0 so it is easy.
+    """
+
+    y_points = cos(pi*arange(Mf)/(Mf-1))
+
+    P = coefficient_of_oscillatory_forcing()
 
     PSI = zeros(Mf, dtype='d')
     Cxx = zeros(Mf, dtype='d')
@@ -674,7 +769,6 @@ def oscillatory_flow():
         cxx_cmplx += 1. + (Wi/pi)*( cxy_cmplx*conj(dyu_cmplx) +
                                    conj(cxy_cmplx)*dyu_cmplx ) 
         Cxx[i] = real(cxx_cmplx)
-
     del y, i
 
     # transform to spectral space.
@@ -712,6 +806,39 @@ def oscillatory_flow():
     Cxy[:N*M] = 0.0
 
     return PSI, Cxx, Cyy, Cxy, forcing, P
+
+def oscillatory_flow_from_file(filename):
+    f = h5py.File(filename,"r")
+
+    PSI = array(f["psi"])
+    Cxx = array(f["cxx"])
+    Cyy = array(f["cyy"])
+    Cxy = array(f["cxy"])
+
+    f.close()
+
+    PSI = format_fftordering_to_matordering(PSI, NOld, MOld)
+    Cxx = format_fftordering_to_matordering(Cxx, NOld, MOld)
+    Cyy = format_fftordering_to_matordering(Cyy, NOld, MOld)
+    Cxy = format_fftordering_to_matordering(Cxy, NOld, MOld)
+
+    PSI = decide_resolution(PSI, NOld, MOld, CNSTS)
+    Cxx = decide_resolution(Cxx, NOld, MOld, CNSTS)
+    Cyy = decide_resolution(Cyy, NOld, MOld, CNSTS)
+    Cxy = decide_resolution(Cxy, NOld, MOld, CNSTS)
+
+    ## Alter the initialisation time
+
+    print 'Changing initialisation time, for oscillatory flow'
+    piston_phase = calculate_piston_phase(PSI[N*M:(N+1)*M], CNSTS)
+
+    initTime = piston_phase
+
+    P = coefficient_of_oscillatory_forcing()
+    forcing = zeros((M,2*N+1), dtype='complex')
+    forcing[0,0] = P
+
+    return PSI, Cxx, Cyy, Cxy, forcing, P, initTime
 
 def real_space_oscillatory_flow(time, CNSTS):
     """
@@ -801,10 +928,20 @@ def calculate_piston_phase(Psi, CNSTS):
     return time_shift
 
 def format_evector(inArr, N, M):
-
     outArr = zeros((M, 2*N+1), dtype='complex') 
     outArr[:, 1] = inArr.reshape(2,M).T[:,1]
     outArr[:, 2] = conj(outArr[:, 1])
+    outArr = fftshift(outArr, axes=1)
+    outArr = outArr.T.flatten()
+
+    return outArr
+
+def format_fftordering_to_matordering(inArr, N, M):
+    tmp = inArr.reshape((N+1, M)).T
+    outArr = zeros((M, 2*N+1), dtype='complex')
+    outArr[:, :N+1] = tmp
+    for n in range(1, N+1):
+        outArr[:, 2*N+1 - n] = conj(outArr[:, n])
     outArr = fftshift(outArr, axes=1)
     outArr = outArr.T.flatten()
 
@@ -876,18 +1013,25 @@ Cxy = zeros((2*N+1)*M,dtype='complex')
 
 
 if args.flow_type==0:
+
     # --------------- POISEUILLE -----------------
     PSI, Cxx, Cyy, Cxy, forcing = poiseuille_flow()
+    #PSI, Cxx, Cyy, Cxy = time_independent_flow_from_file(inFileName)
 
 elif args.flow_type==1:
+
     # --------------- SHEAR LAYER -----------------
     PSI, Cxx, Cyy, Cxy, forcing = shear_layer_flow()
+    #PSI, Cxx, Cyy, Cxy = time_independent_flow_from_file(inFileName)
+
     # set BC
     CNSTS['U0'] = 1.0
 
 elif args.flow_type==2:
+
     # --------------- OSCILLATORY FLOW -----------------
-    PSI, Cxx, Cyy, Cxy, forcing, CNSTS['P'] = oscillatory_flow()
+    #PSI, Cxx, Cyy, Cxy, forcing, CNSTS['P'] = oscillatory_flow()
+    PSI, Cxx, Cyy, Cxy, forcing, CNSTS['P'], CNSTS['initTime'] = oscillatory_flow_from_file("input.h5")
 
 else:
     print "flow type unspecified"
@@ -895,151 +1039,14 @@ else:
 
 psiLam = copy(PSI)
 
-# Read in stream function from file
-#(PSI, Cxx, Cyy, Cxy, Nu) = pickle.load(open(inFileName,'r'))
-#PSI = decide_resolution(PSI, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
-#Cxx = decide_resolution(Cxx, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
-#Cyy = decide_resolution(Cyy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
-#Cxy = decide_resolution(Cxy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
-#psiLam = copy(PSI)
-#print inFileName
-#
-f = h5py.File("input.h5","r")
-
-PSI = array(f["psi"])
-Cxx = array(f["cxx"])
-Cyy = array(f["cyy"])
-Cxy = array(f["cxy"])
-
-f.close()
-
-
-tmp = PSI.reshape((NOld+1, MOld)).T
-PSI = zeros((MOld, 2*NOld+1), dtype='complex')
-PSI[:, :NOld+1] = tmp
-for n in range(1, NOld+1):
-    PSI[:, 2*NOld+1 - n] = conj(PSI[:, n])
-PSI = fftshift(PSI, axes=1)
-PSI = PSI.T.flatten()
-
-tmp = Cxx.reshape((NOld+1, MOld)).T
-Cxx = zeros((MOld, 2*NOld+1), dtype='complex')
-Cxx[:, :NOld+1] = tmp
-for n in range(1, NOld+1):
-    Cxx[:, 2*NOld+1 - n] = conj(Cxx[:, n])
-Cxx = fftshift(Cxx, axes=1)
-Cxx = Cxx.T.flatten()
-
-tmp = Cyy.reshape((NOld+1, MOld)).T
-Cyy = zeros((MOld, 2*NOld+1), dtype='complex')
-Cyy[:, :NOld+1] = tmp
-for n in range(1, NOld+1):
-    Cyy[:, 2*NOld+1 - n] = conj(Cyy[:, n])
-Cyy = fftshift(Cyy, axes=1)
-Cyy = Cyy.T.flatten()
-
-tmp = Cxy.reshape((NOld+1, MOld)).T
-Cxy = zeros((MOld, 2*NOld+1), dtype='complex')
-Cxy[:, :NOld+1] = tmp
-for n in range(1, NOld+1):
-    Cxy[:, 2*NOld+1 - n] = conj(Cxy[:, n])
-Cxy = fftshift(Cxy, axes=1)
-Cxy = Cxy.T.flatten()
-
-PSI = decide_resolution(PSI, NOld, MOld, CNSTS)
-Cxx = decide_resolution(Cxx, NOld, MOld, CNSTS)
-Cyy = decide_resolution(Cyy, NOld, MOld, CNSTS)
-Cxy = decide_resolution(Cxy, NOld, MOld, CNSTS)
-
-psiLam = copy(PSI)
-
-relax_param = 1
-
-tmp = PSI[N*M:(N+1)*M]
-PSI = relax_param*PSI
-PSI[N*M:(N+1)*M] = tmp
-
-tmp = Cxx[N*M:(N+1)*M]
-Cxx = relax_param*Cxx
-Cxx[N*M:(N+1)*M] = tmp
-
-tmp = Cyy[N*M:(N+1)*M]
-Cyy = relax_param*Cyy
-Cyy[N*M:(N+1)*M] = tmp
-
-tmp = Cxy[N*M:(N+1)*M]
-Cxy = relax_param*Cxy
-Cxy[N*M:(N+1)*M] = tmp
-
-## Alter the initialisation time
-
-print 'Changing initialisation time, for oscillatory flow'
-piston_phase = calculate_piston_phase(PSI[N*M:(N+1)*M], CNSTS)
-
-initTime = piston_phase
-
-
 ### ----------------------- PERTURBATIONS ------------------------------------
 
 #PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
-#
-#lsd = 1e-8
-
-#Real part y**7 - 2y**6 + 2y**4 -4y
-#PSI[(N)*M+7] += lsd *(1./64.)
-#PSI[(N)*M+6] += lsd *(-1./16.)
-#PSI[(N)*M+5] += lsd *(3./16. + 7./(4*16.))
-#PSI[(N)*M+4] += lsd *(1./8. )
-#PSI[(N)*M+3] += lsd *(81./(16.*4) )
-#PSI[(N)*M+2] += lsd *(1./16. )
-#PSI[(N)*M+1] += lsd *(155./64. - 4. )
-#PSI[(N)*M+0] += lsd *(1./8) 
-
-#perAmp = 1e-10
-
-#rSpace = zeros(Mf, dtype='complex')
-#rn = ones(5)
-#y = 2.0*arange(Mf)/(Mf-1.0) -1.0
-#
-### sinusoidal
-#rSpace =  perAmp*sin(1.0 * pi * y) * rn[0]
-#rSpace += perAmp*sin(2.0 * pi * y) * rn[1]
-#rSpace += perAmp*sin(3.0 * pi * y) * rn[2]
-#
-### cosinusoidal 
-#rSpace += perAmp*cos(1.0 * 0.5*pi * y) * rn[3]
-#rSpace += perAmp*cos(3.0 * 0.5*pi * y) * rn[4]
-#
-#
-#PSI[(N+1)*M:(N+2)*M] = f2d.forward_cheb_transform(rSpace, CNSTS)
-#PSI[(N-1)*M:(N)*M] = conj(PSI[(N+1)*M:(N+2)*M])
-
-#Cxx[(N+1)*M + 2] = perAmp * (Wi*2./pi)
-#Cxx[(N-1)*M + 2] = perAmp * (Wi*2./pi)
-#
-#Cxy[(N+1)*M + 1] = perAmp * (Wi*2./pi)
-#Cxy[(N-1)*M + 1] = perAmp * (Wi*2./pi)
-
-#f = h5py.File("linear_evec.h5","r")
-#
-#PSIlin = format_evector(array(f["psi"]), NOld, MOld)
-#Cxxlin = format_evector(array(f["cxx"]), NOld, MOld)
-#Cyylin = format_evector(array(f["cyy"]), NOld, MOld)
-#Cxylin = format_evector(array(f["cxy"]), NOld, MOld)
-#
-#f.close()
-#
-#PSIlin = increase_resolution(PSIlin, NOld, MOld, CNSTS)
-#Cxxlin = increase_resolution(Cxxlin, NOld, MOld, CNSTS)
-#Cyylin = increase_resolution(Cyylin, NOld, MOld, CNSTS)
-#Cxylin = increase_resolution(Cxylin, NOld, MOld, CNSTS)
-#
-#perAmp = 1.e-2 / linalg.norm(PSIlin[(N+1)*M:(N+2)*M])
-#
-#PSI = PSI + perAmp*PSIlin
-#Cxx = Cxx + perAmp*Cxxlin
-#Cyy = Cyy + perAmp*Cyylin
-#Cxy = Cxy + perAmp*Cxylin
+#PSI, Cxx, Cyy, Cxy = easy_perturbation(PSI, Cxx, Cyy, Cxy, perAmp=1.0e-10)
+#PSI, Cxx, Cyy, Cxy = simple_perturbation(PSI, Cxx, Cyy, Cxy, perAmp=1.0e-10)
+#PSI, Cxx, Cyy, Cxy = BC_safe_perturbation(PSI, Cxx, Cyy, Cxy, perAmp=1.0e-10)
+#PSI, Cxx, Cyy, Cxy = eigenvector_perturbation(PSI, Cxx, Cyy, Cxy,
+#                                               "linear_evec.h5", Nev, Mev, CNSTS)
 
 # ----------------------------------------------------------------------------
 
@@ -1134,7 +1141,7 @@ cargs = ["./DNS_2D_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
          "-P", "{0:.6e}".format(CNSTS["P"]),
          "-t", "{0:.6e}".format(CNSTS["dt"]),
          "-s", "{0:d}".format(stepsPerFrame), "-T",
-         "{0:d}".format(numTimeSteps), "-i", "{0:.6e}".format(initTime)]
+         "{0:d}".format(numTimeSteps), "-i", "{0:.6e}".format(CNSTS['initTime'])]
 
 if args.flow_type==2:
     cargs.append("-O")
@@ -1150,7 +1157,8 @@ if dealiasing:
              "-P", "{0:.6e}".format(CNSTS["P"]), \
              "-t", "{0:.6e}".format(CNSTS["dt"]),\
              "-s", "{0:d}".format(stepsPerFrame), "-T",\
-             "{0:d}".format(numTimeSteps), "-i", "{0:.6e}".format(initTime), "-d"
+             "{0:d}".format(numTimeSteps), "-i",
+    "{0:.6e}".format(CNSTS['initTime']), "-d"
 
 subprocess.call(cargs)
 

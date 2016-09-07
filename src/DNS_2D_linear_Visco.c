@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu 26 May 17:30:28 2016
+// Last modified: Tue  2 Aug 12:55:50 2016
 
 /* Program Description:
  *
@@ -105,7 +105,7 @@ int main(int argc, char **argv)
     double time = initTime;
     int timeStep;
 
-    int save_traj = 1;
+    int save_traj = 0;
 
     trace_fn = "./output/trace.dat";
     traj_fn = "./output/traj.h5";

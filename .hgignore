@@ -13,5 +13,10 @@ syntax: glob
 *.pvd
 *.txt
 *.log
+*.png
+*.svg
+*.pdf
+*.mp4
+*.avi
 DNS_2D_Newt
 test_fields
