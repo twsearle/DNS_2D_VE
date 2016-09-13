@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Wed  7 Sep 16:13:55 2016
+#   Last modified: Tue 13 Sep 14:15:48 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -109,6 +109,11 @@ tmp = """simulation type,
             2: Oscillatory"""
 argparser.add_argument("-flow_type", type=int, default=3, 
                        help=tmp)
+tmp = """test flag, 
+            0: False
+            1: True """
+argparser.add_argument("-test", type=int, default=0, 
+                       help=tmp)
 
 args = argparser.parse_args()
 N = args.N 
@@ -136,7 +141,7 @@ else:
 numTimeSteps = int(ceil(totTime / dt))
 assert (totTime / dt) - float(numTimeSteps) == 0, "Non-integer number of timesteps"
 assert Wi != 0.0, "cannot have Wi = 0!"
-assert args.flow_type < 3, "flow type unspecified!" 
+assert (args.flow_type < 3) and (args.flow_type >= 0), "flow type unspecified!" 
 
 NOld = N
 MOld = M
@@ -593,9 +598,8 @@ def BC_safe_perturbation(PSI, Cxx, Cyy, Cxy, perAmp=1.0e-10):
 
     return PSI, Cxx, Cyy, Cxy
 
-def eigenvector_perturbation(PSI, Cxx, Cyy, Cxy, "linear_evec.h5", Nev, Mev, CNSTS, perAmp=1.0e-2):
-    
-    f = h5py.File("linear_evec.h5","r")
+def eigenvector_perturbation(PSI, Cxx, Cyy, Cxy, filename, Nev, Mev, CNSTS, perAmp=1.0e-2):
+    f = h5py.File(filename,"r")
     
     PSIlin = format_evector(array(f["psi"]), NEv, MEv)
     Cxxlin = format_evector(array(f["cxx"]), NEv, MEv)
@@ -616,7 +620,7 @@ def eigenvector_perturbation(PSI, Cxx, Cyy, Cxy, "linear_evec.h5", Nev, Mev, CNS
     Cyy = Cyy + perAmp*Cyylin
     Cxy = Cxy + perAmp*Cxylin
 
-return PSI, Cxx, Cyy, Cxy
+    return PSI, Cxx, Cyy, Cxy
 
 def x_independent_profile(PSI):
     """
@@ -722,7 +726,34 @@ def time_independent_flow_from_file(inFileName):
     Cyy = decide_resolution(Cyy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
     Cxy = decide_resolution(Cxy, CNSTS['NOld'], CNSTS['MOld'], CNSTS)
 
-    return PSI, Cxx, Cyy, Cxy
+    forcing = zeros((M,2*N+1), dtype='complex')
+    forcing[0,0] = 2./Re
+
+    return PSI, Cxx, Cyy, Cxy, forcing
+
+def time_independent_flow_from_hdf5(filename):
+    f = h5py.File(filename,"r")
+
+    PSI = array(f["psi"])
+    Cxx = array(f["cxx"])
+    Cyy = array(f["cyy"])
+    Cxy = array(f["cxy"])
+
+    f.close()
+
+    PSI = format_fftordering_to_matordering(PSI, NOld, MOld)
+    Cxx = format_fftordering_to_matordering(Cxx, NOld, MOld)
+    Cyy = format_fftordering_to_matordering(Cyy, NOld, MOld)
+    Cxy = format_fftordering_to_matordering(Cxy, NOld, MOld)
+
+    PSI = decide_resolution(PSI, NOld, MOld, CNSTS)
+    Cxx = decide_resolution(Cxx, NOld, MOld, CNSTS)
+    Cyy = decide_resolution(Cyy, NOld, MOld, CNSTS)
+    Cxy = decide_resolution(Cxy, NOld, MOld, CNSTS)
+
+    forcing = zeros((M,2*N+1), dtype='complex')
+    forcing[0,0] = 2./Re
+    return PSI, Cxx, Cyy, Cxy, forcing
 
 def coefficient_of_oscillatory_forcing():
     tmp = beta + (1-beta) / (1 + 1.j*De)
@@ -807,7 +838,7 @@ def oscillatory_flow():
 
     return PSI, Cxx, Cyy, Cxy, forcing, P
 
-def oscillatory_flow_from_file(filename):
+def oscillatory_flow_from_hdf5(filename):
     f = h5py.File(filename,"r")
 
     PSI = array(f["psi"])
@@ -1018,6 +1049,10 @@ if args.flow_type==0:
     PSI, Cxx, Cyy, Cxy, forcing = poiseuille_flow()
     #PSI, Cxx, Cyy, Cxy = time_independent_flow_from_file(inFileName)
 
+    if args.test:
+        #PSI, Cxx, Cyy, Cxy, forcing = plug_like_flow()
+        PSI, Cxx, Cyy, Cxy, forcing = time_independent_flow_from_hdf5("input.h5")
+
 elif args.flow_type==1:
 
     # --------------- SHEAR LAYER -----------------
@@ -1031,7 +1066,7 @@ elif args.flow_type==2:
 
     # --------------- OSCILLATORY FLOW -----------------
     #PSI, Cxx, Cyy, Cxy, forcing, CNSTS['P'] = oscillatory_flow()
-    PSI, Cxx, Cyy, Cxy, forcing, CNSTS['P'], CNSTS['initTime'] = oscillatory_flow_from_file("input.h5")
+    PSI, Cxx, Cyy, Cxy, forcing, CNSTS['P'], CNSTS['initTime'] = oscillatory_flow_from_hdf5("input.h5")
 
 else:
     print "flow type unspecified"
@@ -1044,9 +1079,11 @@ psiLam = copy(PSI)
 #PSI = perturb(PSI, totEnergy, perKEestimate, sigma, gam)
 #PSI, Cxx, Cyy, Cxy = easy_perturbation(PSI, Cxx, Cyy, Cxy, perAmp=1.0e-10)
 #PSI, Cxx, Cyy, Cxy = simple_perturbation(PSI, Cxx, Cyy, Cxy, perAmp=1.0e-10)
-#PSI, Cxx, Cyy, Cxy = BC_safe_perturbation(PSI, Cxx, Cyy, Cxy, perAmp=1.0e-10)
 #PSI, Cxx, Cyy, Cxy = eigenvector_perturbation(PSI, Cxx, Cyy, Cxy,
 #                                               "linear_evec.h5", Nev, Mev, CNSTS)
+#if args.test:
+#    PSI, Cxx, Cyy, Cxy = BC_safe_perturbation(PSI, Cxx, Cyy, Cxy, perAmp=1.0e-4)
+
 
 # ----------------------------------------------------------------------------
 
