@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Tue 13 Sep 14:15:48 2016
+#   Last modified: Mon 26 Sep 17:43:39 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -48,8 +48,10 @@ Outline:
 # MODULES
 from scipy import *
 from scipy import linalg
-from scipy import optimize
-from scipy.fftpack import dct as dct
+from scipy import optimize, linalg, special
+import numpy as np
+
+from scipy.fftpack import dct as spdct
 
 from numpy.linalg import cond 
 from numpy.fft import fftshift, ifftshift
@@ -393,13 +395,13 @@ def backward_cheb_transform(cSpec, CNSTS):
     tmp[Mf-1] = 2*tmp[Mf-1]
 
     out = zeros(Mf, dtype='complex')
-    out = dct(tmp, type=1).astype('complex') 
+    out = spdct(tmp, type=1).astype('complex') 
 
     tmp[0] = imag(cSpec[0])
     tmp[1:M] = 0.5*imag(cSpec[1:M])
     tmp[Mf-1] = 2*tmp[Mf-1]
 
-    out += dct(tmp, type=1) * 1.j
+    out += spdct(tmp, type=1) * 1.j
 
     return out[0:Mf]
 
@@ -766,7 +768,7 @@ def coefficient_of_oscillatory_forcing():
     # the coefficient for the forcing
     P = (0.5*pi)**2 * (Re*De) / (Chi*Wi)
 
-    return P
+    return alpha, Chi, P
 
 def oscillatory_flow():
     """
@@ -776,7 +778,7 @@ def oscillatory_flow():
 
     y_points = cos(pi*arange(Mf)/(Mf-1))
 
-    P = coefficient_of_oscillatory_forcing()
+    alpha, Chi, P = coefficient_of_oscillatory_forcing()
 
     PSI = zeros(Mf, dtype='d')
     Cxx = zeros(Mf, dtype='d')
@@ -803,7 +805,9 @@ def oscillatory_flow():
     del y, i
 
     # transform to spectral space.
+    #savez('psir.npz', psi=PSI, consts=CNSTS)
     PSI0 = f2d.forward_cheb_transform(PSI, CNSTS)
+    #savez('psi.npz', psi=PSI0, consts=CNSTS)
     Cxx0 = f2d.forward_cheb_transform(Cxx, CNSTS)
     Cxy0 = f2d.forward_cheb_transform(Cxy, CNSTS)
 
@@ -865,7 +869,7 @@ def oscillatory_flow_from_hdf5(filename):
 
     initTime = piston_phase
 
-    P = coefficient_of_oscillatory_forcing()
+    alpha, Chi, P = coefficient_of_oscillatory_forcing()
     forcing = zeros((M,2*N+1), dtype='complex')
     forcing[0,0] = P
 
@@ -1059,14 +1063,22 @@ elif args.flow_type==1:
     PSI, Cxx, Cyy, Cxy, forcing = shear_layer_flow()
     #PSI, Cxx, Cyy, Cxy = time_independent_flow_from_file(inFileName)
 
+    if args.test:
+        PSI, Cxx, Cyy, Cxy, forcing = time_independent_flow_from_hdf5("input.h5")
+        _, _, _, _, forcing = shear_layer_flow()
+
     # set BC
     CNSTS['U0'] = 1.0
 
 elif args.flow_type==2:
 
     # --------------- OSCILLATORY FLOW -----------------
-    #PSI, Cxx, Cyy, Cxy, forcing, CNSTS['P'] = oscillatory_flow()
-    PSI, Cxx, Cyy, Cxy, forcing, CNSTS['P'], CNSTS['initTime'] = oscillatory_flow_from_hdf5("input.h5")
+    PSI, Cxx, Cyy, Cxy, forcing, CNSTS['P'] = oscillatory_flow()
+    #PSI, Cxx, Cyy, Cxy, forcing, CNSTS['P'], CNSTS['initTime'] = oscillatory_flow_from_hdf5("input.h5")
+
+    if args.test:
+        PSI, Cxx, Cyy, Cxy, forcing, CNSTS['P'], CNSTS['initTime'] = oscillatory_flow_from_hdf5("input.h5")
+
 
 else:
     print "flow type unspecified"
@@ -1081,9 +1093,7 @@ psiLam = copy(PSI)
 #PSI, Cxx, Cyy, Cxy = simple_perturbation(PSI, Cxx, Cyy, Cxy, perAmp=1.0e-10)
 #PSI, Cxx, Cyy, Cxy = eigenvector_perturbation(PSI, Cxx, Cyy, Cxy,
 #                                               "linear_evec.h5", Nev, Mev, CNSTS)
-#if args.test:
-#    PSI, Cxx, Cyy, Cxy = BC_safe_perturbation(PSI, Cxx, Cyy, Cxy, perAmp=1.0e-4)
-
+#PSI, Cxx, Cyy, Cxy = BC_safe_perturbation(PSI, Cxx, Cyy, Cxy, perAmp=1.0e-4)
 
 # ----------------------------------------------------------------------------
 

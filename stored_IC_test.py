@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   Test for 2D DNS codes using stored initial conditions
 #
-#   Last modified: Tue 13 Sep 14:29:39 2016
+#   Last modified: Mon 26 Sep 17:50:12 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -26,30 +26,81 @@ def load_hdf5_visco(filename):
 
     return psi, cxx, cyy, cxy
 
+def run_flow_test(cfgFilename, ICFilename, FCFilename, flowType):
+
+    # set constants 
+    # copy the test config file over the config file
+    subprocess.call(["cp", cfgFilename, "config.cfg"])
+
+    # run the DNS code using the test initial conditions
+    subprocess.call(["cp", ICFilename, "input.h5"])
+
+    # use subprocess to run the python program 
+    subprocess.call(["time", "python", "DNS_2D_Visco.py", "-flow_type", flowType, "-test", "1"])
+
+    # read in the result and compare to test final conditions
+    psi, cxx, cyy, cxy  = load_hdf5_visco("output/final.h5") 
+    psiTrue, cxxTrue, cyyTrue, cxyTrue  = load_hdf5_visco(FCFilename) 
+
+    print "------------------------------"
+    print "Test"
+    if flowType=="0": print "Poiseuille Flow"
+    if flowType=="1": print "Shear Layer Flow"
+    if flowType=="2": print "Oscillatory Flow"
+    print "------------------------------"
+
+    psiTest = allclose(psi, psiTrue)
+    cxxTest = allclose(cxx, cxxTrue)
+    cxyTest = allclose(cxy, cxyTrue)
+    cyyTest = allclose(cyy, cyyTrue)
+
+    print "Identical psi? ", psiTest, "norm ", norm(psi-psiTrue)
+    print "Identical cxx? ", cxxTest, "norm", norm(cxx-cxxTrue)
+    print "Identical cxy? ", cxyTest, "norm", norm(cxy-cxyTrue)
+    print "Identical cyy? ", cyyTest, "norm", norm(cyy-cyyTrue)
+
+    if not psiTest:
+        print "failed to match psi"
+        exit(1)
+    if not cxxTest:
+        print "failed to match cxx"
+        exit(1)
+    if not cxyTest:
+        print "failed to match cxy"
+        exit(1)
+    if not cyyTest:
+        print "failed to match cyy"
+        exit(1)
+
+def test_Poiseuille_flow():
+    # A mean time over 5 runs: 21.31
+    #(21.03 + 21.25 + 21.54 + 21.19 + 21.53) / 5
+
+    flowType = "0" # Poiseuille flow setting 
+    run_flow_test("TEST/PPF.cfg", "TEST/PPF_IC.h5", "TEST/PPF_FC.h5", flowType)
+
+def test_shear_layer_flow():
+    # A mean time over 5 runs: 23.17
+    #(22.95 + 22.92 + 23.08 + 23.33 + 23.56) / 5
+
+    flowType = "1" # shear layer flow setting 
+    run_flow_test("TEST/SLF.cfg", "TEST/SLF_IC.h5", "TEST/SLF_FC.h5", flowType)
+
+def test_oscillatory_flow():
+    # A mean time over 5 runs: 32.47
+    #(32.91 + 32.69 + 31.85 + 31.90 + 33.02) / 5
+
+    flowType = "2" # oscillatory flow setting 
+    run_flow_test("TEST/OSCF.cfg", "TEST/OSCF_IC.h5", "TEST/OSCF_FC.h5", flowType)
+
 ### MAIN ###
 
 if __name__ == "__main__":
 
-    # set constants 
-    # copy the test config file over the config file
-    subprocess.call(["cp", "TEST/PPF.cfg", "config.cfg"])
+    test_Poiseuille_flow()
 
-    # run the DNS code using the test initial conditions
-    subprocess.call(["cp", "TEST/PPF_IC.h5", "input.h5"])
+    test_shear_layer_flow()
 
-    # use subprocess to run the python program 
-    subprocess.call(["python", "DNS_2D_Visco.py", "-flow_type", "0", "-test", "1"])
+    test_oscillatory_flow()
 
-    # read in the result and compare to test final conditions
-    psi, cxx, cyy, cxy  = load_hdf5_visco("output/final.h5") 
-    psiTrue, cxxTrue, cyyTrue, cxyTrue  = load_hdf5_visco("TEST/PPF_FC.h5") 
-
-    print "------------------------------"
-    print "Test Plane Poiseuille flow"
-    print "------------------------------"
-
-    print "Identical psi? ", allclose(psi, psiTrue), "norm", norm(psi-psiTrue) 
-    print "Identical cxx? ", allclose(cxx, cxxTrue), "norm", norm(cxx-cxxTrue)
-    print "Identical cxy? ", allclose(cxy, cxyTrue), "norm", norm(cxy-cxyTrue)
-    print "Identical cyy? ", allclose(cyy, cyyTrue), "norm", norm(cyy-cyyTrue)
 

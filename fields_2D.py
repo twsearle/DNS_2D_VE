@@ -97,15 +97,19 @@ so the fft doesn't bother including it.
 
 from scipy import *
 from numpy.random import rand
-from scipy import fftpack, optimize, linalg, special
+from scipy import optimize, linalg, special
+import numpy as np
+
+from numpy.fft import fftshift, ifftshift
+
+import matplotlib.pyplot as plt
 #from scipy.fftpack import dct as dct
 import subprocess
 import cPickle as pickle
 import h5py
 
 # IF YOU WANT TO UNCOMMENT THE TESTS, YOU WILL NEED THESE PACKAGES
-#from pylab import *
-#import TobySpectralMethods as tsm
+import TobySpectralMethods as tsm
 
 ### FUNCTIONS ###
 
@@ -455,7 +459,7 @@ def to_physical(in2D, CNSTS):
     _realtmp = zeros((2*Mf-2, 2*Nf+1), dtype='double')
     out2D = zeros((2*Mf-2, 2*Nf+1), dtype='complex')
 
-    out2D[:M, :] = fftpack.ifft(tmp, axis=-1)
+    out2D[:M, :] = np.fft.fftpack.ifft(tmp, axis=-1)
 
     # test imaginary part of the fft is zero
     normImag = linalg.norm(imag(out2D))
@@ -478,7 +482,7 @@ def to_physical(in2D, CNSTS):
     _realtmp[Mf-1, :] = 2*_realtmp[Mf-1, :]
 
     # Perform the transformation
-    out2D = 0.5*fftpack.rfft(_realtmp, axis=0 )
+    out2D = 0.5*np.fft.fftpack.rfft(_realtmp, axis=0 )
 
     normImag = linalg.norm(imag(out2D[0:M, :]))
     if normImag > 1e-12:
@@ -537,7 +541,7 @@ def to_physical_2(in2D, CNSTS):
     #if CNSTS['dealiasing']:
     #    out2D[:, 2*N/3 + 2 : 2*N+1 - 2*N/3] = 0 
 
-    #out2D[:M, :] = conj(fftpack.fft(out2D[:M, :], axis=-1))
+    #out2D[:M, :] = conj(np.fft.fftpack.fft(out2D[:M, :], axis=-1))
 
     # The second half contains the vector on the Gauss-Labatto points excluding
     # the first and last elements and in reverse order
@@ -550,7 +554,7 @@ def to_physical_2(in2D, CNSTS):
 
     # Perform the FFT across the x and z directions   
 
-    out2D = 0.5*fftpack.fft2(out2D)
+    out2D = 0.5*np.fft.fftpack.fft2(out2D)
 
     #out2D = real(out2D)
     
@@ -588,7 +592,7 @@ def to_physical_3(in2D, CNSTS):
 
     # Perform the iFFT across the x and z directions   
 
-    out2D = 0.5*fftpack.ifft2(scratch2D) 
+    out2D = 0.5*np.fft.fftpack.ifft2(scratch2D) 
 
     #out2D = real(out2D)
     
@@ -623,7 +627,7 @@ def to_spectral(in2D, CNSTS):
 
     # Perform the transformation on this temporary vector
     # TODO: Think about antialiasing here
-    _realtmp = fftpack.rfft(_realtmp, axis=0)
+    _realtmp = np.fft.fftpack.rfft(_realtmp, axis=0)
 
     # Renormalise and divide by c_k to convert to Chebyshev polynomials
     _realtmp[0, :] = (0.5/(Mf-1.0))*_realtmp[0, :]
@@ -637,7 +641,7 @@ def to_spectral(in2D, CNSTS):
         print 'highest x, z modes:'
         print imag(_realtmp)[0, N-3:N+1]
 
-    _realtmp[:Mf, :] = fftpack.fft(_realtmp[:Mf, :])
+    _realtmp[:Mf, :] = np.fft.fftpack.fft(_realtmp[:Mf, :])
 
     out2D[:, :N+1] = _realtmp[:M, :N+1]
     out2D[:, N+1:] = _realtmp[:M, 2*Nf+1-N:]
@@ -678,8 +682,8 @@ def to_spectral_2(in2D, CNSTS):
 
     # Perform the transformation on this temporary vector
     # TODO: Think about antialiasing here
-    #_realtmp = fftpack.rfft(_realtmp, axis=0)
-    tmp = fftpack.fft2(tmp)
+    #_realtmp = np.fft.fftpack.rfft(_realtmp, axis=0)
+    tmp = np.fft.fftpack.fft2(tmp)
 
     ## Renormalise and divide by c_k to convert to Chebyshev polynomials
     tmp[0, :] = (0.5/(Mf-1.))*tmp[0, :]
@@ -720,9 +724,11 @@ def forward_cheb_transform(GLcmplx, CNSTS):
     # the first and last elements and in reverse order
     tmp[Mf:] = real(GLcmplx[Mf-2:0:-1])
 
+    #savez('tmp.npz', tmp=tmp, consts=CNSTS)
+
     # Perform the transformation on this temporary vector
     # TODO: Think about antialiasing here
-    tmp = real(fftpack.rfft(tmp))
+    tmp = real(np.fft.fftpack.rfft(tmp))
 
     out = zeros(M, dtype='complex')
 
@@ -745,7 +751,7 @@ def forward_cheb_transform(GLcmplx, CNSTS):
     tmp[Mf:] = imag(GLcmplx[Mf-2:0:-1])
 
     # Perform the transformation on this temporary vector
-    tmp = real(fftpack.rfft(tmp))
+    tmp = real(np.fft.fftpack.rfft(tmp))
 
     # Renormalise and divide by c_k to convert to Chebyshev polynomials
     out[0] += 1.j * (0.5/(Mf-1.0)) * tmp[0]
@@ -779,8 +785,8 @@ def backward_cheb_transform(cSpec, CNSTS):
     _realtmp[Mf-1] = 2*_realtmp[Mf-1]
 
     # Perform the transformation
-    #print shape(fftpack.rfft(r_[1:5]))
-    out += 0.5*real(fftpack.rfft(_realtmp))
+    #print shape(np.fft.fftpack.rfft(r_[1:5]))
+    out += 0.5*real(np.fft.fftpack.rfft(_realtmp))
 
     _realtmp[:] = 0.0
     _realtmp[:M] = imag(cSpec[:])
@@ -797,7 +803,7 @@ def backward_cheb_transform(cSpec, CNSTS):
     _realtmp[Mf-1] = 2*_realtmp[Mf-1]
 
     # Perform the transformation
-    out += 0.5*1.j*real(fftpack.rfft(_realtmp))
+    out += 0.5*1.j*real(np.fft.fftpack.rfft(_realtmp))
 
     return out[0:Mf]
 
@@ -1009,8 +1015,8 @@ def load_hdf5_state(filename):
 #        # x dependence
 #        actualRYderiv[:,i] = actualRYderiv[:, i]*cos(kx*x_points[i])
 #
-#    #imshow(real(GLreal), origin='lower')
-#    #imshow(real(actualRYderiv), origin='lower')
+#    #plt.imshow(real(GLreal), origin='lower')
+#    #plt.imshow(real(actualRYderiv), origin='lower')
 #    #show()
 #
 #
@@ -1046,12 +1052,12 @@ def load_hdf5_state(filename):
 #    result2 = to_physical_3(actualSpec, CNSTS)
 #    print allclose(result1,result2)
 #    #print linalg.norm( (result1-result2))
-#    #imshow(real(result2), origin='lower')
-#    #colorbar()
-#    #show()
-#    #imshow(real(result1), origin='lower')
-#    #colorbar()
-#    #show()
+#    #plt.imshow(real(result2), origin='lower')
+#    #plt.colorbar()
+#    #plt.show()
+#    #plt.imshow(real(result1), origin='lower')
+#    #plt.colorbar()
+#    #plt.show()
 #
 #
 #    ## Backwards Test ##
@@ -1083,20 +1089,20 @@ def load_hdf5_state(filename):
 #    #print 'difference Fourier dir: ', (physicalTest2-physicalTest)[M/2,:]
 #    #print 'difference Cheby dir: ', (physicalTest2-physicalTest)[:,N/2]
 #
-#    plot(y_points, real(physicalTest[:,10]), 'b')
-#    plot(y_points, real(GLreal[:,10]), 'r+')
-#    show()
+#    plt.plot(y_points, real(physicalTest[:,10]), 'b')
+#    plt.plot(y_points, real(GLreal[:,10]), 'r+')
+#    plt.show()
 #
-#    plot(x_points, real(physicalTest[M/2,:]), 'b')
-#    plot(x_points, real(GLreal[M/2,:]), 'r+')
-#    show()
+#    plt.plot(x_points, real(physicalTest[M/2,:]), 'b')
+#    plt.plot(x_points, real(GLreal[M/2,:]), 'r+')
+#    plt.show()
 #
-#    imshow(real(GLreal),  origin='lower')
-#    colorbar()
-#    show()
-#    imshow(real(physicalTest),  origin='lower')
-#    colorbar()
-#    show()
+#    plt.imshow(real(GLreal),  origin='lower')
+#    plt.colorbar()
+#    plt.show()
+#    plt.imshow(real(physicalTest),  origin='lower')
+#    plt.colorbar()
+#    plt.show()
 #
 #    #print 'the maximum difference in the arrays ', amax(real(GLreal) -real(physicalTest))
 #
@@ -1110,17 +1116,17 @@ def load_hdf5_state(filename):
 #
 #    print 'analytic spectrum = transformed GL spectrum?', allclose(actualSpec,
 #                                                                   cSpec)
-#    #plot(real(cSpec[:,1]), 'b')
-#    #plot(real(actualSpec[:,1]), 'r+')
-#    #show()
+#    #plt.plot(real(cSpec[:,1]), 'b')
+#    #plt.plot(real(actualSpec[:,1]), 'r+')
+#    #plt.show()
 #
-#    #plot(real(cSpec[2,:]), 'b')
-#    #plot(real(actualSpec[2,:]), 'r+')
-#    #show()
+#    #plt.plot(real(cSpec[2,:]), 'b')
+#    #plt.plot(real(actualSpec[2,:]), 'r+')
+#    #plt.show()
 #
-#    #plot(y_points, GLreal)
-#    #plot(y_points, physical_test, '+')
-#    #show()
+#    #plt.plot(y_points, GLreal)
+#    #plt.plot(y_points, physical_test, '+')
+#    #plt.show()
 #
 #    SpectralTest2 = to_spectral_2(GLreal, CNSTS)
 #    print '2D transform is the same as 2 1D transforms?', allclose(cSpec, 
@@ -1142,18 +1148,18 @@ def load_hdf5_state(filename):
 #    print 'compare matrix product code with python fft products'
 #
 #    pyprod = to_spectral(physicalTest2*physicalTest2, CNSTS) # * (2*Nf+1)**2
-#    #imshow(real(physicalTest2*physicalTest2))
-#    #colorbar()
-#    #show()
-#    #imshow(real(to_physical(matprod, CNSTS)))
-#    #colorbar()
-#    #show()
+#    #plt.imshow(real(physicalTest2*physicalTest2))
+#    #plt.colorbar()
+#    #plt.show()
+#    #plt.imshow(real(to_physical(matprod, CNSTS)))
+#    #plt.colorbar()
+#    #plt.show()
 #    
 #    print allclose(pyprod, matprod)
 #    #print linalg.norm(pyprod - matprod)
-#    #imshow(real(pyprod -matprod))
-#    #colorbar()
-#    #show()
+#    #plt.imshow(real(pyprod -matprod))
+#    #plt.colorbar()
+#    #plt.show()
 #
 #    print """
 #    -----------------------
@@ -1228,7 +1234,7 @@ def load_hdf5_state(filename):
 #    Test mixed derivatives:
 #    -----------------------
 #    """
-#
+
 #def test_prods(CNSTS):
 #    """
 #    tests the transform methods for products of fields.
@@ -1268,42 +1274,42 @@ def load_hdf5_state(filename):
 #    print allclose(Aold,As), allclose(Bold,Bs)
 #    print linalg.norm(Aold)/linalg.norm(As)
 #
-#def test_arrays_equal(arr1, arr2, tol=1e-12):
-#    testBool = allclose(arr1, arr2)
-#    print testBool
-#    if not testBool:
-#        print 'difference', linalg.norm(arr1-arr2)
-#
-#        if linalg.norm(arr1-arr2)>tol:
-#            print 'relative difference', linalg.norm(arr1-arr2)
-#
-#            print "max difference", amax(arr1-arr2)
-#            print "max difference arg", argmax(arr1-arr2)
-#
-#            if shape(arr1) == (M, 2*N+1):
-#                print "mode 0", linalg.norm(arr1[:,0]-arr2[:,0])
-#                for n in range(1,N+1):
-#                    print "mode", n, linalg.norm(arr1[:, n]-arr2[:, n])
-#                    print "mode", -n,linalg.norm(arr1[:, n]-arr2[:, n])
-#
-#            if shape(arr1) == ((2*N+1)*M):
-#                print "mode 0", linalg.norm(arr1[N*M:(N+1)*M]-arr2[N*M:(N+1)*M])
-#                for n in range(1,N+1):
-#                    print "mode", n, linalg.norm(arr1[(N+n)*M:(N+n+1)*M]-arr2[(N+n)*M:(N+n+1)*M])
-#                    print "mode", -n,linalg.norm(arr1[(N-n)*M:(N+1-n)*M]-arr2[(N-n)*M:(N+1-n)*M])
-#
-#
-#            #imshow(real(ctestSpec3), origin='lower')
-#            #colorbar()
-#            #show()
-#            #imshow(real(pythonSpec3), origin='lower')
-#            #colorbar()
-#            #show()
-#
-#            print 'FAIL'
-#
-#            exit(1)
-#
+def test_arrays_equal(arr1, arr2, tol=1e-12):
+    testBool = allclose(arr1, arr2)
+    print testBool
+    if not testBool:
+        print 'difference', linalg.norm(arr1-arr2)
+
+        if linalg.norm(arr1-arr2)>tol:
+            print 'relative difference', linalg.norm(arr1-arr2)
+
+            print "max difference", amax(arr1-arr2)
+            print "max difference arg", argmax(arr1-arr2)
+
+            if shape(arr1) == (M, 2*N+1):
+                print "mode 0", linalg.norm(arr1[:,0]-arr2[:,0])
+                for n in range(1,N+1):
+                    print "mode", n, linalg.norm(arr1[:, n]-arr2[:, n])
+                    print "mode", -n,linalg.norm(arr1[:, n]-arr2[:, n])
+
+            if shape(arr1) == ((2*N+1)*M):
+                print "mode 0", linalg.norm(arr1[N*M:(N+1)*M]-arr2[N*M:(N+1)*M])
+                for n in range(1,N+1):
+                    print "mode", n, linalg.norm(arr1[(N+n)*M:(N+n+1)*M]-arr2[(N+n)*M:(N+n+1)*M])
+                    print "mode", -n,linalg.norm(arr1[(N-n)*M:(N+1-n)*M]-arr2[(N-n)*M:(N+1-n)*M])
+
+
+            #plt.imshow(real(ctestSpec3), origin='lower')
+            #plt.colorbar()
+            #plt.show()
+            #plt.imshow(real(pythonSpec3), origin='lower')
+            #plt.colorbar()
+            #plt.show()
+
+            print 'FAIL'
+
+            exit(1)
+
 #def test_c_version(CNSTS):
 #    """
 #    Test the C version of the code. Make sure constants are the same across
@@ -1538,7 +1544,7 @@ def load_hdf5_state(filename):
 #
 #    ==============================================================================
 #    """
-#
+
 #def test_c_version_1D(CNSTS):
 #    """
 #    Test the C version of the code. Make sure constants are the same across
@@ -1764,9 +1770,9 @@ if __name__ == "__main__":
 
     #test_prods(CNSTS)
 
-    #test_c_version(CNSTS)
+#    test_c_version(CNSTS)
 
-    #test_c_version_1D(CNSTS)
+#   test_c_version_1D(CNSTS)
 
 #    test = rand(100)+ 1.j*rand(100)
 #    a = backward_cheb_transform(test,CNSTS)

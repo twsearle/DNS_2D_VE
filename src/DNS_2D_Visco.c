@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Tue  2 Aug 12:56:33 2016
+// Last modified: Thu 22 Sep 11:23:37 2016
 
 /* Program Description:
  *
@@ -432,11 +432,11 @@ int main(int argc, char **argv)
 
 
     // Cant get the oscillatory laminar flow working in python, so I did it here
-    if (params.oscillatory_flow != 0)
-    {
-	calc_base_cij(cij, phase + 0.0, scr, params);
-	calc_base_sf(psi, phase + 0.0, scr, params);
-    }
+    //if (params.oscillatory_flow != 0)
+    //{
+    //    calc_base_cij(cij, phase + 0.0, scr, params);
+    //    calc_base_sf(psi, phase + 0.0, scr, params);
+    //}
 
     save_hdf5_snapshot_visco(&hdf5fp, &filetype_id, &datatype_id,
 	 psi, &cij[0], &cij[(N+1)*M], &cij[2*(N+1)*M], 0.0, params);
