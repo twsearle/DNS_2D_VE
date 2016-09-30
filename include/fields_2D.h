@@ -9,7 +9,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Thu 28 Jan 14:56:39 2016
+// Last modified: Wed 28 Sep 17:37:01 2016
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -92,6 +92,10 @@ struct flow_scratch {
     fftw_complex *opsList, *hopsList, *tmpop;
 
     fftw_plan *phys_plan, *spec_plan;
+
+    // A stupid fix. I began by only carrying a pointer to the plan but have
+    // decided to switch to carrying the full plan
+    fftw_plan act_phys_plan, act_spec_plan;
 };
 
 #endif // FIELDS_2D_C_H
