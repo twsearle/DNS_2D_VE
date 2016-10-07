@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Mon 26 Sep 17:43:39 2016
+#   Last modified: Fri  7 Oct 14:18:22 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -65,6 +65,7 @@ import subprocess
 import h5py
 
 import fields_2D as f2d
+import cpy_DNS_2D_Visco
 
 # SETTINGS---------------------------------------------------------------------
 
@@ -148,9 +149,13 @@ assert (args.flow_type < 3) and (args.flow_type >= 0), "flow type unspecified!"
 NOld = N
 MOld = M
 
+stepsPerFrame = numTimeSteps/numFrames
 CNSTS = {'NOld': NOld, 'MOld': MOld, 'N': N, 'M': M, 'Nf':Nf, 'Mf':Mf,'U0':0,
-          'Re': Re, 'Wi': Wi, 'beta': beta, 'De':De, 'kx': kx,'time': totTime,
-         'dt':dt, 'P': 1.0, 'initTime':initTime, 'dealiasing':dealiasing}
+         'Re': Re, 'Wi': Wi, 'beta': beta, 'De':De, 'kx': kx,'time': totTime,
+         'stepsPerFrame':stepsPerFrame, 'numTimeSteps':numTimeSteps,
+         'dt':dt, 'P': 1.0, 'initTime':initTime, 'oscillatory_flow':False, 'dealiasing':dealiasing}
+if args.flow_type == 2:
+    CNSTS['oscillatory_flow'] = True
  
 kwargs=CNSTS
 inFileName = "pf-N{NOld}-M{MOld}-kx{kx}-Re{Re}-b{beta}-Wi{Wi}.pickle".format(**kwargs)
@@ -1176,38 +1181,7 @@ stepsPerFrame = numTimeSteps/numFrames
 
 # Run program in C
 
-# pass the flow variables and the time iteration settings to the C code
-
-# pass the flow variables and the time iteration settings to the C code
-cargs = ["./DNS_2D_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",
-         "{0:d}".format(CNSTS["M"]),"-U", "{0:.6e}".format(CNSTS["U0"]), "-k",
-         "{0:.6e}".format(CNSTS["kx"]), "-R", "{0:.6e}".format(CNSTS["Re"]),
-         "-W", "{0:.6e}".format(CNSTS["Wi"]), "-b",
-         "{0:.6e}".format(CNSTS["beta"]), "-D",
-         "{0:.6e}".format(CNSTS["De"]),
-         "-P", "{0:.6e}".format(CNSTS["P"]),
-         "-t", "{0:.6e}".format(CNSTS["dt"]),
-         "-s", "{0:d}".format(stepsPerFrame), "-T",
-         "{0:d}".format(numTimeSteps), "-i", "{0:.6e}".format(CNSTS['initTime'])]
-
-if args.flow_type==2:
-    cargs.append("-O")
-
-if dealiasing:
-    cargs.append("-d")
-
-    print "./DNS_2D_Visco", "-N", "{0:d}".format(CNSTS["N"]), "-M",\
-             "{0:d}".format(CNSTS["M"]),"-U", "{0:.6e}".format(CNSTS["U0"]), "-k",\
-             "{0:.6e}".format(CNSTS["kx"]), "-R", "{0:.6e}".format(CNSTS["Re"]),\
-             "-W", "{0:.6e}".format(CNSTS["Wi"]), "-b",\
-             "{0:.6e}".format(CNSTS["beta"]), "-D", "{0:.6e}".format(CNSTS["De"]),\
-             "-P", "{0:.6e}".format(CNSTS["P"]), \
-             "-t", "{0:.6e}".format(CNSTS["dt"]),\
-             "-s", "{0:d}".format(stepsPerFrame), "-T",\
-             "{0:d}".format(numTimeSteps), "-i",
-    "{0:.6e}".format(CNSTS['initTime']), "-d"
-
-subprocess.call(cargs)
+cpy_DNS_2D_Visco.run_simulation(CNSTS)
 
 # Read in data from the C code
 print 'done'

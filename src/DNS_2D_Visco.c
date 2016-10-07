@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri 30 Sep 14:05:11 2016
+// Last modified: Fri  7 Oct 14:22:13 2016
 
 /* Program Description:
  *
@@ -24,33 +24,22 @@
 #include"fields_IO.h"
 #include"fields_2D.h"
 #include"time_steppers.h"
+#include"DNS_2D_Visco.h"
 
-void read_cline_args(int argc, char **argv, flow_params *params);
-
-void setup_scratch_space(flow_scratch *scr, flow_params params);
-
-void output_macro_state(complex_d *psi, complex_d *cij,  complex_d *trC, double phase, double time,
-	FILE *traceKE, FILE *tracePSI, FILE *trace1mode, FILE *traceStressfp, flow_scratch scr, flow_params params);
-
-void debug_output_halfstep_variables(complex_d *psiNL, complex_d *cijNL, flow_scratch scr, flow_params params);
-
-void debug_output_fullstep_variables(complex_d *psi, complex_d *cij, flow_scratch scr, flow_params params);
-
-//int DNS_2D_Visco(flow_params params);
+//int main(int argc, char **argv) 
 //{
+//    flow_params params;
 //
+//    printf("\n------\nReading Command line arguments\n------\n");
+//    read_cline_args(argc, argv, &params);
+//    
 //    return DNS_2D_Visco(params);
 //}
 
-// Main
 
-int main(int argc, char **argv) 
+int DNS_2D_Visco(flow_params params)
 {
-    flow_params params;
 
-    printf("\n------\nReading Command line arguments\n------\n");
-    read_cline_args(argc, argv, &params);
-    
     int stepsPerFrame = params.stepsPerFrame;
     int numTimeSteps = params.numTimeSteps;
     double dt = params.dt;
@@ -338,11 +327,11 @@ int main(int argc, char **argv)
 	    step_sf_SI_oscil_visco(psiOld, psi, cijOld, cij, psiNL,
 				forcing, forcingN, dt, timeStep, opsList, scr, params);
 
-
 	} else {
 
 	    step_conformation_Crank_Nicolson(cijOld, cijNL, psiOld, cijOld,
 		    0.5*dt, scr, params);
+
 
 #ifdef MYDEBUG
 	    if(timeStep==0)
@@ -498,6 +487,26 @@ void read_cline_args(int argc, char **argv, flow_params *pParams)
     int shortArg;
     extern char *optarg;
     extern int optind;
+
+    // initialise all the flow parameter variables.
+    pParams->N=0;
+    pParams->M=0;
+    pParams->dealiasing=0;
+    pParams->oscillatory_flow=0;
+    pParams->Nf=0;
+    pParams->Mf=0;
+    pParams->kx=0.0;
+    pParams->U0=0.0;
+    pParams->Re=0.0;
+    pParams->Wi=0.0;
+    pParams->beta=0.0;
+    pParams->De=0.0;
+    pParams->P=0.0;
+    pParams->dt=0.0;
+
+    int stepsPerFrame=0.0;
+    int numTimeSteps=0.0;
+    double initTime;
 
     printf("begin reading arguments using getopt\n");
     while ((shortArg = getopt (argc, argv, "OdN:M:U:k:R:W:b:D:P:t:s:T:i:")) != -1)
