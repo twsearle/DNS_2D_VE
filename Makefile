@@ -60,3 +60,4 @@ clean :
 	rm -f DNS_2D_linear_Visco DNS_2D_linear_Newt 
 	rm -f ./operators/*.h5
 	rm -f ./initial.h5
+	rm -f ./*.so

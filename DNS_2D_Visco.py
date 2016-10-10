@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Fri  7 Oct 14:18:22 2016
+#   Last modified: Mon 10 Oct 14:53:26 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -987,6 +987,13 @@ def format_fftordering_to_matordering(inArr, N, M):
 
     return outArr
 
+def format_matordering_to_fftordering(inArr, N, M):
+    
+    inArr = inArr.reshape(2*N+1, M).T
+    inArr = ifftshift(inArr, axes=1)
+
+    return inArr.T.flatten()
+
 # -----------------------------------------------------------------------------
 # MAIN
 # -----------------------------------------------------------------------------
@@ -1151,27 +1158,22 @@ for i in range(N+1):
 del i
 
 
-PSI = PSI.reshape(2*N+1, M).T
-PSI = ifftshift(PSI, axes=1)
-
-Cxx = Cxx.reshape(2*N+1, M).T
-Cxx = ifftshift(Cxx, axes=1)
-
-Cyy = Cyy.reshape(2*N+1, M).T
-Cyy = ifftshift(Cyy, axes=1)
-
-Cxy = Cxy.reshape(2*N+1, M).T
-Cxy = ifftshift(Cxy, axes=1)
+psiLam = format_matordering_to_fftordering(psiLam, N, M)
+forcing = forcing.T.flatten()
+PSI = format_matordering_to_fftordering(PSI, N, M)
+Cxx = format_matordering_to_fftordering(Cxx, N, M)
+Cyy = format_matordering_to_fftordering(Cyy, N, M)
+Cxy = format_matordering_to_fftordering(Cxy, N, M)
 
 f = h5py.File("initial_visco.h5", "w")
 psih = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
-psih[...] = PSI.T.flatten()
+psih[...] = PSI
 cxxh = f.create_dataset("cxx", ((2*N+1)*M,), dtype='complex')
-cxxh[...] = Cxx.T.flatten()
+cxxh[...] = Cxx
 cyyh = f.create_dataset("cyy", ((2*N+1)*M,), dtype='complex')
-cyyh[...] = Cyy.T.flatten()
+cyyh[...] = Cyy
 cxyh = f.create_dataset("cxy", ((2*N+1)*M,), dtype='complex')
-cxyh[...] = Cxy.T.flatten()
+cxyh[...] = Cxy
 f.close()
 
 
@@ -1181,7 +1183,16 @@ stepsPerFrame = numTimeSteps/numFrames
 
 # Run program in C
 
-cpy_DNS_2D_Visco.run_simulation(CNSTS)
+#print allclose(PsiOpInvList.flatten()[3*M*M:4*M*M], PsiOpInvList[3].flatten())
+#for i in range(M*M):
+#    print PsiOpInvList[1].flatten()[i]
+#exit(1)
+
+cpy_DNS_2D_Visco.run_simulation(PSI[:(N+1)*M], Cxx[:(N+1)*M], Cyy[:(N+1)*M],
+                                Cxy[:(N+1)*M], forcing[:(N+1)*M], psiLam[:(N+1)*M],
+                                PsiOpInvList.flatten()[:(N+1)*M*M],
+                                PsiOpInvListHalf.flatten()[:(N+1)*M*M], CNSTS)
+
 
 # Read in data from the C code
 print 'done'

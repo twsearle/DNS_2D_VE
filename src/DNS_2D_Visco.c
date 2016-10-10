@@ -7,15 +7,13 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Fri  7 Oct 14:22:13 2016
+// Last modified: Mon 10 Oct 15:02:56 2016
 
 /* Program Description:
  *
- * This program is written to work with a python setup program. The setup
- * program will write a series of files containing matrix operators of all
- * Fourier modes in the problem. These will then be imported and this program
- * will perform the timestepping using FFT's for the products and my own
- * functions to perform derivatives. 
+ * This is the main simulation for 2D viscoelastic flow. This function is
+ * compiled into a shared object library by cython, and the python driver
+ * program sets up the initial conditions and runs it.
  *
  */
 
@@ -37,7 +35,8 @@
 //}
 
 
-int DNS_2D_Visco(flow_params params)
+int DNS_2D_Visco(complex_d *psi, complex_d *cij, complex_d *forcing, complex_d
+	*psi_lam, complex_d *opsList, complex_d *hopsList, flow_params params)
 {
 
     int stepsPerFrame = params.stepsPerFrame;
@@ -120,12 +119,11 @@ int DNS_2D_Visco(flow_params params)
 
     // field arrays are declared as pointers and then I malloc.
 
-    complex_d *psi, *psiOld, *psiNL, *psi_lam;
-    complex_d *forcing, *forcingN;
-    complex_d *cijOld, *cij, *cijNL;
+    complex_d *psiOld, *psiNL;
+    complex_d *forcingN;
+    complex_d *cijOld, *cijNL;
     complex_d *trC;
     complex_d *tmpop;
-    complex_d *opsList, *hopsList;
 
     flow_scratch scr;
     setup_scratch_space(&scr, params); 
@@ -139,14 +137,10 @@ int DNS_2D_Visco(flow_params params)
 
     // dynamically malloc array of complex numbers.
     tmpop = (complex_d*) fftw_malloc(M*M * sizeof(complex_d));
-    opsList = (complex_d*) fftw_malloc((N+1)*M*M * sizeof(complex_d));
-    hopsList = (complex_d*) fftw_malloc((N+1)*M*M * sizeof(complex_d));
 
     psiOld = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
-    psi = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
     psiNL = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
     psi_lam = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
-    forcing = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
     forcingN = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
 
     // Viscoelastic variables
@@ -154,14 +148,11 @@ int DNS_2D_Visco(flow_params params)
     trC = (complex_d*) fftw_malloc(M*(N+1) * sizeof(complex_d));
 
     cijOld = (complex_d*) fftw_malloc(3*(N+1)*M * sizeof(complex_d));
-    cij = (complex_d*) fftw_malloc(3*(N+1)*M * sizeof(complex_d));
     cijNL = (complex_d*) fftw_malloc(3*(N+1)*M * sizeof(complex_d));
 
     printf("\n------\nLoading initial streamfunction and operators\n------\n");
 
     // load the initial field from scipy
-    load_hdf5_state_visco("initial_visco.h5", psi, &cij[0], &cij[(N+1)*M],
-				&cij[2*(N+1)*M], params);
         for (i=0; i<3*(N+1)*M; i++)
 	{
 	    cijOld[i] = cij[i];
@@ -171,42 +162,10 @@ int DNS_2D_Visco(flow_params params)
 	    psiOld[i] = psi[i];
 	}
 
-    load_hdf5_state("forcing.h5", forcing, params);
-
         for (i=0; i<(N+1)*M; i++)
         {
 	    forcingN[i] = forcing[i];
 	}
-
-    load_hdf5_state("laminar.h5", psi_lam, params);
-
-    // load the operators from scipy 
-    for (i=0; i<N+1; i++) 
-    {
-	char fn[30];
-	sprintf(fn, "./operators/op%d.h5", i);
-	#ifdef MYDEBUG
-	printf("opening: %s\n", fn);
-	#endif
-	load_hdf5_operator(fn, tmpop, params);
-
-	for (j=0; j<M*M; j++)
-	{
-	    opsList[i*M*M + j] = tmpop[j];
-	}
-
-	sprintf(fn, "./operators/hOp%d.h5", i);
-	#ifdef MYDEBUG
-	printf("opening: %s\n", fn);
-	#endif
-	load_hdf5_operator(fn, tmpop, params);
-
-	for (j=0; j<M*M; j++)
-	{
-	    hopsList[i*M*M + j] = tmpop[j];
-	}
-
-    }
 
     #ifdef MYDEBUG
     for (i=0; i<N+1; i++) 
@@ -340,18 +299,6 @@ int DNS_2D_Visco(flow_params params)
 	    }
 #endif  // MY_DEBUG
 
-	    //if (timestep%(2*params.Wi/dt)==0)
-	    //{
-	    //  for(int i=1; i<(N+1)*M; i++)
-	//	{
-	//	    //forcing[i]	*= 0.5;
-	//	    //forcingN[i] *= 0.5;
-	//	    forcing[i]	*= 0.0;
-	//	    forcingN[i] *= 0.0;
-	//	}
-	    //printf("\n STEPPING THE FORCING DOWN \n");
-	    //}
-
 	    step_sf_SI_Crank_Nicolson_visco(psiOld, psiNL, cijOld, cijNL, psiOld,
 		    forcing, forcingN, 0.5*dt, timeStep, hopsList, scr, params);
 
@@ -416,17 +363,11 @@ int DNS_2D_Visco(flow_params params)
     fftw_destroy_plan(scr.act_spec_plan);
 
     fftw_free(tmpop);
-    fftw_free(opsList);
-    fftw_free(hopsList);
-    fftw_free(forcing);
     fftw_free(forcingN);
 
     fftw_free(psiOld);
-    fftw_free(psi);
     fftw_free(psiNL);
-    fftw_free(psi_lam);
     fftw_free(cijOld);
-    fftw_free(cij);
     fftw_free(cijNL);
     fftw_free(trC);
 

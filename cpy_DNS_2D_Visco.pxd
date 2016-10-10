@@ -7,7 +7,7 @@
 #  *                                                                            *
 #  * -------------------------------------------------------------------------- */
 
-# Last modified: Thu  6 Oct 17:10:19 2016
+# Last modified: Mon 10 Oct 14:31:50 2016
 cdef extern from "include/DNS_2D_Visco.h":
 
     ctypedef struct flow_params:
@@ -31,4 +31,6 @@ cdef extern from "include/DNS_2D_Visco.h":
         double initTime;
 
 cdef extern from "include/DNS_2D_Visco.h":
-    int DNS_2D_Visco(flow_params params);
+    int DNS_2D_Visco(double complex *psi, double complex *cij, double complex
+                     *forcing, double complex *psi_lam, double complex *opsList,
+                     double complex *hopsList, flow_params params);
