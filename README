@@ -1,0 +1,34 @@
+
+##Requirements:
+
+#C packages: 
+
+hdf5 --- tested with version 1.10.0_0
+
+fftw --- tested with version 3.3.5 
+
+
+#Python packages:
+
+h5py --- tested with version 2.6.0
+
+cython --- tested with version 0.25.1_0
+
+numpy --- tested with version 1.11.2_1
+
+scipy --- tested with version 0.17.0_0
+
+
+##Build and Run Instructions:
+
+* First setup the cython files:
+
+`python setup.py build_ext --inplace`
+
+Then test using the test script
+
+`python stored_IC.py`
+
+If all goes well the script will run 3 simulations, before passing. If it doesn't pass, I am sorry about that :(
+
+Now you can edit the DNS_2D_Visco.py script to change the initial conditions, and the config.cfg file to change the parameters of the simulation.
