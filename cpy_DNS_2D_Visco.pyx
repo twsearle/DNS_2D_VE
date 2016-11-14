@@ -13,7 +13,7 @@ DTYPE_CMPLX = np.complex128
 ctypedef np.double_t DTYPE_DOUB_t
 ctypedef np.complex128_t DTYPE_CMPLX_t
 
-def run_simulation(np.ndarray[DTYPE_CMPLX_t, ndim=1, mode="c"] psi,
+def run_full_simulation(np.ndarray[DTYPE_CMPLX_t, ndim=1, mode="c"] psi,
                    np.ndarray[DTYPE_CMPLX_t, ndim=1, mode="c"] cxx,
                    np.ndarray[DTYPE_CMPLX_t, ndim=1, mode="c"] cyy,
                    np.ndarray[DTYPE_CMPLX_t, ndim=1, mode="c"] cxy,

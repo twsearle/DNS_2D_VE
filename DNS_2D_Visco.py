@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Mon 10 Oct 14:53:26 2016
+#   Last modified: Mon 10 Oct 16:43:23 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -1188,7 +1188,7 @@ stepsPerFrame = numTimeSteps/numFrames
 #    print PsiOpInvList[1].flatten()[i]
 #exit(1)
 
-cpy_DNS_2D_Visco.run_simulation(PSI[:(N+1)*M], Cxx[:(N+1)*M], Cyy[:(N+1)*M],
+cpy_DNS_2D_Visco.run_full_simulation(PSI[:(N+1)*M], Cxx[:(N+1)*M], Cyy[:(N+1)*M],
                                 Cxy[:(N+1)*M], forcing[:(N+1)*M], psiLam[:(N+1)*M],
                                 PsiOpInvList.flatten()[:(N+1)*M*M],
                                 PsiOpInvListHalf.flatten()[:(N+1)*M*M], CNSTS)
