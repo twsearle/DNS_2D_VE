@@ -1,7 +1,7 @@
 #-----------------------------------------------------------------------------
 #   2D spectral direct numerical simulator
 #
-#   Last modified: Mon 10 Oct 16:43:23 2016
+#   Last modified: Mon 14 Nov 15:05:17 2016
 #
 #-----------------------------------------------------------------------------
 
@@ -1132,31 +1132,6 @@ else:
 
 #### SAVE THE OPERATORS AND INITIAL STATE FOR THE C CODE
 
-for i in range(N+1):
-    # operator order in list is 0->N
-    n = i
-    opFn = "./operators/op{0}.h5".format(n)
-    f = h5py.File(opFn, "w")
-    dset = f.create_dataset("op", (M*M,), dtype='complex')
-    dset[...] = PsiOpInvList[i].flatten()
-    f.close()
-
-    #savetxt("./operators/op{0}.dat".format(abs(n)),PsiOpInvList[n])
-del i
-
-for i in range(N+1):
-    # operator order in list is 0->N
-    n = i
-    opFn = "./operators/hOp{0}.h5".format(n)
-    f = h5py.File(opFn, "w")
-    dset = f.create_dataset("op", (M*M,), dtype='complex')
-    dset[...] = PsiOpInvListHalf[i].flatten()
-
-    f.close()
-
-    #savetxt("./operators/op{0}.dat".format(abs(n)),PsiOpInvList[n])
-del i
-
 
 psiLam = format_matordering_to_fftordering(psiLam, N, M)
 forcing = forcing.T.flatten()
@@ -1164,18 +1139,6 @@ PSI = format_matordering_to_fftordering(PSI, N, M)
 Cxx = format_matordering_to_fftordering(Cxx, N, M)
 Cyy = format_matordering_to_fftordering(Cyy, N, M)
 Cxy = format_matordering_to_fftordering(Cxy, N, M)
-
-f = h5py.File("initial_visco.h5", "w")
-psih = f.create_dataset("psi", ((2*N+1)*M,), dtype='complex')
-psih[...] = PSI
-cxxh = f.create_dataset("cxx", ((2*N+1)*M,), dtype='complex')
-cxxh[...] = Cxx
-cyyh = f.create_dataset("cyy", ((2*N+1)*M,), dtype='complex')
-cyyh[...] = Cyy
-cxyh = f.create_dataset("cxy", ((2*N+1)*M,), dtype='complex')
-cxyh[...] = Cxy
-f.close()
-
 
 #### TIME ITERATE 
 

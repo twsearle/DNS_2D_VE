@@ -108,8 +108,9 @@ import subprocess
 import cPickle as pickle
 import h5py
 
-# IF YOU WANT TO UNCOMMENT THE TESTS, YOU WILL NEED THESE PACKAGES
-import TobySpectralMethods as tsm
+# IF YOU WANT TO UNCOMMENT THE TESTS, YOU WILL NEED THIS PACKAGE FROM MY
+# BITBUCKET ACCOUNT
+#import TobySpectralMethods as tsm
 
 ### FUNCTIONS ###
 
