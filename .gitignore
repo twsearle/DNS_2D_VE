@@ -1,0 +1,24 @@
+*.pyc
+*~
+*.swp
+*.DS_Store
+*.o
+*.so
+*.dat
+*.vtr
+*.pvd
+*.log
+*.png
+*.svg
+*.pdf
+*.mp4
+*.avi
+
+# HDF5 files to ignore
+output
+forcing.h5
+input.h5
+laminar.h5
+
+# Cython generated C files to ignore
+cpy_DNS_2D_Visco.c
