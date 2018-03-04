@@ -71,12 +71,17 @@ For any piece of C there are a couple of steps:
 #. Move the C functionality into the pyx wrapper
 #. Remove the underlying C code and interface directly with the layer underneath that
 
-At the moment I need to:
+So at this layer of the code, I need to move the rest of DNS_2D_Visco.c into cpy_DNS_2D_Visco.pyx:
+ * split off the functions called by DNS_2D_Visco so that the code has to run each function in turn, called by the pyx code.
+ * move code above the DNS_2D_Visco function call into the .pyx file.
+ * call the function from within the pyx file instead of the c file
+ * repeat above for next function call
 
-* Move the rest of DNS_2D_Visco.c into cpy_DNS_2D_Visco.pyx
-    - split off the functions called by DNS_2D_Visco so that the code has to run each function in turn, called by the pyx code.
-    - move code above the DNS_2D_Visco function call into the .pyx file.
-    - call the function from within the pyx file instead of the c file
-    - repeat above for next function call
+My current tasks:
+* Move the setup_scratch_space function into the cython code
+    - wrap the scratch space struct in cython
+        - wrap the fftw library plan and complex data types
+    - wrap the function cython, call it from cython and pass results to DNS_2D_Visco C function
+
 
 

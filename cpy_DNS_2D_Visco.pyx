@@ -7,11 +7,6 @@ cimport numpy as np
 # type info object.
 DTYPE_DOUB = np.double
 DTYPE_CMPLX = np.complex128
-# "ctypedef" assigns a corresponding compile-time type to DTYPE_t. For
-# every type in the numpy module there's a corresponding compile-time
-# type with a _t-suffix.
-ctypedef np.double_t DTYPE_DOUB_t
-ctypedef np.complex128_t DTYPE_CMPLX_t
 
 def run_full_simulation(np.ndarray[DTYPE_CMPLX_t, ndim=1, mode="c"] psi,
                    np.ndarray[DTYPE_CMPLX_t, ndim=1, mode="c"] cxx,
@@ -45,10 +40,26 @@ def run_full_simulation(np.ndarray[DTYPE_CMPLX_t, ndim=1, mode="c"] psi,
     params.numTimeSteps = flowConsts['numTimeSteps'];
     params.initTime = flowConsts['initTime'];
 
-    cdef np.ndarray[DTYPE_CMPLX_t, ndim=1, mode="c"] cij = np.zeros([3*(N+1)*M], dtype=DTYPE_CMPLX)
+    cdef np.ndarray[DTYPE_CMPLX_t, ndim=1, mode="c"] cij = np.zeros(
+        [3*(N+1)*M], dtype=DTYPE_CMPLX)
     cij[:(N+1)*M] = cxx[:]
     cij[(N+1)*M:2*(N+1)*M] = cyy[:]
     cij[2*(N+1)*M:3*(N+1)*M] = cxy[:]
+
+    paramsString=("PARAMETERS: "
+                  "\nN                   \t {N:d} "
+                  "\nM                   \t {M:d} "
+                  "\nU0                  \t {U0:f} "
+                  "\nkx                  \t {kx:f} "
+                  "\nRe                  \t {Re:e} "
+                  "\nWi                  \t {Wi:e} "
+                  "\nbeta                \t {beta:e} "
+                  "\nDe                  \t {De:e} "
+                  "\nTime Step           \t {dt:e} "
+                  "\nNumber of Time Steps\t {numTimeSteps} "
+                  "\nTime Steps per frame\t {stepsPerFrame:d} "
+                  "\nInitial Time        \t {initTime:f} \n")
+    print paramsString.format(**flowConsts)
 
     cpy_DNS_2D_Visco.DNS_2D_Visco(&psi[0], &cij[0], &forcing[0], &psi_lam[0],
                                   &opsList[0], &hopsList[0], params)

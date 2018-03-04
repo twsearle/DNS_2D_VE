@@ -7,7 +7,7 @@
  *                                                                            *
  * -------------------------------------------------------------------------- */
 
-// Last modified: Mon 10 Oct 15:02:56 2016
+// Last modified: Sun  4 Mar 10:17:04 2018
 
 /* Program Description:
  *
@@ -41,7 +41,6 @@ int DNS_2D_Visco(complex_d *psi, complex_d *cij, complex_d *forcing, complex_d
 
     int stepsPerFrame = params.stepsPerFrame;
     int numTimeSteps = params.numTimeSteps;
-    double dt = params.dt;
     double initTime=params.initTime;
     
     int timeStep = 0;
@@ -67,20 +66,6 @@ int DNS_2D_Visco(complex_d *psi, complex_d *cij, complex_d *forcing, complex_d
     double EE_tot = 0.0;
     double EE_xdepend = 0.0;
 
-    printf("PARAMETERS: ");
-    printf("\nN                   \t %d ", params.N);
-    printf("\nM                   \t %d ", params.M);
-    printf("\nU0                  \t %f ", params.U0);
-    printf("\nkx                  \t %e ", params.kx);
-    printf("\nRe                  \t %e ", params.Re);
-    printf("\nWi                  \t %e ", params.Wi);
-    printf("\nbeta                \t %e ", params.beta);
-    printf("\nDe                  \t %e ", params.De);
-    printf("\nTime Step           \t %e ", dt);
-    printf("\nNumber of Time Steps\t %d ", numTimeSteps);
-    printf("\nTime Steps per frame\t %d ", stepsPerFrame);
-    printf("\nInitial Time\t %f \n", initTime);
-    
 
     FILE *tracefp, *tracePSI, *trace1mode, *traceStressfp;
     char *trace_fn, *traj_fn;
@@ -116,8 +101,6 @@ int DNS_2D_Visco(complex_d *psi, complex_d *cij, complex_d *forcing, complex_d
 
     // create Hdf5 output file
     hdf5fp = H5Fcreate(traj_fn, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-
-    // field arrays are declared as pointers and then I malloc.
 
     complex_d *psiOld, *psiNL;
     complex_d *forcingN;
@@ -200,7 +183,7 @@ int DNS_2D_Visco(complex_d *psi, complex_d *cij, complex_d *forcing, complex_d
     #endif
 
     #ifndef MYDEBUG
-    //equilibriate_stress( psiOld, psi_lam, cijOld, cij, cijNL, dt, scr, params,
+    //equilibriate_stress( psiOld, psi_lam, cijOld, cij, cijNL, params.dt, scr, params,
     //	    		&hdf5fp, &filetype_id, &datatype_id);
     #endif
 
@@ -229,7 +212,7 @@ int DNS_2D_Visco(complex_d *psi, complex_d *cij, complex_d *forcing, complex_d
     for (timeStep=0; timeStep<numTimeSteps; timeStep++)
     {
 
-	time = (timeStep)*dt;
+	time = (timeStep)*params.dt;
         
         #ifdef MYDEBUG
         if (timeStep==0)
@@ -264,13 +247,13 @@ int DNS_2D_Visco(complex_d *psi, complex_d *cij, complex_d *forcing, complex_d
 	if (params.oscillatory_flow != 0)
 	{
 	    // OSCILLATING PRESSURE GRADIENT
-	    forcing[ind(0,0)] = params.P*cos((timeStep)*dt + phase);
-	    forcingN[ind(0,0)] = params.P*cos((timeStep+0.5)*dt + phase);
+	    forcing[ind(0,0)] = params.P*cos((timeStep)*params.dt + phase);
+	    forcingN[ind(0,0)] = params.P*cos((timeStep+0.5)*params.dt + phase);
 
 	    step_conformation_oscil(cijOld, cijNL, psiOld, cijOld,
-						0.5*dt, scr, params);
+						0.5*params.dt, scr, params);
 	    step_sf_SI_oscil_visco(psiOld, psiNL, cijOld, cijNL, psiOld,
-			    forcing, forcingN, 0.5*dt, timeStep, hopsList, scr, params);
+			    forcing, forcingN, 0.5*params.dt, timeStep, hopsList, scr, params);
 
 	    #ifdef MYDEBUG
 	    printf("\nFORCE END DEBUGGING RUN\n");
@@ -278,18 +261,18 @@ int DNS_2D_Visco(complex_d *psi, complex_d *cij, complex_d *forcing, complex_d
 	    #endif
 
 	    // calculate forcing on the half step
-	    forcing[ind(0,0)] = params.P*cos((timeStep)*dt + phase);
-	    forcingN[ind(0,0)] = params.P*cos((timeStep+1.0)*dt + phase);
+	    forcing[ind(0,0)] = params.P*cos((timeStep)*params.dt + phase);
+	    forcingN[ind(0,0)] = params.P*cos((timeStep+1.0)*params.dt + phase);
 
-	    step_conformation_oscil(cijOld, cij, psiNL, cijNL, dt, scr, params);
+	    step_conformation_oscil(cijOld, cij, psiNL, cijNL, params.dt, scr, params);
 
 	    step_sf_SI_oscil_visco(psiOld, psi, cijOld, cij, psiNL,
-				forcing, forcingN, dt, timeStep, opsList, scr, params);
+		forcing, forcingN, params.dt, timeStep, opsList, scr, params);
 
 	} else {
 
 	    step_conformation_Crank_Nicolson(cijOld, cijNL, psiOld, cijOld,
-		    0.5*dt, scr, params);
+		0.5*params.dt, scr, params);
 
 
 #ifdef MYDEBUG
@@ -300,14 +283,15 @@ int DNS_2D_Visco(complex_d *psi, complex_d *cij, complex_d *forcing, complex_d
 #endif  // MY_DEBUG
 
 	    step_sf_SI_Crank_Nicolson_visco(psiOld, psiNL, cijOld, cijNL, psiOld,
-		    forcing, forcingN, 0.5*dt, timeStep, hopsList, scr, params);
+		forcing, forcingN, 0.5*params.dt, timeStep, hopsList, scr, params);
 
 	    // use the old values plus the values on the half step for the NL terms
-	    step_conformation_Crank_Nicolson(cijOld, cij, psiNL, cijNL, dt, scr, params);
+	    step_conformation_Crank_Nicolson(
+		cijOld, cij, psiNL, cijNL, params.dt, scr, params);
 
 
 	    step_sf_SI_Crank_Nicolson_visco(psiOld, psi, cijOld, cij, psiNL,
-		    forcing, forcingN, dt, timeStep, opsList, scr, params);
+		forcing, forcingN, params.dt, timeStep, opsList, scr, params);
 
 
 #ifdef MYDEBUG
@@ -327,7 +311,7 @@ int DNS_2D_Visco(complex_d *psi, complex_d *cij, complex_d *forcing, complex_d
         {
 
 
-	    time = (timeStep + 1)*dt;
+	    time = (timeStep + 1)*params.dt;
 
 	    output_macro_state(psi, cij, trC, phase, time, tracefp,
 		    tracePSI, trace1mode, traceStressfp, scr, params);
